@@ -112,3 +112,31 @@
   text-anchor: middle;
   dominant-baseline: central;
 }
+
+/* Edge Endpoint Reconnection Handles */
+.bpmn-edge-handle {
+  display: none;
+  fill: var(--bg-primary);
+  stroke: var(--border-focus);
+  stroke-width: 2.5px;
+  cursor: grab;
+  pointer-events: all;
+  transition: transform 0.15s ease, fill 0.15s ease, stroke-width 0.15s ease;
+}
+
+.bpmn-edge.selected .bpmn-edge-handle {
+  display: block;
+}
+
+.bpmn-edge-handle:hover {
+  cursor: grab;
+  fill: var(--border-focus);
+  transform-origin: center;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
+}
+
+.bpmn-edge-handle:active {
+  cursor: grabbing;
+}

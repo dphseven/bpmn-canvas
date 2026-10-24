@@ -35,6 +35,7 @@ export class BpmnCanvas {
     this.draggedNode = null;
     this.dragStartPos = { x: 0, y: 0 };
     this.connectingFrom = null;
+    this.reconnectingEdge = null; // { edge, endpoint: 'source' | 'target' }
 
     // Event Bus Callbacks
     this.listeners = new Map();
@@ -141,13 +142,39 @@ export class BpmnCanvas {
         return;
       }
 
-      // 3. Drawing connection draft
+      // 3. Drawing connection draft (new edge)
       if (this.connectingFrom) {
         const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
         const p1 = this.connectingFrom.node.getPortPosition(this.connectingFrom.port);
         const path = Router.getBezierPath(p1, mouseCanvas, this.connectingFrom.port, 'left');
         this.connectionDraft.setAttribute('d', path);
         this.connectionDraft.style.display = 'block';
+        return;
+      }
+
+      // 4. Reconnecting existing edge endpoint
+      if (this.reconnectingEdge) {
+        const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
+        const edge = this.reconnectingEdge.edge;
+        const isReconnectingSource = this.reconnectingEdge.endpoint === 'source';
+
+        if (isReconnectingSource) {
+          const targetNode = this.getNode(edge.targetId);
+          if (targetNode) {
+            const p2 = targetNode.getPortPosition(edge.targetPort);
+            const path = Router.getBezierPath(mouseCanvas, p2, 'right', edge.targetPort);
+            this.connectionDraft.setAttribute('d', path);
+            this.connectionDraft.style.display = 'block';
+          }
+        } else {
+          const sourceNode = this.getNode(edge.sourceId);
+          if (sourceNode) {
+            const p1 = sourceNode.getPortPosition(edge.sourcePort);
+            const path = Router.getBezierPath(p1, mouseCanvas, edge.sourcePort, 'left');
+            this.connectionDraft.setAttribute('d', path);
+            this.connectionDraft.style.display = 'block';
+          }
+        }
       }
     });
 
@@ -183,6 +210,39 @@ export class BpmnCanvas {
         }
 
         this.connectingFrom = null;
+      }
+
+      if (this.reconnectingEdge) {
+        this.surface.classList.remove('connecting');
+        this.connectionDraft.style.display = 'none';
+
+        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+        if (elemUnder && elemUnder.classList.contains('bpmn-port')) {
+          const targetNodeId = elemUnder.dataset.nodeId;
+          const targetPort = elemUnder.dataset.port;
+          const edge = this.reconnectingEdge.edge;
+          const isReconnectingSource = this.reconnectingEdge.endpoint === 'source';
+
+          if (isReconnectingSource) {
+            // Cannot connect to the same node as target
+            if (targetNodeId && targetNodeId !== edge.targetId) {
+              this.updateEdgeEndpoints(edge.id, {
+                sourceId: targetNodeId,
+                sourcePort: targetPort
+              });
+            }
+          } else {
+            // Cannot connect to the same node as source
+            if (targetNodeId && targetNodeId !== edge.sourceId) {
+              this.updateEdgeEndpoints(edge.id, {
+                targetId: targetNodeId,
+                targetPort: targetPort
+              });
+            }
+          }
+        }
+
+        this.reconnectingEdge = null;
       }
     });
 
@@ -228,6 +288,18 @@ export class BpmnCanvas {
     this.surface.classList.add('connecting');
   }
 
+  startReconnecting(edge, endpoint, e) {
+    this.reconnectingEdge = { edge, endpoint };
+    this.surface.classList.add('connecting');
+  }
+
+  updateEdgeEndpoints(edgeId, updates) {
+    const edge = this.edges.get(edgeId);
+    if (!edge) return;
+    edge.updateConnection(updates);
+    this.emit('edge:reconnect', { edge, updates });
+  }
+
   addNode(config) {
     const node = new BpmnNode(config, this);
     this.nodes.set(node.id, node);
@@ -261,6 +333,10 @@ export class BpmnCanvas {
 
   getNode(id) {
     return this.nodes.get(id);
+  }
+
+  getNodes() {
+    return Array.from(this.nodes.values());
   }
 
   addEdge(config) {

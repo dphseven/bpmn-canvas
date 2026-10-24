@@ -20,6 +20,8 @@ export class BpmnEdge {
     this.pathElement = null;
     this.haloElement = null;
     this.labelGroup = null;
+    this.sourceHandle = null;
+    this.targetHandle = null;
 
     this.initSVG();
   }
@@ -47,9 +49,20 @@ export class BpmnEdge {
     this.labelGroup = document.createElementNS(svgNS, 'g');
     this.labelGroup.classList.add('bpmn-edge-label-group');
 
+    // Interactive endpoint handles for dragging/reconnecting source and target
+    this.sourceHandle = document.createElementNS(svgNS, 'circle');
+    this.sourceHandle.classList.add('bpmn-edge-handle', 'bpmn-edge-handle-source');
+    this.sourceHandle.setAttribute('r', '6');
+
+    this.targetHandle = document.createElementNS(svgNS, 'circle');
+    this.targetHandle.classList.add('bpmn-edge-handle', 'bpmn-edge-handle-target');
+    this.targetHandle.setAttribute('r', '6');
+
     this.groupElement.appendChild(this.haloElement);
     this.groupElement.appendChild(this.pathElement);
     this.groupElement.appendChild(this.labelGroup);
+    this.groupElement.appendChild(this.sourceHandle);
+    this.groupElement.appendChild(this.targetHandle);
 
     this.bindEvents();
     this.render();
@@ -63,6 +76,18 @@ export class BpmnEdge {
 
     this.haloElement.addEventListener('pointerdown', selectHandler);
     this.pathElement.addEventListener('pointerdown', selectHandler);
+
+    this.sourceHandle.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.canvas.selectEdge(this);
+      this.canvas.startReconnecting(this, 'source', e);
+    });
+
+    this.targetHandle.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.canvas.selectEdge(this);
+      this.canvas.startReconnecting(this, 'target', e);
+    });
   }
 
   render() {
@@ -84,6 +109,16 @@ export class BpmnEdge {
     this.pathElement.setAttribute('d', d);
     this.haloElement.setAttribute('d', d);
 
+    // Position source & target endpoint handles
+    if (this.sourceHandle) {
+      this.sourceHandle.setAttribute('cx', p1.x);
+      this.sourceHandle.setAttribute('cy', p1.y);
+    }
+    if (this.targetHandle) {
+      this.targetHandle.setAttribute('cx', p2.x);
+      this.targetHandle.setAttribute('cy', p2.y);
+    }
+
     // Update label position if label exists
     if (this.label) {
       const mid = Router.getMidpoint(p1, p2);
@@ -91,6 +126,15 @@ export class BpmnEdge {
     } else {
       this.labelGroup.innerHTML = '';
     }
+  }
+
+  updateConnection({ sourceId, sourcePort, targetId, targetPort }) {
+    if (sourceId !== undefined) this.sourceId = sourceId;
+    if (sourcePort !== undefined) this.sourcePort = sourcePort;
+    if (targetId !== undefined) this.targetId = targetId;
+    if (targetPort !== undefined) this.targetPort = targetPort;
+    this.render();
+    this.canvas.emit('edge:update', this);
   }
 
   renderLabel(pos) {

@@ -47,6 +47,18 @@ export class Inspector {
         }
       }
     });
+
+    this.canvas.on('edge:update', (edge) => {
+      if (this.currentTarget === edge) {
+        this.inspectEdge(edge);
+      }
+    });
+
+    this.canvas.on('edge:reconnect', ({ edge }) => {
+      if (this.currentTarget === edge) {
+        this.inspectEdge(edge);
+      }
+    });
   }
 
   inspectNode(node) {
@@ -120,6 +132,22 @@ export class Inspector {
     this.targetType = 'edge';
     this.container.classList.remove('hidden');
 
+    const allNodes = this.canvas.getNodes();
+    const ports = ['left', 'right', 'top', 'bottom'];
+
+    const renderNodeOptions = (selectedId, excludeId) => {
+      return allNodes
+        .filter(n => n.id !== excludeId)
+        .map(n => `<option value="${n.id}" ${n.id === selectedId ? 'selected' : ''}>${n.label || n.id} (${n.type})</option>`)
+        .join('');
+    };
+
+    const renderPortOptions = (selectedPort) => {
+      return ports
+        .map(p => `<option value="${p}" ${p === selectedPort ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`)
+        .join('');
+    };
+
     this.container.innerHTML = `
       <div class="inspector-title">
         <span>Flow Connector</span>
@@ -129,6 +157,30 @@ export class Inspector {
       <div class="inspector-field">
         <label class="inspector-label" for="prop-edge-label">Condition / Label</label>
         <input class="inspector-input" id="prop-edge-label" type="text" value="${edge.label || ''}" placeholder="e.g. Yes / Validated" />
+      </div>
+
+      <div class="inspector-field">
+        <label class="inspector-label" for="prop-edge-source">Source Node</label>
+        <div style="display: flex; gap: 6px;">
+          <select class="inspector-select" id="prop-edge-source" style="flex: 2;">
+            ${renderNodeOptions(edge.sourceId, edge.targetId)}
+          </select>
+          <select class="inspector-select" id="prop-edge-source-port" style="flex: 1;" title="Source Port">
+            ${renderPortOptions(edge.sourcePort)}
+          </select>
+        </div>
+      </div>
+
+      <div class="inspector-field">
+        <label class="inspector-label" for="prop-edge-target">Target Node</label>
+        <div style="display: flex; gap: 6px;">
+          <select class="inspector-select" id="prop-edge-target" style="flex: 2;">
+            ${renderNodeOptions(edge.targetId, edge.sourceId)}
+          </select>
+          <select class="inspector-select" id="prop-edge-target-port" style="flex: 1;" title="Target Port">
+            ${renderPortOptions(edge.targetPort)}
+          </select>
+        </div>
       </div>
 
       <div class="inspector-field">
@@ -154,6 +206,28 @@ export class Inspector {
     const labelInput = this.container.querySelector('#prop-edge-label');
     labelInput.addEventListener('input', (e) => {
       edge.setLabel(e.target.value);
+    });
+
+    const sourceSelect = this.container.querySelector('#prop-edge-source');
+    sourceSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { sourceId: e.target.value });
+      this.inspectEdge(edge);
+    });
+
+    const sourcePortSelect = this.container.querySelector('#prop-edge-source-port');
+    sourcePortSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { sourcePort: e.target.value });
+    });
+
+    const targetSelect = this.container.querySelector('#prop-edge-target');
+    targetSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { targetId: e.target.value });
+      this.inspectEdge(edge);
+    });
+
+    const targetPortSelect = this.container.querySelector('#prop-edge-target-port');
+    targetPortSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { targetPort: e.target.value });
     });
 
     const routingSelect = this.container.querySelector('#prop-edge-routing');
