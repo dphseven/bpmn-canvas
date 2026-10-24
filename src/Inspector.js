@@ -106,7 +106,8 @@ export class Inspector {
             <option value="start-timer-event" ${node.type === 'start-timer-event' ? 'selected' : ''}>Timer Start Event (⏱)</option>
             <option value="start-message-event" ${node.type === 'start-message-event' ? 'selected' : ''}>Message Start Event (✉️)</option>
             <option value="start-signal-event" ${node.type === 'start-signal-event' ? 'selected' : ''}>Signal Start Event (▲)</option>
-            <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
+            <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Intermediate Event (None)</option>
+            <option value="intermediate-timer-event" ${node.type === 'intermediate-timer-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
             <option value="intermediate-message-event" ${node.type === 'intermediate-message-event' ? 'selected' : ''}>Message Intermediate Event (✉️)</option>
             <option value="intermediate-signal-event" ${node.type === 'intermediate-signal-event' ? 'selected' : ''}>Signal Intermediate Event (▲)</option>
             <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event (None)</option>

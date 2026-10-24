@@ -73,7 +73,11 @@ export class Palette {
             </div>
             <span class="palette-item-label">Message End</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-event" data-event-def="timer">
+          <div class="palette-item" draggable="true" data-type="intermediate-event">
+            <div class="palette-item-icon" style="border: 2px double #f59e0b; outline: 1.5px solid #f59e0b; outline-offset: -4px; border-radius: 50%; width: 22px; height: 22px;"></div>
+            <span class="palette-item-label">Intermediate (None)</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="intermediate-timer-event">
             <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="10" cy="10" r="8" />

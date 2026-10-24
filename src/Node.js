@@ -29,7 +29,8 @@ export class BpmnNode {
       case 'end-error-event': return 'Error Occurred';
       case 'end-terminate-event': return 'Process Terminated';
       case 'end-message-event': return 'Message Sent';
-      case 'intermediate-event': return 'Wait';
+      case 'intermediate-event': return 'Milestone';
+      case 'intermediate-timer-event': return 'Wait';
       case 'intermediate-message-event': return 'Message Received';
       case 'intermediate-signal-event': return 'Signal Received';
       case 'gateway-exclusive': return '';
@@ -136,7 +137,7 @@ export class BpmnNode {
               </svg>
             </div>
           `;
-        } else {
+        } else if (this.type === 'intermediate-timer-event') {
           innerIcon = `
             <div class="bpmn-event-inner-icon bpmn-event-timer-icon">
               <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -145,6 +146,9 @@ export class BpmnNode {
               </svg>
             </div>
           `;
+        } else {
+          // Generic intermediate event (None): double rings with no inner glyph
+          innerIcon = '';
         }
       } else if (isEnd) {
         if (this.type === 'end-error-event') {

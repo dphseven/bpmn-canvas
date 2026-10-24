@@ -147,6 +147,7 @@
 .bpmn-node.bpmn-node-end-terminate-event,
 .bpmn-node.bpmn-node-end-message-event,
 .bpmn-node.bpmn-node-intermediate-event,
+.bpmn-node.bpmn-node-intermediate-timer-event,
 .bpmn-node.bpmn-node-intermediate-message-event,
 .bpmn-node.bpmn-node-intermediate-signal-event {
   width: 52px;
@@ -171,6 +172,7 @@
 .bpmn-node.bpmn-node-end-terminate-event:hover,
 .bpmn-node.bpmn-node-end-message-event:hover,
 .bpmn-node.bpmn-node-intermediate-event:hover,
+.bpmn-node.bpmn-node-intermediate-timer-event:hover,
 .bpmn-node.bpmn-node-intermediate-message-event:hover,
 .bpmn-node.bpmn-node-intermediate-signal-event:hover {
   filter: brightness(1.15);
@@ -206,6 +208,7 @@
 
 /* Intermediate Events (Double-ring concentric styling in warm gold/amber) */
 .bpmn-node-intermediate-event,
+.bpmn-node-intermediate-timer-event,
 .bpmn-node-intermediate-message-event,
 .bpmn-node-intermediate-signal-event {
   border: 2px double var(--accent-amber);
@@ -215,6 +218,7 @@
 }
 
 .bpmn-node-intermediate-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-timer-event .bpmn-event-inner-icon,
 .bpmn-node-intermediate-message-event .bpmn-event-inner-icon,
 .bpmn-node-intermediate-signal-event .bpmn-event-inner-icon,
 .bpmn-event-timer-icon,
