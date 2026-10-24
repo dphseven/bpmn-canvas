@@ -143,6 +143,9 @@
 .bpmn-node.bpmn-node-start-message-event,
 .bpmn-node.bpmn-node-start-signal-event,
 .bpmn-node.bpmn-node-end-event,
+.bpmn-node.bpmn-node-end-error-event,
+.bpmn-node.bpmn-node-end-terminate-event,
+.bpmn-node.bpmn-node-end-message-event,
 .bpmn-node.bpmn-node-intermediate-event,
 .bpmn-node.bpmn-node-intermediate-message-event,
 .bpmn-node.bpmn-node-intermediate-signal-event {
@@ -164,6 +167,9 @@
 .bpmn-node.bpmn-node-start-message-event:hover,
 .bpmn-node.bpmn-node-start-signal-event:hover,
 .bpmn-node.bpmn-node-end-event:hover,
+.bpmn-node.bpmn-node-end-error-event:hover,
+.bpmn-node.bpmn-node-end-terminate-event:hover,
+.bpmn-node.bpmn-node-end-message-event:hover,
 .bpmn-node.bpmn-node-intermediate-event:hover,
 .bpmn-node.bpmn-node-intermediate-message-event:hover,
 .bpmn-node.bpmn-node-intermediate-signal-event:hover {
@@ -184,9 +190,18 @@
   color: var(--accent-emerald);
 }
 
-.bpmn-node.bpmn-node-end-event {
+.bpmn-node.bpmn-node-end-event,
+.bpmn-node.bpmn-node-end-error-event,
+.bpmn-node.bpmn-node-end-terminate-event,
+.bpmn-node.bpmn-node-end-message-event {
   border: 4.5px solid var(--accent-rose) !important;
   box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
+}
+
+.bpmn-end-error-icon,
+.bpmn-end-terminate-icon,
+.bpmn-end-message-icon {
+  color: var(--accent-rose);
 }
 
 /* Intermediate Events (Double-ring concentric styling in warm gold/amber) */

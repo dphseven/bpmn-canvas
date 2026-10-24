@@ -26,6 +26,9 @@ export class BpmnNode {
       case 'start-message-event': return 'Message Arrived';
       case 'start-signal-event': return 'Signal Broadcast';
       case 'end-event': return 'End';
+      case 'end-error-event': return 'Error Occurred';
+      case 'end-terminate-event': return 'Process Terminated';
+      case 'end-message-event': return 'Message Sent';
       case 'intermediate-event': return 'Wait';
       case 'intermediate-message-event': return 'Message Received';
       case 'intermediate-signal-event': return 'Signal Received';
@@ -139,6 +142,33 @@ export class BpmnNode {
               <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="10" cy="10" r="8" />
                 <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
+          `;
+        }
+      } else if (isEnd) {
+        if (this.type === 'end-error-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-end-error-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'end-terminate-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-end-terminate-icon">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                <circle cx="10" cy="10" r="7" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'end-message-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-end-message-icon">
+              <svg width="18" height="13" viewBox="0 0 20 15" fill="currentColor">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <polygon points="2,2 10,8.5 18,2" />
               </svg>
             </div>
           `;

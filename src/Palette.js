@@ -48,6 +48,31 @@ export class Palette {
             <div class="palette-item-icon" style="border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">End Event</span>
           </div>
+          <div class="palette-item" draggable="true" data-type="end-error-event">
+            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Error End</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="end-terminate-event">
+            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor">
+                <circle cx="10" cy="10" r="7" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Terminate End</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="end-message-event">
+            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="12" height="9" viewBox="0 0 20 15" fill="currentColor">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
+                <polygon points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Message End</span>
+          </div>
           <div class="palette-item" draggable="true" data-type="intermediate-event" data-event-def="timer">
             <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

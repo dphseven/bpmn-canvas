@@ -109,7 +109,10 @@ export class Inspector {
             <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
             <option value="intermediate-message-event" ${node.type === 'intermediate-message-event' ? 'selected' : ''}>Message Intermediate Event (✉️)</option>
             <option value="intermediate-signal-event" ${node.type === 'intermediate-signal-event' ? 'selected' : ''}>Signal Intermediate Event (▲)</option>
-            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event</option>
+            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event (None)</option>
+            <option value="end-error-event" ${node.type === 'end-error-event' ? 'selected' : ''}>Error End Event (⚡)</option>
+            <option value="end-terminate-event" ${node.type === 'end-terminate-event' ? 'selected' : ''}>Terminate End Event (⬤)</option>
+            <option value="end-message-event" ${node.type === 'end-message-event' ? 'selected' : ''}>Message End Event (✉️)</option>
           </optgroup>
           <optgroup label="Gateways">
             <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
