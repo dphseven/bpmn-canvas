@@ -645,7 +645,9 @@ export class BpmnCanvas {
       x: Math.round(dockedX),
       y: Math.round(dockedY),
       dockEdge,
-      hostNodeId: hostNode.id
+      hostNodeId: hostNode.id,
+      relativeOffsetX: Math.round(dockedX - left),
+      relativeOffsetY: Math.round(dockedY - top)
     };
   }
 
@@ -689,11 +691,49 @@ export class BpmnCanvas {
     const docking = this.calculateBoundaryDocking(hostNode, centerX, centerY, boundaryNode.width, boundaryNode.height);
     boundaryNode.data = Object.assign(boundaryNode.data || {}, {
       hostNodeId: hostNode.id,
-      dockEdge: docking.dockEdge
+      dockEdge: docking.dockEdge,
+      relativeOffsetX: docking.relativeOffsetX,
+      relativeOffsetY: docking.relativeOffsetY
     });
     boundaryNode.setPosition(docking.x, docking.y);
     boundaryNode.createPorts();
     this.emit('node:update', boundaryNode);
+  }
+
+  updateAttachedBoundaryPositions(hostNode, oldWidth, oldHeight) {
+    if (!hostNode) return;
+    this.nodes.forEach(node => {
+      if (node.type.startsWith('boundary-') && node.data?.hostNodeId === hostNode.id) {
+        const dockEdge = node.data.dockEdge || 'bottom';
+        let newX = node.x;
+        let newY = node.y;
+
+        if (dockEdge === 'bottom') {
+          // Bottom border shifted: stay centered on the new bottom edge
+          newY = hostNode.y + hostNode.height - node.height / 2;
+        } else if (dockEdge === 'right') {
+          // Right border shifted: stay centered on the new right edge
+          newX = hostNode.x + hostNode.width - node.width / 2;
+        } else if (dockEdge === 'top') {
+          newY = hostNode.y - node.height / 2;
+        } else if (dockEdge === 'left') {
+          newX = hostNode.x - node.width / 2;
+        }
+
+        // Clamp along edge bounds
+        const halfW = node.width / 2;
+        const halfH = node.height / 2;
+        if (dockEdge === 'bottom' || dockEdge === 'top') {
+          newX = Math.max(hostNode.x + halfW, Math.min(hostNode.x + hostNode.width - halfW, newX + halfW)) - halfW;
+        } else {
+          newY = Math.max(hostNode.y + halfH, Math.min(hostNode.y + hostNode.height - halfH, newY + halfH)) - halfH;
+        }
+
+        node.setPosition(Math.round(newX), Math.round(newY));
+        node.data.relativeOffsetX = Math.round(node.x - hostNode.x);
+        node.data.relativeOffsetY = Math.round(node.y - hostNode.y);
+      }
+    });
   }
 
   getNode(id) {

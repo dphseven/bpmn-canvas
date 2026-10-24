@@ -95,6 +95,9 @@ export class BpmnNode {
           const newWidth = borderBoxSize ? borderBoxSize.inlineSize : entry.contentRect.width;
 
           let changed = false;
+          const oldHeight = this.height;
+          const oldWidth = this.width;
+
           if (newHeight && Math.abs(newHeight - this.height) > 0.5) {
             this.height = Math.round(newHeight);
             changed = true;
@@ -106,6 +109,9 @@ export class BpmnNode {
 
           if (changed && this.canvas) {
             this.canvas.updateConnectedEdges(this.id);
+            if (this.canvas.updateAttachedBoundaryPositions) {
+              this.canvas.updateAttachedBoundaryPositions(this, oldWidth, oldHeight);
+            }
           }
         }
       });
@@ -493,11 +499,15 @@ export class BpmnNode {
     if (labelEl) {
       labelEl.innerText = label;
     }
-    // Update connected edges in case label change immediately expanded height
+    // Update connected edges and attached boundary events in case label change immediately expanded height
     if (this.domElement && this.canvas) {
       const currentHeight = this.domElement.offsetHeight;
       if (currentHeight && currentHeight !== this.height) {
+        const oldHeight = this.height;
         this.height = currentHeight;
+        if (this.canvas.updateAttachedBoundaryPositions) {
+          this.canvas.updateAttachedBoundaryPositions(this, this.width, oldHeight);
+        }
       }
       this.canvas.updateConnectedEdges(this.id);
     }
