@@ -35,7 +35,11 @@
           <span>📥</span> Export JSON
         </button>
         <button class="btn" id="btn-import-json">
-          <span>📤</span> Load Demo
+          <span>📤</span> Import JSON
+        </button>
+        <input type="file" id="file-import-input" accept=".json,application/json" style="display: none;" />
+        <button class="btn" id="btn-demo-flow">
+          <span>✨</span> Demo Flow
         </button>
         <button class="btn btn-primary" id="btn-fit-view">
           <span>🎯</span> Fit View
@@ -49,7 +53,14 @@
       <aside id="palette-container"></aside>
 
       <!-- Infinite Interactive Canvas -->
-      <div id="canvas-container"></div>
+      <div id="canvas-container">
+        <!-- Drag & Drop JSON Import Overlay -->
+        <div class="canvas-drop-overlay" id="canvas-drop-overlay">
+          <div class="drop-icon">📥</div>
+          <div class="drop-title">Drop BPMN JSON Model Here</div>
+          <div class="drop-subtitle">Release file to import and load workflow onto canvas</div>
+        </div>
+      </div>
 
       <!-- Live Properties Inspector -->
       <aside id="inspector-container"></aside>
@@ -381,6 +392,48 @@
       themeLabel.textContent = isLight ? 'Light' : 'Dark';
     });
 
+    // Toast Notification helper
+    function showToast(message, type = 'success') {
+      let toast = document.querySelector('.bpmn-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'bpmn-toast';
+        document.body.appendChild(toast);
+      }
+      toast.className = `bpmn-toast toast-${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : '⚠️'}</span><span>${message}</span>`;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3500);
+    }
+
+    // Common JSON Loader with validation
+    function importWorkflowJson(jsonText) {
+      try {
+        const parsed = JSON.parse(jsonText);
+        if (!parsed || typeof parsed !== 'object') {
+          throw new Error('Invalid JSON format: root must be an object.');
+        }
+        if (!Array.isArray(parsed.nodes)) {
+          throw new Error('Invalid BPMN model: "nodes" array is required.');
+        }
+
+        canvas.loadData(parsed);
+        showToast(`Workflow imported successfully (${parsed.nodes.length} nodes, ${(parsed.edges || []).length} sequence flows)`);
+        
+        // Auto start simulation on successful import
+        setTimeout(() => {
+          canvas.startSimulation();
+          simLabel.textContent = 'Pause Flow';
+          simBtn.style.borderColor = 'var(--border-focus)';
+        }, 150);
+      } catch (err) {
+        console.error('Error importing JSON workflow:', err);
+        showToast(`Failed to load JSON: ${err.message}`, 'error');
+      }
+    }
+
     // 8. Export / Import Data
     document.getElementById('btn-export-json').addEventListener('click', () => {
       const data = canvas.exportData();
@@ -391,13 +444,90 @@
       a.download = 'bpmn-workflow.json';
       a.click();
       URL.revokeObjectURL(url);
+      showToast('Workflow JSON downloaded');
     });
 
-    document.getElementById('btn-import-json').addEventListener('click', () => {
+    const fileImportInput = document.getElementById('file-import-input');
+    const importBtn = document.getElementById('btn-import-json');
+
+    // Trigger file chooser dialog
+    importBtn.addEventListener('click', () => {
+      fileImportInput.value = '';
+      fileImportInput.click();
+    });
+
+    // Handle file selection
+    fileImportInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        importWorkflowJson(evt.target.result);
+      };
+      reader.onerror = () => {
+        showToast('Error reading the selected file', 'error');
+      };
+      reader.readAsText(file);
+    });
+
+    // Handle Drag and Drop JSON onto Canvas
+    const dropOverlay = document.getElementById('canvas-drop-overlay');
+    let dragCounter = 0;
+
+    canvasContainer.addEventListener('dragenter', (e) => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+        e.preventDefault();
+        dragCounter++;
+        dropOverlay.classList.add('active');
+      }
+    });
+
+    canvasContainer.addEventListener('dragover', (e) => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    });
+
+    canvasContainer.addEventListener('dragleave', (e) => {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) {
+        dropOverlay.classList.remove('active');
+      }
+    });
+
+    canvasContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.remove('active');
+
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+
+      const file = files[0];
+      if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+        showToast('Please drop a valid .json file', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        importWorkflowJson(evt.target.result);
+      };
+      reader.onerror = () => {
+        showToast('Error reading dropped file', 'error');
+      };
+      reader.readAsText(file);
+    });
+
+    // Demo Flow button
+    document.getElementById('btn-demo-flow').addEventListener('click', () => {
       loadSampleWorkflow();
       canvas.startSimulation();
       simLabel.textContent = 'Pause Flow';
       simBtn.style.borderColor = 'var(--border-focus)';
+      showToast('Loaded demo workflow');
     });
 
     // Start simulation automatically on initial load

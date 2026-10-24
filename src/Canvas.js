@@ -1448,6 +1448,29 @@ export class BpmnCanvas {
   }
 
   loadData(data) {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid JSON format: data must be a valid JSON object.');
+    }
+    if (!Array.isArray(data.nodes)) {
+      throw new Error('Invalid BPMN model: "nodes" array is required.');
+    }
+
+    // Stop and clear any active simulation before reloading
+    if (this.simulationActive) {
+      if (this.simAnimationId) {
+        cancelAnimationFrame(this.simAnimationId);
+        this.simAnimationId = null;
+      }
+      if (this.simTimeoutId) {
+        clearTimeout(this.simTimeoutId);
+        this.simTimeoutId = null;
+      }
+      this.simulationActive = false;
+      if (this.simTokenGroup) {
+        this.simTokenGroup.style.display = 'none';
+      }
+    }
+
     // Clear current canvas
     this.edges.forEach(e => e.destroy());
     this.nodes.forEach(n => n.destroy());
@@ -1455,16 +1478,33 @@ export class BpmnCanvas {
     this.nodes.clear();
     this.clearSelection();
 
-    if (data.nodes) {
-      data.nodes.forEach(n => this.addNode(n));
-    }
-    if (data.edges) {
+    // Add nodes
+    data.nodes.forEach(n => this.addNode(n));
+
+    // Add edges
+    if (Array.isArray(data.edges)) {
       data.edges.forEach(e => this.addEdge(e));
     }
+
+    // Restore subprocess children visibility and state
+    this.nodes.forEach(n => {
+      if (n.type === 'subprocess') {
+        const isExpanded = !!n.data?.expanded;
+        this.updateSubprocessChildrenVisibility(n.id, isExpanded);
+      }
+    });
+
+    // Refresh boundary event ports and positions
+    this.nodes.forEach(n => {
+      if (n.type.startsWith('boundary-')) {
+        n.createPorts();
+      }
+    });
 
     if (data.autoFit !== false) {
       this.fitView();
     }
+    this.emit('data:load', data);
   }
 
   /* -------------------------------------------------------------
