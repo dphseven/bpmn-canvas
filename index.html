@@ -87,136 +87,241 @@
       const sample = {
         nodes: [
           {
-            id: 'start_node',
-            type: 'start-signal-event',
-            label: 'Order Placed',
+            id: "start_node",
+            type: "start-signal-event",
+            label: "Order Placed",
             x: 94,
             y: 214,
             width: 52,
             height: 52,
-            data: {}
+            data: {
+              interrupting: true
+            }
           },
           {
-            id: 'task_review',
-            type: 'user-task',
-            label: 'Review Order Details',
-            x: 237,
-            y: 193,
-            width: 150,
-            height: 94,
-            data: {}
+            id: "task_review",
+            type: "subprocess",
+            label: "Review Order Details",
+            x: 228,
+            y: 108,
+            width: 624,
+            height: 264,
+            data: {
+              interrupting: true,
+              expanded: true,
+              expansionYShift: -82.5,
+              pushedOffsets: {
+                gateway_check: { dx: 454, dy: 0 },
+                task_process: { dx: 454, dy: 0 },
+                task_reject: { dx: 454, dy: 0 },
+                end_success: { dx: 454, dy: 0 },
+                end_fail: { dx: 454, dy: 0 }
+              }
+            }
           },
           {
-            id: 'gateway_check',
-            type: 'gateway-exclusive',
-            label: 'Approved?',
-            x: 480,
+            id: "gateway_check",
+            type: "gateway-exclusive",
+            label: "Approved?",
+            x: 934,
             y: 212,
             width: 56,
             height: 56,
-            data: {}
+            data: {
+              interrupting: true
+            }
           },
           {
-            id: 'task_process',
-            type: 'service-task',
-            label: 'Charge Credit Card',
-            x: 645,
+            id: "task_process",
+            type: "service-task",
+            label: "Charge Credit Card",
+            x: 1099,
             y: 97,
             width: 150,
             height: 94,
-            data: {}
+            data: {
+              interrupting: true
+            }
           },
           {
-            id: 'task_reject',
-            type: 'manual-task',
-            label: 'Send Rejection Notice',
-            x: 645,
+            id: "task_reject",
+            type: "manual-task",
+            label: "Send Rejection Notice",
+            x: 1099,
             y: 290.5,
             width: 150,
-            height: 91,
-            data: {}
+            height: 94,
+            data: {
+              interrupting: true
+            }
           },
           {
-            id: 'end_success',
-            type: 'end-event',
-            label: 'Order Fulfilled',
-            x: 886,
+            id: "end_success",
+            type: "end-event",
+            label: "Order Fulfilled",
+            x: 1340,
             y: 118,
             width: 52,
             height: 52,
-            data: {}
+            data: {
+              interrupting: true
+            }
           },
           {
-            id: 'end_fail',
-            type: 'end-error-event',
-            label: 'Order Cancelled',
-            x: 886,
+            id: "end_fail",
+            type: "end-error-event",
+            label: "Order Cancelled",
+            x: 1340,
             y: 310,
             width: 52,
             height: 52,
-            data: {}
+            data: {
+              interrupting: true
+            }
+          },
+          {
+            id: "node_1792872587195_m4eby",
+            type: "start-event",
+            label: "",
+            x: 262,
+            y: 214,
+            width: 52,
+            height: 52,
+            data: {
+              interrupting: true,
+              parentId: "task_review"
+            }
+          },
+          {
+            id: "node_1792872590256_blfne",
+            type: "end-event",
+            label: "",
+            x: 742,
+            y: 214,
+            width: 52,
+            height: 52,
+            data: {
+              interrupting: true,
+              parentId: "task_review"
+            }
+          },
+          {
+            id: "node_1792872602067_s2c4u",
+            type: "service-task",
+            label: "Verify items in inventory",
+            x: 357,
+            y: 193,
+            width: 150,
+            height: 94,
+            data: {
+              interrupting: true,
+              parentId: "task_review"
+            }
+          },
+          {
+            id: "node_1792872623148_k3eq9",
+            type: "service-task",
+            label: "Validate address",
+            x: 549,
+            y: 200,
+            width: 150,
+            height: 80,
+            data: {
+              interrupting: true,
+              parentId: "task_review"
+            }
           }
         ],
         edges: [
           {
-            id: 'e1',
-            sourceId: 'start_node',
-            targetId: 'task_review',
-            sourcePort: 'right',
-            targetPort: 'left',
-            label: '',
-            routing: 'bezier',
+            id: "e1",
+            sourceId: "start_node",
+            targetId: "task_review",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
             animated: true
           },
           {
-            id: 'e2',
-            sourceId: 'task_review',
-            targetId: 'gateway_check',
-            sourcePort: 'right',
-            targetPort: 'left',
-            label: '',
-            routing: 'bezier',
+            id: "e2",
+            sourceId: "task_review",
+            targetId: "gateway_check",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
             animated: true
           },
           {
-            id: 'e3',
-            sourceId: 'gateway_check',
-            targetId: 'task_process',
-            sourcePort: 'top',
-            targetPort: 'left',
-            label: 'Yes',
-            routing: 'bezier',
+            id: "e3",
+            sourceId: "gateway_check",
+            targetId: "task_process",
+            sourcePort: "top",
+            targetPort: "left",
+            label: "Yes",
+            routing: "bezier",
             animated: true
           },
           {
-            id: 'e4',
-            sourceId: 'gateway_check',
-            targetId: 'task_reject',
-            sourcePort: 'bottom',
-            targetPort: 'left',
-            label: 'No',
-            routing: 'bezier',
+            id: "e4",
+            sourceId: "gateway_check",
+            targetId: "task_reject",
+            sourcePort: "bottom",
+            targetPort: "left",
+            label: "No",
+            routing: "bezier",
             animated: false
           },
           {
-            id: 'e5',
-            sourceId: 'task_process',
-            targetId: 'end_success',
-            sourcePort: 'right',
-            targetPort: 'left',
-            label: '',
-            routing: 'bezier',
+            id: "e5",
+            sourceId: "task_process",
+            targetId: "end_success",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
             animated: true
           },
           {
-            id: 'e6',
-            sourceId: 'task_reject',
-            targetId: 'end_fail',
-            sourcePort: 'right',
-            targetPort: 'left',
-            label: '',
-            routing: 'bezier',
+            id: "e6",
+            sourceId: "task_reject",
+            targetId: "end_fail",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
             animated: false
+          },
+          {
+            id: "edge_1792872644921_uazi9",
+            sourceId: "node_1792872587195_m4eby",
+            targetId: "node_1792872602067_s2c4u",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
+            animated: true
+          },
+          {
+            id: "edge_1792872647217_eqsi1",
+            sourceId: "node_1792872602067_s2c4u",
+            targetId: "node_1792872623148_k3eq9",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
+            animated: true
+          },
+          {
+            id: "edge_1792872649719_7l2u3",
+            sourceId: "node_1792872623148_k3eq9",
+            targetId: "node_1792872590256_blfne",
+            sourcePort: "right",
+            targetPort: "left",
+            label: "",
+            routing: "bezier",
+            animated: true
           }
         ]
       };
