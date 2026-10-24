@@ -25,8 +25,11 @@
         <button class="btn" id="btn-theme-toggle" title="Toggle Theme">
           <span>🌙</span> <span id="theme-label">Dark</span>
         </button>
-        <button class="btn" id="btn-snap-toggle" title="Snap to Grid">
-          <span>🧲</span> Grid Snap: <span id="snap-status">Off</span>
+        <button class="btn" id="btn-simulate" title="Simulate Token Flow" style="border-color: var(--border-focus)">
+          <span>▶</span> <span id="sim-label">Pause Flow</span>
+        </button>
+        <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
+          <span>🧲</span> Grid Snap: <span id="snap-status">On</span>
         </button>
         <button class="btn" id="btn-export-json">
           <span>📥</span> Export JSON
@@ -69,7 +72,7 @@
     const canvasContainer = document.getElementById('canvas-container');
     const canvas = new BpmnCanvas(canvasContainer, {
       defaultRouting: 'bezier',
-      snapToGrid: false
+      snapToGrid: true
     });
 
     // 2. Initialize Palette & Inspector
@@ -82,52 +85,73 @@
         nodes: [
           {
             id: 'start_node',
-            type: 'start-event',
+            type: 'start-signal-event',
             label: 'Order Placed',
-            x: 96,
-            y: 214 // Center Y = 240
+            x: 94,
+            y: 214,
+            width: 52,
+            height: 52,
+            data: {}
           },
           {
             id: 'task_review',
             type: 'user-task',
             label: 'Review Order Details',
-            x: 240,
-            y: 200 // Center Y = 240
+            x: 237,
+            y: 193,
+            width: 150,
+            height: 94,
+            data: {}
           },
           {
             id: 'gateway_check',
             type: 'gateway-exclusive',
             label: 'Approved?',
             x: 480,
-            y: 212 // Center Y = 240
+            y: 212,
+            width: 56,
+            height: 56,
+            data: {}
           },
           {
             id: 'task_process',
             type: 'service-task',
             label: 'Charge Credit Card',
-            x: 648,
-            y: 100 // Center Y = 140
+            x: 645,
+            y: 97,
+            width: 150,
+            height: 94,
+            data: {}
           },
           {
             id: 'task_reject',
-            type: 'task',
+            type: 'manual-task',
             label: 'Send Rejection Notice',
-            x: 648,
-            y: 300 // Center Y = 340
+            x: 645,
+            y: 290.5,
+            width: 150,
+            height: 91,
+            data: {}
           },
           {
             id: 'end_success',
             type: 'end-event',
             label: 'Order Fulfilled',
-            x: 888,
-            y: 114 // Center Y = 140
+            x: 886,
+            y: 118,
+            width: 52,
+            height: 52,
+            data: {}
           },
           {
             id: 'end_fail',
-            type: 'end-event',
+            type: 'end-error-event',
             label: 'Order Cancelled',
-            x: 888,
-            y: 314 // Center Y = 340
+            x: 886,
+            y: 310,
+            width: 52,
+            height: 52,
+            data: {}
           }
         ],
         edges: [
@@ -137,6 +161,7 @@
             targetId: 'task_review',
             sourcePort: 'right',
             targetPort: 'left',
+            label: '',
             routing: 'bezier',
             animated: true
           },
@@ -146,13 +171,15 @@
             targetId: 'gateway_check',
             sourcePort: 'right',
             targetPort: 'left',
-            routing: 'bezier'
+            label: '',
+            routing: 'bezier',
+            animated: true
           },
           {
             id: 'e3',
             sourceId: 'gateway_check',
             targetId: 'task_process',
-            sourcePort: 'right',
+            sourcePort: 'top',
             targetPort: 'left',
             label: 'Yes',
             routing: 'bezier',
@@ -165,7 +192,8 @@
             sourcePort: 'bottom',
             targetPort: 'left',
             label: 'No',
-            routing: 'bezier'
+            routing: 'bezier',
+            animated: false
           },
           {
             id: 'e5',
@@ -173,6 +201,7 @@
             targetId: 'end_success',
             sourcePort: 'right',
             targetPort: 'left',
+            label: '',
             routing: 'bezier',
             animated: true
           },
@@ -182,13 +211,14 @@
             targetId: 'end_fail',
             sourcePort: 'right',
             targetPort: 'left',
-            routing: 'bezier'
+            label: '',
+            routing: 'bezier',
+            animated: false
           }
         ]
       };
 
       canvas.loadData(sample);
-      setTimeout(() => canvas.fitView(), 50);
     }
 
     loadSampleWorkflow();
@@ -215,7 +245,16 @@
       canvas.fitView();
     });
 
-    // 5. Grid Snap Toggle
+    // 5. Token Flow Simulation Toggle
+    const simBtn = document.getElementById('btn-simulate');
+    const simLabel = document.getElementById('sim-label');
+    simBtn.addEventListener('click', () => {
+      const isRunning = canvas.toggleSimulation();
+      simLabel.textContent = isRunning ? 'Pause Flow' : 'Play Flow';
+      simBtn.style.borderColor = isRunning ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6. Grid Snap Toggle
     const snapBtn = document.getElementById('btn-snap-toggle');
     const snapStatus = document.getElementById('snap-status');
     snapBtn.addEventListener('click', () => {
@@ -224,7 +263,7 @@
       snapBtn.style.borderColor = canvas.options.snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
     });
 
-    // 6. Theme Toggle (Dark / Light)
+    // 7. Theme Toggle (Dark / Light)
     const themeBtn = document.getElementById('btn-theme-toggle');
     const themeLabel = document.getElementById('theme-label');
     let isLight = false;
@@ -234,7 +273,7 @@
       themeLabel.textContent = isLight ? 'Light' : 'Dark';
     });
 
-    // 7. Export / Import Data
+    // 8. Export / Import Data
     document.getElementById('btn-export-json').addEventListener('click', () => {
       const data = canvas.exportData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -248,7 +287,15 @@
 
     document.getElementById('btn-import-json').addEventListener('click', () => {
       loadSampleWorkflow();
+      canvas.startSimulation();
+      simLabel.textContent = 'Pause Flow';
+      simBtn.style.borderColor = 'var(--border-focus)';
     });
+
+    // Start simulation automatically on initial load
+    setTimeout(() => {
+      canvas.startSimulation();
+    }, 200);
   </script>
 </body>
 </html>

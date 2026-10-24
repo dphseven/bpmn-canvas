@@ -34,6 +34,8 @@ export class Inspector {
         this.inspectNode(event.item);
       } else if (event.type === 'edge') {
         this.inspectEdge(event.item);
+      } else if (event.type === 'multi') {
+        this.inspectMulti(event.items);
       } else {
         this.hide();
       }
@@ -45,6 +47,27 @@ export class Inspector {
         if (input && input !== document.activeElement) {
           input.value = label;
         }
+      }
+    });
+
+    this.canvas.on('edge:labelChange', ({ edge, label }) => {
+      if (this.currentTarget === edge) {
+        const input = this.container.querySelector('#prop-edge-label');
+        if (input && input !== document.activeElement) {
+          input.value = label;
+        }
+      }
+    });
+
+    this.canvas.on('edge:update', (edge) => {
+      if (this.currentTarget === edge) {
+        this.inspectEdge(edge);
+      }
+    });
+
+    this.canvas.on('edge:reconnect', ({ edge }) => {
+      if (this.currentTarget === edge) {
+        this.inspectEdge(edge);
       }
     });
   }
@@ -74,18 +97,34 @@ export class Inspector {
         <label class="inspector-label" for="prop-type">Type</label>
         <select class="inspector-select" id="prop-type">
           <optgroup label="Activities">
-            <option value="task" ${node.type === 'task' ? 'selected' : ''}>Generic Activity</option>
+            <option value="manual-task" ${node.type === 'manual-task' || node.type === 'task' || node.type === 'activity' ? 'selected' : ''}>Manual Task</option>
             <option value="user-task" ${node.type === 'user-task' ? 'selected' : ''}>User Task</option>
             <option value="service-task" ${node.type === 'service-task' ? 'selected' : ''}>Service Task</option>
+            <option value="business-rule-task" ${node.type === 'business-rule-task' ? 'selected' : ''}>Business Rule Task (📊)</option>
+            <option value="script-task" ${node.type === 'script-task' ? 'selected' : ''}>Script Task (📜)</option>
+            <option value="subprocess" ${node.type === 'subprocess' ? 'selected' : ''}>Subprocess (⊞)</option>
           </optgroup>
           <optgroup label="Events">
-            <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event</option>
-            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event</option>
-            <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Timer Event</option>
+            <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event (None)</option>
+            <option value="start-timer-event" ${node.type === 'start-timer-event' ? 'selected' : ''}>Timer Start Event (⏱)</option>
+            <option value="start-message-event" ${node.type === 'start-message-event' ? 'selected' : ''}>Message Start Event (✉️)</option>
+            <option value="start-signal-event" ${node.type === 'start-signal-event' ? 'selected' : ''}>Signal Start Event (▲)</option>
+            <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Intermediate Event (None)</option>
+            <option value="intermediate-timer-event" ${node.type === 'intermediate-timer-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
+            <option value="intermediate-message-event" ${node.type === 'intermediate-message-event' ? 'selected' : ''}>Message Intermediate Event (✉️)</option>
+            <option value="intermediate-signal-event" ${node.type === 'intermediate-signal-event' ? 'selected' : ''}>Signal Intermediate Event (▲)</option>
+            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event (None)</option>
+            <option value="end-error-event" ${node.type === 'end-error-event' ? 'selected' : ''}>Error End Event (⚡)</option>
+            <option value="end-terminate-event" ${node.type === 'end-terminate-event' ? 'selected' : ''}>Terminate End Event (⬤)</option>
+            <option value="end-message-event" ${node.type === 'end-message-event' ? 'selected' : ''}>Message End Event (✉️)</option>
           </optgroup>
           <optgroup label="Gateways">
             <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
             <option value="gateway-parallel" ${node.type === 'gateway-parallel' ? 'selected' : ''}>Parallel Gateway (AND)</option>
+          </optgroup>
+          <optgroup label="Artifacts">
+            <option value="text-annotation" ${node.type === 'text-annotation' ? 'selected' : ''}>Text Annotation ([ T)</option>
+            <option value="data-object" ${node.type === 'data-object' ? 'selected' : ''}>Data Object (📄)</option>
           </optgroup>
         </select>
       </div>
@@ -115,10 +154,56 @@ export class Inspector {
     });
   }
 
+  inspectMulti(nodes) {
+    this.currentTarget = nodes;
+    this.targetType = 'multi';
+    this.container.classList.remove('hidden');
+
+    this.container.innerHTML = `
+      <div class="inspector-title">
+        <span>Multiple Elements</span>
+        <span class="inspector-badge">${nodes.length} Selected</span>
+      </div>
+
+      <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 12px 0;">
+        You have selected <strong>${nodes.length}</strong> shapes. Drag any selected shape to move them together, or press <kbd style="background: var(--bg-primary); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border-color);">Del</kbd> to delete.
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button class="btn" id="btn-delete-multi" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
+          Delete ${nodes.length} Elements
+        </button>
+      </div>
+    `;
+
+    const deleteBtn = this.container.querySelector('#btn-delete-multi');
+    deleteBtn.addEventListener('click', () => {
+      const ids = nodes.map(n => n.id);
+      ids.forEach(id => this.canvas.removeNode(id));
+      this.canvas.clearSelection();
+    });
+  }
+
   inspectEdge(edge) {
     this.currentTarget = edge;
     this.targetType = 'edge';
     this.container.classList.remove('hidden');
+
+    const allNodes = this.canvas.getNodes();
+    const ports = ['left', 'right', 'top', 'bottom'];
+
+    const renderNodeOptions = (selectedId, excludeId) => {
+      return allNodes
+        .filter(n => n.id !== excludeId)
+        .map(n => `<option value="${n.id}" ${n.id === selectedId ? 'selected' : ''}>${n.label || n.id} (${n.type})</option>`)
+        .join('');
+    };
+
+    const renderPortOptions = (selectedPort) => {
+      return ports
+        .map(p => `<option value="${p}" ${p === selectedPort ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`)
+        .join('');
+    };
 
     this.container.innerHTML = `
       <div class="inspector-title">
@@ -129,6 +214,30 @@ export class Inspector {
       <div class="inspector-field">
         <label class="inspector-label" for="prop-edge-label">Condition / Label</label>
         <input class="inspector-input" id="prop-edge-label" type="text" value="${edge.label || ''}" placeholder="e.g. Yes / Validated" />
+      </div>
+
+      <div class="inspector-field">
+        <label class="inspector-label" for="prop-edge-source">Source Node</label>
+        <div style="display: flex; gap: 6px;">
+          <select class="inspector-select" id="prop-edge-source" style="flex: 2;">
+            ${renderNodeOptions(edge.sourceId, edge.targetId)}
+          </select>
+          <select class="inspector-select" id="prop-edge-source-port" style="flex: 1;" title="Source Port">
+            ${renderPortOptions(edge.sourcePort)}
+          </select>
+        </div>
+      </div>
+
+      <div class="inspector-field">
+        <label class="inspector-label" for="prop-edge-target">Target Node</label>
+        <div style="display: flex; gap: 6px;">
+          <select class="inspector-select" id="prop-edge-target" style="flex: 2;">
+            ${renderNodeOptions(edge.targetId, edge.sourceId)}
+          </select>
+          <select class="inspector-select" id="prop-edge-target-port" style="flex: 1;" title="Target Port">
+            ${renderPortOptions(edge.targetPort)}
+          </select>
+        </div>
       </div>
 
       <div class="inspector-field">
@@ -154,6 +263,28 @@ export class Inspector {
     const labelInput = this.container.querySelector('#prop-edge-label');
     labelInput.addEventListener('input', (e) => {
       edge.setLabel(e.target.value);
+    });
+
+    const sourceSelect = this.container.querySelector('#prop-edge-source');
+    sourceSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { sourceId: e.target.value });
+      this.inspectEdge(edge);
+    });
+
+    const sourcePortSelect = this.container.querySelector('#prop-edge-source-port');
+    sourcePortSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { sourcePort: e.target.value });
+    });
+
+    const targetSelect = this.container.querySelector('#prop-edge-target');
+    targetSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { targetId: e.target.value });
+      this.inspectEdge(edge);
+    });
+
+    const targetPortSelect = this.container.querySelector('#prop-edge-target-port');
+    targetPortSelect.addEventListener('change', (e) => {
+      this.canvas.updateEdgeEndpoints(edge.id, { targetPort: e.target.value });
     });
 
     const routingSelect = this.container.querySelector('#prop-edge-routing');

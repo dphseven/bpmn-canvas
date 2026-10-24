@@ -42,8 +42,12 @@
 /* 1. Activity / Task Node Styling */
 .bpmn-node.bpmn-node-task,
 .bpmn-node.bpmn-node-activity,
+.bpmn-node.bpmn-node-manual-task,
 .bpmn-node.bpmn-node-user-task,
 .bpmn-node.bpmn-node-service-task,
+.bpmn-node.bpmn-node-business-rule-task,
+.bpmn-node.bpmn-node-script-task,
+.bpmn-node.bpmn-node-subprocess,
 .bpmn-node.bpmn-node-send-task {
   width: 150px;
   min-height: 80px;
@@ -62,8 +66,12 @@
 
 .bpmn-node.bpmn-node-task:hover,
 .bpmn-node.bpmn-node-activity:hover,
+.bpmn-node.bpmn-node-manual-task:hover,
 .bpmn-node.bpmn-node-user-task:hover,
 .bpmn-node.bpmn-node-service-task:hover,
+.bpmn-node.bpmn-node-business-rule-task:hover,
+.bpmn-node.bpmn-node-script-task:hover,
+.bpmn-node.bpmn-node-subprocess:hover,
 .bpmn-node.bpmn-node-send-task:hover {
   border-color: rgba(255, 255, 255, 0.35);
   box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.5);
@@ -100,12 +108,17 @@
   white-space: normal;
   margin-top: 8px;
   width: 100%;
-}
-
-.bpmn-activity-label[contenteditable="true"]:focus {
-  background: rgba(255, 255, 255, 0.08);
+  cursor: inherit;
   border-radius: 4px;
   padding: 2px 4px;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.bpmn-activity-label[contenteditable="true"] {
+  cursor: text;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px var(--border-focus);
 }
 
 .bpmn-node-user-task {
@@ -116,6 +129,52 @@
   border-top: 4px solid var(--accent-violet) !important;
 }
 
+.bpmn-node-manual-task {
+  border-top: 4px solid var(--accent-cyan) !important;
+}
+
+.bpmn-node-business-rule-task {
+  border-top: 4px solid var(--accent-amber) !important;
+}
+
+.bpmn-node-script-task {
+  border-top: 4px solid var(--accent-emerald) !important;
+}
+
+.bpmn-node-subprocess {
+  border-top: 4px solid #818cf8 !important;
+  border-style: solid;
+}
+
+/* Subprocess [+] Expand Box Marker */
+.bpmn-subprocess-marker {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.bpmn-subprocess-plus {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.bpmn-node-task,
+.bpmn-node-activity {
+  border-top: 4px solid var(--accent-cyan) !important;
+}
+
 .bpmn-node-send-task {
   border-top: 4px solid var(--accent-cyan) !important;
 }
@@ -123,8 +182,17 @@
 /* 2. Event Node Styling (Start, End, Intermediate) */
 .bpmn-node.bpmn-node-event,
 .bpmn-node.bpmn-node-start-event,
+.bpmn-node.bpmn-node-start-timer-event,
+.bpmn-node.bpmn-node-start-message-event,
+.bpmn-node.bpmn-node-start-signal-event,
 .bpmn-node.bpmn-node-end-event,
-.bpmn-node.bpmn-node-intermediate-event {
+.bpmn-node.bpmn-node-end-error-event,
+.bpmn-node.bpmn-node-end-terminate-event,
+.bpmn-node.bpmn-node-end-message-event,
+.bpmn-node.bpmn-node-intermediate-event,
+.bpmn-node.bpmn-node-intermediate-timer-event,
+.bpmn-node.bpmn-node-intermediate-message-event,
+.bpmn-node.bpmn-node-intermediate-signal-event {
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -139,38 +207,68 @@
 
 .bpmn-node.bpmn-node-event:hover,
 .bpmn-node.bpmn-node-start-event:hover,
+.bpmn-node.bpmn-node-start-timer-event:hover,
+.bpmn-node.bpmn-node-start-message-event:hover,
+.bpmn-node.bpmn-node-start-signal-event:hover,
 .bpmn-node.bpmn-node-end-event:hover,
-.bpmn-node.bpmn-node-intermediate-event:hover {
+.bpmn-node.bpmn-node-end-error-event:hover,
+.bpmn-node.bpmn-node-end-terminate-event:hover,
+.bpmn-node.bpmn-node-end-message-event:hover,
+.bpmn-node.bpmn-node-intermediate-event:hover,
+.bpmn-node.bpmn-node-intermediate-timer-event:hover,
+.bpmn-node.bpmn-node-intermediate-message-event:hover,
+.bpmn-node.bpmn-node-intermediate-signal-event:hover {
   filter: brightness(1.15);
 }
 
-.bpmn-node.bpmn-node-start-event {
-  border: 2.5px solid var(--accent-emerald) !important;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+.bpmn-node.bpmn-node-start-event,
+.bpmn-node.bpmn-node-start-timer-event,
+.bpmn-node.bpmn-node-start-message-event,
+.bpmn-node.bpmn-node-start-signal-event {
+  border: 2px solid var(--accent-emerald) !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.25);
 }
 
-.bpmn-node.bpmn-node-start-event .bpmn-event-inner-icon {
+.bpmn-start-timer-icon,
+.bpmn-start-message-icon,
+.bpmn-start-signal-icon {
   color: var(--accent-emerald);
 }
 
-.bpmn-node.bpmn-node-end-event {
-  border: 4px solid var(--accent-rose) !important;
-  box-shadow: 0 0 14px rgba(244, 63, 94, 0.3);
+.bpmn-node.bpmn-node-end-event,
+.bpmn-node.bpmn-node-end-error-event,
+.bpmn-node.bpmn-node-end-terminate-event,
+.bpmn-node.bpmn-node-end-message-event {
+  border: 4.5px solid var(--accent-rose) !important;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
 }
 
-.bpmn-node-end-event .bpmn-event-inner-icon {
+.bpmn-end-error-icon,
+.bpmn-end-terminate-icon,
+.bpmn-end-message-icon {
   color: var(--accent-rose);
 }
 
-.bpmn-node-intermediate-event {
+/* Intermediate Events (Double-ring concentric styling in warm gold/amber) */
+.bpmn-node-intermediate-event,
+.bpmn-node-intermediate-timer-event,
+.bpmn-node-intermediate-message-event,
+.bpmn-node-intermediate-signal-event {
   border: 2px double var(--accent-amber);
   outline: 2px solid var(--accent-amber);
   outline-offset: -5px;
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
 }
 
-.bpmn-node-intermediate-event .bpmn-event-inner-icon {
+.bpmn-node-intermediate-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-timer-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-message-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-signal-event .bpmn-event-inner-icon,
+.bpmn-event-timer-icon,
+.bpmn-event-message-icon,
+.bpmn-event-signal-icon {
   color: var(--accent-amber);
+  font-size: 14px;
 }
 
 .bpmn-event-floating-label {
@@ -182,7 +280,20 @@
   font-weight: 500;
   color: var(--text-muted);
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 0.15s ease;
+  outline: none;
+}
+
+.bpmn-event-floating-label[contenteditable="true"],
+.bpmn-gateway-floating-label[contenteditable="true"] {
+  cursor: text;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 1px var(--border-focus);
 }
 
 /* 3. Gateway Node Styling (Diamond) */
@@ -192,7 +303,6 @@
   width: 56px;
   height: 56px;
   box-sizing: border-box;
-  position: relative;
 }
 
 .bpmn-gateway-diamond {
@@ -230,7 +340,133 @@
   font-weight: 500;
   color: var(--text-muted);
   white-space: nowrap;
+  pointer-events: auto;
+  cursor: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 0.15s ease;
+  outline: none;
+}
+
+/* 4. Artifacts: Text Annotation & Data Object */
+.bpmn-node.bpmn-node-text-annotation {
+  background: rgba(30, 41, 59, 0.4);
+  box-shadow: none;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  min-height: 44px;
+  padding: 6px 10px 6px 14px;
+  display: flex;
+  align-items: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.bpmn-node.bpmn-node-text-annotation:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.bpmn-node.bpmn-node-text-annotation.selected::after {
+  display: none; /* Suppress generic rectangular halo for text annotations */
+}
+
+.bpmn-annotation-bracket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 16px;
+  border-left: 3px solid #94a3b8;
+  border-top: 3px solid #94a3b8;
+  border-bottom: 3px solid #94a3b8;
+  border-radius: 4px 0 0 4px;
   pointer-events: none;
+  transition: border-color 0.15s ease, filter 0.15s ease;
+}
+
+.bpmn-node.bpmn-node-text-annotation:hover .bpmn-annotation-bracket,
+.bpmn-node.bpmn-node-text-annotation.selected .bpmn-annotation-bracket {
+  border-color: var(--border-focus);
+  filter: drop-shadow(0 0 4px var(--border-focus));
+}
+
+.bpmn-annotation-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  font-style: italic;
+  width: 100%;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+  outline: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.bpmn-annotation-text[contenteditable="true"] {
+  cursor: text;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1.5px var(--border-focus);
+}
+
+/* Data Object */
+.bpmn-node.bpmn-node-data-object {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  width: 60px;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.bpmn-data-object-icon {
+  width: 38px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38bdf8;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.bpmn-node.bpmn-node-data-object:hover .bpmn-data-object-icon {
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+  transform: translateY(-1px);
+}
+
+.bpmn-data-object-floating-label {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 0.15s ease;
+  outline: none;
+}
+
+.bpmn-data-object-floating-label[contenteditable="true"] {
+  cursor: text;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 1px var(--border-focus);
 }
 
 /* Ports / Connection Handles */
@@ -248,9 +484,17 @@
 }
 
 .bpmn-node:hover .bpmn-port,
-.bpmn-node.selected .bpmn-port,
-.bpmn-canvas-surface.connecting .bpmn-port {
+.bpmn-node.selected .bpmn-port {
   opacity: 0.85;
+}
+
+/* While an edge is selected, suppress greedy node port hover unless actively dragging to reconnect */
+.bpmn-canvas-surface.edge-selected .bpmn-node:hover .bpmn-port {
+  opacity: 0;
+}
+
+.bpmn-canvas-surface.connecting .bpmn-port {
+  opacity: 0.85 !important;
 }
 
 .bpmn-port:hover {
