@@ -274,7 +274,7 @@ export class Inspector {
 
       <div class="inspector-field">
         <label class="inspector-label" for="prop-edge-label">Condition / Label</label>
-        <input class="inspector-input" id="prop-edge-label" type="text" value="${edge.label || ''}" placeholder="e.g. Yes / Validated" />
+        <textarea class="inspector-input" id="prop-edge-label" rows="2" placeholder="e.g. Yes / Validated" style="resize: vertical; font-family: inherit;">${edge.label || ''}</textarea>
       </div>
 
       <div class="inspector-field">

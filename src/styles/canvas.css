@@ -144,15 +144,20 @@
   border: 1.5px solid var(--border-focus);
   box-shadow: var(--shadow-glow), 0 4px 12px rgba(0, 0, 0, 0.4);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 4px 8px;
+  font-family: inherit;
   font-size: 11px;
+  line-height: 14px;
   font-weight: 500;
   color: var(--text-main);
   outline: none;
   z-index: 60;
-  min-width: 60px;
+  min-width: 64px;
   text-align: center;
   box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
 }
 
 /* Top SVG Layer for Interactive Handles */
