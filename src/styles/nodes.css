@@ -42,6 +42,7 @@
 /* 1. Activity / Task Node Styling */
 .bpmn-node.bpmn-node-task,
 .bpmn-node.bpmn-node-activity,
+.bpmn-node.bpmn-node-manual-task,
 .bpmn-node.bpmn-node-user-task,
 .bpmn-node.bpmn-node-service-task,
 .bpmn-node.bpmn-node-send-task {
@@ -62,6 +63,7 @@
 
 .bpmn-node.bpmn-node-task:hover,
 .bpmn-node.bpmn-node-activity:hover,
+.bpmn-node.bpmn-node-manual-task:hover,
 .bpmn-node.bpmn-node-user-task:hover,
 .bpmn-node.bpmn-node-service-task:hover,
 .bpmn-node.bpmn-node-send-task:hover {
@@ -119,6 +121,15 @@
 
 .bpmn-node-service-task {
   border-top: 4px solid var(--accent-violet) !important;
+}
+
+.bpmn-node-manual-task {
+  border-top: 4px solid var(--accent-cyan) !important;
+}
+
+.bpmn-node-task,
+.bpmn-node-activity {
+  border-top: 4px solid var(--accent-cyan) !important;
 }
 
 .bpmn-node-send-task {

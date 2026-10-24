@@ -97,7 +97,7 @@ export class Inspector {
         <label class="inspector-label" for="prop-type">Type</label>
         <select class="inspector-select" id="prop-type">
           <optgroup label="Activities">
-            <option value="task" ${node.type === 'task' ? 'selected' : ''}>Generic Activity</option>
+            <option value="manual-task" ${node.type === 'manual-task' || node.type === 'task' || node.type === 'activity' ? 'selected' : ''}>Manual Task</option>
             <option value="user-task" ${node.type === 'user-task' ? 'selected' : ''}>User Task</option>
             <option value="service-task" ${node.type === 'service-task' ? 'selected' : ''}>Service Task</option>
           </optgroup>

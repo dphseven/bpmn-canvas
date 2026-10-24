@@ -28,9 +28,10 @@ export class BpmnNode {
       case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
       case 'service-task': return 'Process Payment';
+      case 'manual-task': return 'Manual Task';
       case 'activity':
       case 'task':
-      default: return 'New Activity';
+      default: return 'Manual Task';
     }
   }
 
@@ -99,8 +100,8 @@ export class BpmnNode {
       `;
     } else {
       // Activity / Task
-      const icon = this.type === 'user-task' ? '👤' : (this.type === 'service-task' ? '⚙️' : '📋');
-      const badge = this.type === 'user-task' ? 'User Task' : (this.type === 'service-task' ? 'Service Task' : 'Activity');
+      const icon = this.type === 'user-task' ? '👤' : (this.type === 'service-task' ? '⚙️' : '✋');
+      const badge = this.type === 'user-task' ? 'User Task' : (this.type === 'service-task' ? 'Service Task' : 'Manual Task');
       
       this.domElement.innerHTML = `
         <div class="bpmn-activity-header">

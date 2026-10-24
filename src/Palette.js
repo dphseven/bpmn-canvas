@@ -40,9 +40,9 @@ export class Palette {
             <div class="palette-item-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">⚙️</div>
             <span class="palette-item-label">Service Task</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="task">
-            <div class="palette-item-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">📋</div>
-            <span class="palette-item-label">Generic Activity</span>
+          <div class="palette-item" draggable="true" data-type="manual-task">
+            <div class="palette-item-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">✋</div>
+            <span class="palette-item-label">Manual Task</span>
           </div>
         </div>
       </div>
