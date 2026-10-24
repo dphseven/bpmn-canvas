@@ -372,8 +372,9 @@ export class BpmnCanvas {
           const targetNodeId = elemUnder.dataset.nodeId;
           const targetPort = elemUnder.dataset.port;
           const targetNode = this.getNode(targetNodeId);
-          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows
-          if (targetNode && targetNode.type.startsWith('boundary-')) {
+          const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
+          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
             return null;
           }
           if (targetNodeId && targetNodeId !== excludeNodeId) {
@@ -385,8 +386,9 @@ export class BpmnCanvas {
         const nodeEl = elemUnder.closest('.bpmn-node');
         if (nodeEl && nodeEl.id && nodeEl.id !== excludeNodeId) {
           const targetNode = this.getNode(nodeEl.id);
-          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows
-          if (targetNode && targetNode.type.startsWith('boundary-')) {
+          const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
+          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
             return null;
           }
           if (targetNode) {
@@ -1119,52 +1121,65 @@ export class BpmnCanvas {
         return;
       }
 
+      const startNextEdgeTraversal = () => {
+        const totalLength = pathEl.getTotalLength();
+        // Speed: roughly 200 pixels per second scaled by simulationSpeed
+        const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
+        let startTime = null;
+
+        this.simTokenGroup.style.display = 'block';
+
+        const step = (timestamp) => {
+          if (!this.simulationActive) return;
+          if (!startTime) startTime = timestamp;
+
+          const elapsed = timestamp - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const distance = progress * totalLength;
+          const point = pathEl.getPointAtLength(distance);
+
+          this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
+
+          if (progress < 1) {
+            this.simAnimationId = requestAnimationFrame(step);
+          } else {
+            // Token reached target node!
+            highlightNode(edge.targetId, 250);
+            edgeIndex++;
+
+            // Brief pause at each node (180ms) for visual rhythm
+            this.simTimeoutId = setTimeout(() => {
+              if (this.simulationActive) {
+                animateEdgeStep();
+              }
+            }, 180);
+          }
+        };
+
+        this.simAnimationId = requestAnimationFrame(step);
+      };
+
       // Highlight starting node of first edge
       if (edgeIndex === 0) {
         highlightNode(edge.sourceId, 300);
+        startNextEdgeTraversal();
       } else {
-        // If this edge begins from a boundary event, pulse the boundary event node
+        // If this edge begins from a boundary event, insert a clear pause (260ms) after task before boundary pulses
         const sourceNode = this.getNode(edge.sourceId);
         if (sourceNode && sourceNode.type.startsWith('boundary-')) {
-          highlightNode(edge.sourceId, 350);
+          this.simTimeoutId = setTimeout(() => {
+            if (!this.simulationActive) return;
+            highlightNode(edge.sourceId, 350);
+            // After boundary pulses, start edge traversal
+            this.simTimeoutId = setTimeout(() => {
+              if (!this.simulationActive) return;
+              startNextEdgeTraversal();
+            }, 200);
+          }, 260);
+        } else {
+          startNextEdgeTraversal();
         }
       }
-
-      const totalLength = pathEl.getTotalLength();
-      // Speed: roughly 200 pixels per second scaled by simulationSpeed
-      const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
-      let startTime = null;
-
-      this.simTokenGroup.style.display = 'block';
-
-      const step = (timestamp) => {
-        if (!this.simulationActive) return;
-        if (!startTime) startTime = timestamp;
-
-        const elapsed = timestamp - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const distance = progress * totalLength;
-        const point = pathEl.getPointAtLength(distance);
-
-        this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
-
-        if (progress < 1) {
-          this.simAnimationId = requestAnimationFrame(step);
-        } else {
-          // Token reached target node!
-          highlightNode(edge.targetId, 250);
-          edgeIndex++;
-
-          // Brief pause at each node (180ms) for visual rhythm
-          this.simTimeoutId = setTimeout(() => {
-            if (this.simulationActive) {
-              animateEdgeStep();
-            }
-          }, 180);
-        }
-      };
-
-      this.simAnimationId = requestAnimationFrame(step);
     };
 
     animateEdgeStep();
