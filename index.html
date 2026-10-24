@@ -87,50 +87,71 @@
             id: 'start_node',
             type: 'start-event',
             label: 'Order Placed',
-            x: 96,
-            y: 214 // Center Y = 240
+            x: 94,
+            y: 214,
+            width: 52,
+            height: 52,
+            data: {}
           },
           {
             id: 'task_review',
             type: 'user-task',
             label: 'Review Order Details',
-            x: 240,
-            y: 200 // Center Y = 240
+            x: 237,
+            y: 193,
+            width: 150,
+            height: 94,
+            data: {}
           },
           {
             id: 'gateway_check',
             type: 'gateway-exclusive',
             label: 'Approved?',
             x: 480,
-            y: 212 // Center Y = 240
+            y: 212,
+            width: 56,
+            height: 56,
+            data: {}
           },
           {
             id: 'task_process',
             type: 'service-task',
             label: 'Charge Credit Card',
-            x: 648,
-            y: 100 // Center Y = 140
+            x: 645,
+            y: 97,
+            width: 150,
+            height: 94,
+            data: {}
           },
           {
             id: 'task_reject',
             type: 'task',
             label: 'Send Rejection Notice',
-            x: 648,
-            y: 300 // Center Y = 340
+            x: 645,
+            y: 290.5,
+            width: 150,
+            height: 91,
+            data: {}
           },
           {
             id: 'end_success',
             type: 'end-event',
             label: 'Order Fulfilled',
-            x: 888,
-            y: 114 // Center Y = 140
+            x: 886,
+            y: 118,
+            width: 52,
+            height: 52,
+            data: {}
           },
           {
             id: 'end_fail',
             type: 'end-event',
             label: 'Order Cancelled',
-            x: 888,
-            y: 314 // Center Y = 340
+            x: 886,
+            y: 310,
+            width: 52,
+            height: 52,
+            data: {}
           }
         ],
         edges: [
@@ -140,6 +161,7 @@
             targetId: 'task_review',
             sourcePort: 'right',
             targetPort: 'left',
+            label: '',
             routing: 'bezier',
             animated: true
           },
@@ -149,6 +171,7 @@
             targetId: 'gateway_check',
             sourcePort: 'right',
             targetPort: 'left',
+            label: '',
             routing: 'bezier',
             animated: true
           },
@@ -156,7 +179,7 @@
             id: 'e3',
             sourceId: 'gateway_check',
             targetId: 'task_process',
-            sourcePort: 'right',
+            sourcePort: 'top',
             targetPort: 'left',
             label: 'Yes',
             routing: 'bezier',
@@ -169,7 +192,8 @@
             sourcePort: 'bottom',
             targetPort: 'left',
             label: 'No',
-            routing: 'bezier'
+            routing: 'bezier',
+            animated: false
           },
           {
             id: 'e5',
@@ -177,6 +201,7 @@
             targetId: 'end_success',
             sourcePort: 'right',
             targetPort: 'left',
+            label: '',
             routing: 'bezier',
             animated: true
           },
@@ -186,7 +211,9 @@
             targetId: 'end_fail',
             sourcePort: 'right',
             targetPort: 'left',
-            routing: 'bezier'
+            label: '',
+            routing: 'bezier',
+            animated: false
           }
         ]
       };
