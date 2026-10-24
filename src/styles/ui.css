@@ -358,3 +358,87 @@ body, html {
   min-width: 44px;
   text-align: center;
 }
+
+/* Canvas File Drop Overlay */
+.canvas-drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border: 3px dashed var(--accent-cyan);
+  margin: 16px;
+  border-radius: 16px;
+}
+
+.canvas-drop-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.canvas-drop-overlay .drop-icon {
+  font-size: 48px;
+  animation: bounceSlow 1.5s infinite ease-in-out;
+}
+
+.canvas-drop-overlay .drop-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.canvas-drop-overlay .drop-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Notification Toast */
+.bpmn-toast {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.bpmn-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.bpmn-toast.toast-success {
+  background: rgba(16, 185, 129, 0.95);
+  color: #ffffff;
+}
+
+.bpmn-toast.toast-error {
+  background: rgba(239, 68, 68, 0.95);
+  color: #ffffff;
+}
