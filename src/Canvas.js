@@ -40,6 +40,21 @@ export class BpmnCanvas {
     // Event Bus Callbacks
     this.listeners = new Map();
 
+    this.on('edge:animatedChange', () => {
+      if (this.simulationActive) {
+        // Stop current animation cycle and seamlessly restart with updated path
+        if (this.simAnimationId) {
+          cancelAnimationFrame(this.simAnimationId);
+          this.simAnimationId = null;
+        }
+        if (this.simTimeoutId) {
+          clearTimeout(this.simTimeoutId);
+          this.simTimeoutId = null;
+        }
+        this.runSimulationCycle();
+      }
+    });
+
     this.initDOM();
     this.bindEvents();
   }

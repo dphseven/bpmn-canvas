@@ -224,6 +224,9 @@ export class BpmnEdge {
     } else {
       this.groupElement.classList.remove('animated');
     }
+    if (this.canvas) {
+      this.canvas.emit('edge:animatedChange', { edge: this, animated });
+    }
   }
 
   setLabel(label) {
