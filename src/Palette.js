@@ -22,9 +22,31 @@ export class Palette {
             <div class="palette-item-icon" style="border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">End Event</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-event">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">⏱</div>
+          <div class="palette-item" draggable="true" data-type="intermediate-event" data-event-def="timer">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
             <span class="palette-item-label">Timer Event</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="intermediate-message-event" data-event-def="message">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
+              <svg width="14" height="11" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                <polyline points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Message Event</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="intermediate-signal-event" data-event-def="signal">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="10,2 18,17 2,17" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Signal Event</span>
           </div>
         </div>
       </div>

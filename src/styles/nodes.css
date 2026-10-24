@@ -140,7 +140,9 @@
 .bpmn-node.bpmn-node-event,
 .bpmn-node.bpmn-node-start-event,
 .bpmn-node.bpmn-node-end-event,
-.bpmn-node.bpmn-node-intermediate-event {
+.bpmn-node.bpmn-node-intermediate-event,
+.bpmn-node.bpmn-node-intermediate-message-event,
+.bpmn-node.bpmn-node-intermediate-signal-event {
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -156,7 +158,9 @@
 .bpmn-node.bpmn-node-event:hover,
 .bpmn-node.bpmn-node-start-event:hover,
 .bpmn-node.bpmn-node-end-event:hover,
-.bpmn-node.bpmn-node-intermediate-event:hover {
+.bpmn-node.bpmn-node-intermediate-event:hover,
+.bpmn-node.bpmn-node-intermediate-message-event:hover,
+.bpmn-node.bpmn-node-intermediate-signal-event:hover {
   filter: brightness(1.15);
 }
 
@@ -170,15 +174,24 @@
   box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
 }
 
-.bpmn-node-intermediate-event {
+/* Intermediate Events (Double-ring concentric styling in warm gold/amber) */
+.bpmn-node-intermediate-event,
+.bpmn-node-intermediate-message-event,
+.bpmn-node-intermediate-signal-event {
   border: 2px double var(--accent-amber);
   outline: 2px solid var(--accent-amber);
   outline-offset: -5px;
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
 }
 
-.bpmn-node-intermediate-event .bpmn-event-inner-icon {
+.bpmn-node-intermediate-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-message-event .bpmn-event-inner-icon,
+.bpmn-node-intermediate-signal-event .bpmn-event-inner-icon,
+.bpmn-event-timer-icon,
+.bpmn-event-message-icon,
+.bpmn-event-signal-icon {
   color: var(--accent-amber);
+  font-size: 14px;
 }
 
 .bpmn-event-floating-label {

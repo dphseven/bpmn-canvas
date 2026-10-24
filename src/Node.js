@@ -24,6 +24,8 @@ export class BpmnNode {
       case 'start-event': return 'Start';
       case 'end-event': return 'End';
       case 'intermediate-event': return 'Wait';
+      case 'intermediate-message-event': return 'Message Received';
+      case 'intermediate-signal-event': return 'Signal Received';
       case 'gateway-exclusive': return '';
       case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
@@ -82,7 +84,37 @@ export class BpmnNode {
     if (this.type.includes('event')) {
       const isStart = this.type === 'start-event';
       const isEnd = this.type === 'end-event';
-      const innerIcon = (!isStart && !isEnd) ? `<div class="bpmn-event-inner-icon">⏱</div>` : '';
+      let innerIcon = '';
+
+      if (!isStart && !isEnd) {
+        if (this.type === 'intermediate-message-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-event-message-icon">
+              <svg width="18" height="13" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                <polyline points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'intermediate-signal-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-event-signal-icon">
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="10,2 18,17 2,17" />
+              </svg>
+            </div>
+          `;
+        } else {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-event-timer-icon">
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
+          `;
+        }
+      }
       
       this.domElement.innerHTML = `
         ${innerIcon}
