@@ -139,6 +139,9 @@
 /* 2. Event Node Styling (Start, End, Intermediate) */
 .bpmn-node.bpmn-node-event,
 .bpmn-node.bpmn-node-start-event,
+.bpmn-node.bpmn-node-start-timer-event,
+.bpmn-node.bpmn-node-start-message-event,
+.bpmn-node.bpmn-node-start-signal-event,
 .bpmn-node.bpmn-node-end-event,
 .bpmn-node.bpmn-node-intermediate-event,
 .bpmn-node.bpmn-node-intermediate-message-event,
@@ -157,6 +160,9 @@
 
 .bpmn-node.bpmn-node-event:hover,
 .bpmn-node.bpmn-node-start-event:hover,
+.bpmn-node.bpmn-node-start-timer-event:hover,
+.bpmn-node.bpmn-node-start-message-event:hover,
+.bpmn-node.bpmn-node-start-signal-event:hover,
 .bpmn-node.bpmn-node-end-event:hover,
 .bpmn-node.bpmn-node-intermediate-event:hover,
 .bpmn-node.bpmn-node-intermediate-message-event:hover,
@@ -164,9 +170,18 @@
   filter: brightness(1.15);
 }
 
-.bpmn-node.bpmn-node-start-event {
+.bpmn-node.bpmn-node-start-event,
+.bpmn-node.bpmn-node-start-timer-event,
+.bpmn-node.bpmn-node-start-message-event,
+.bpmn-node.bpmn-node-start-signal-event {
   border: 2px solid var(--accent-emerald) !important;
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.25);
+}
+
+.bpmn-start-timer-icon,
+.bpmn-start-message-icon,
+.bpmn-start-signal-icon {
+  color: var(--accent-emerald);
 }
 
 .bpmn-node.bpmn-node-end-event {

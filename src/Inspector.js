@@ -102,11 +102,14 @@ export class Inspector {
             <option value="service-task" ${node.type === 'service-task' ? 'selected' : ''}>Service Task</option>
           </optgroup>
           <optgroup label="Events">
-            <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event</option>
-            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event</option>
+            <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event (None)</option>
+            <option value="start-timer-event" ${node.type === 'start-timer-event' ? 'selected' : ''}>Timer Start Event (⏱)</option>
+            <option value="start-message-event" ${node.type === 'start-message-event' ? 'selected' : ''}>Message Start Event (✉️)</option>
+            <option value="start-signal-event" ${node.type === 'start-signal-event' ? 'selected' : ''}>Signal Start Event (▲)</option>
             <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
             <option value="intermediate-message-event" ${node.type === 'intermediate-message-event' ? 'selected' : ''}>Message Intermediate Event (✉️)</option>
             <option value="intermediate-signal-event" ${node.type === 'intermediate-signal-event' ? 'selected' : ''}>Signal Intermediate Event (▲)</option>
+            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event</option>
           </optgroup>
           <optgroup label="Gateways">
             <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
