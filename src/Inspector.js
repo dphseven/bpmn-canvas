@@ -125,6 +125,8 @@ export class Inspector {
           <optgroup label="Boundary Events">
             <option value="boundary-timer-event" ${node.type === 'boundary-timer-event' ? 'selected' : ''}>Boundary Timer Event (⏱)</option>
             <option value="boundary-error-event" ${node.type === 'boundary-error-event' ? 'selected' : ''}>Boundary Error Event (⚡)</option>
+            <option value="boundary-message-event" ${node.type === 'boundary-message-event' ? 'selected' : ''}>Boundary Message Event (✉️)</option>
+            <option value="boundary-signal-event" ${node.type === 'boundary-signal-event' ? 'selected' : ''}>Boundary Signal Event (▲)</option>
           </optgroup>
           <optgroup label="Artifacts">
             <option value="text-annotation" ${node.type === 'text-annotation' ? 'selected' : ''}>Text Annotation ([ T)</option>

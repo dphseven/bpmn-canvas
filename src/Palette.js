@@ -126,6 +126,23 @@ export class Palette {
             </div>
             <span class="palette-item-label">Boundary Error</span>
           </div>
+          <div class="palette-item" draggable="true" data-type="boundary-message-event">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="11" height="8" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                <polyline points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Boundary Message</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="boundary-signal-event">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="10,2 18,17 2,17" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Boundary Signal</span>
+          </div>
         </div>
       </div>
 

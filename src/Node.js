@@ -37,6 +37,8 @@ export class BpmnNode {
       case 'intermediate-signal-event': return 'Signal Received';
       case 'boundary-timer-event': return 'Timeout';
       case 'boundary-error-event': return 'Catch Error';
+      case 'boundary-message-event': return 'Message Boundary';
+      case 'boundary-signal-event': return 'Signal Boundary';
       case 'gateway-exclusive': return '';
       case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
@@ -160,6 +162,23 @@ export class BpmnNode {
             <div class="bpmn-event-inner-icon bpmn-boundary-error-icon">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-message-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-message-icon">
+              <svg width="14" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                <polyline points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-signal-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-signal-icon">
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="10,2 18,17 2,17" />
               </svg>
             </div>
           `;

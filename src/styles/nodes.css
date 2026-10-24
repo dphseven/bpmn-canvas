@@ -273,7 +273,9 @@
 
 /* Boundary Events (Compact 36px double-concentric rings) */
 .bpmn-node.bpmn-node-boundary-timer-event,
-.bpmn-node.bpmn-node-boundary-error-event {
+.bpmn-node.bpmn-node-boundary-error-event,
+.bpmn-node.bpmn-node-boundary-message-event,
+.bpmn-node.bpmn-node-boundary-signal-event {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -287,14 +289,18 @@
 }
 
 /* Boundary Timer Event: Gold/Amber concentric rings */
-.bpmn-node.bpmn-node-boundary-timer-event {
+.bpmn-node.bpmn-node-boundary-timer-event,
+.bpmn-node.bpmn-node-boundary-message-event,
+.bpmn-node.bpmn-node-boundary-signal-event {
   border: 1.8px solid var(--accent-amber) !important;
   outline: 1.5px solid var(--accent-amber);
   outline-offset: -4px;
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
 }
 
-.bpmn-node.bpmn-node-boundary-timer-event .bpmn-boundary-timer-icon {
+.bpmn-node.bpmn-node-boundary-timer-event .bpmn-boundary-timer-icon,
+.bpmn-node.bpmn-node-boundary-message-event .bpmn-boundary-message-icon,
+.bpmn-node.bpmn-node-boundary-signal-event .bpmn-boundary-signal-icon {
   color: var(--accent-amber);
   display: flex;
   align-items: center;
@@ -318,13 +324,17 @@
 
 /* Non-Interrupting Boundary Events: BPMN 2.0 Dashed Double Rings */
 .bpmn-node.bpmn-node-boundary-timer-event.non-interrupting,
-.bpmn-node.bpmn-node-boundary-error-event.non-interrupting {
+.bpmn-node.bpmn-node-boundary-error-event.non-interrupting,
+.bpmn-node.bpmn-node-boundary-message-event.non-interrupting,
+.bpmn-node.bpmn-node-boundary-signal-event.non-interrupting {
   border-style: dashed !important;
   outline-style: dashed !important;
 }
 
 .bpmn-node.bpmn-node-boundary-timer-event .bpmn-event-floating-label,
-.bpmn-node.bpmn-node-boundary-error-event .bpmn-event-floating-label {
+.bpmn-node.bpmn-node-boundary-error-event .bpmn-event-floating-label,
+.bpmn-node.bpmn-node-boundary-message-event .bpmn-event-floating-label,
+.bpmn-node.bpmn-node-boundary-signal-event .bpmn-event-floating-label {
   top: 40px;
 }
 
