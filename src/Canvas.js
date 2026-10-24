@@ -1016,13 +1016,29 @@ export class BpmnCanvas {
         visited.add(currentEdge.id);
         path.push(currentEdge);
         const nextTargetId = currentEdge.targetId;
-        currentEdge = animatedEdges.find(e => e.sourceId === nextTargetId);
+
+        // First look for direct outbound animated edge from target node
+        let nextEdge = animatedEdges.find(e => e.sourceId === nextTargetId && !visited.has(e.id));
+
+        // If no direct outbound edge, check if target node has an attached boundary event with an animated edge
+        if (!nextEdge) {
+          const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === nextTargetId);
+          for (const bNode of attachedBoundaryNodes) {
+            const bEdge = animatedEdges.find(e => e.sourceId === bNode.id && !visited.has(e.id));
+            if (bEdge) {
+              nextEdge = bEdge;
+              break;
+            }
+          }
+        }
+
+        currentEdge = nextEdge;
       }
       if (path.length > 0) return path;
     }
 
     // 2. Otherwise find start-event node and traverse sequentially
-    const startNode = Array.from(this.nodes.values()).find(n => n.type === 'start-event') ||
+    const startNode = Array.from(this.nodes.values()).find(n => n.type.startsWith('start-')) ||
                       this.nodes.values().next().value;
     if (!startNode) return [];
 
@@ -1032,9 +1048,23 @@ export class BpmnCanvas {
 
     while (currentNodeId) {
       const outgoing = Array.from(this.edges.values()).filter(e => e.sourceId === currentNodeId && !visitedEdges.has(e.id));
-      if (!outgoing.length) break;
-      // Prefer animated edge or first outgoing edge
-      const nextEdge = outgoing.find(e => e.animated) || outgoing[0];
+      let nextEdge = outgoing.find(e => e.animated) || outgoing[0];
+
+      // If no direct outgoing edge from this node, check if it has an attached boundary event with outgoing edges
+      if (!nextEdge) {
+        const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === currentNodeId);
+        for (const bNode of attachedBoundaryNodes) {
+          const bOutgoing = Array.from(this.edges.values()).filter(e => e.sourceId === bNode.id && !visitedEdges.has(e.id));
+          const cand = bOutgoing.find(e => e.animated) || bOutgoing[0];
+          if (cand) {
+            nextEdge = cand;
+            break;
+          }
+        }
+      }
+
+      if (!nextEdge) break;
+
       visitedEdges.add(nextEdge.id);
       path.push(nextEdge);
       currentNodeId = nextEdge.targetId;
@@ -1092,6 +1122,12 @@ export class BpmnCanvas {
       // Highlight starting node of first edge
       if (edgeIndex === 0) {
         highlightNode(edge.sourceId, 300);
+      } else {
+        // If this edge begins from a boundary event, pulse the boundary event node
+        const sourceNode = this.getNode(edge.sourceId);
+        if (sourceNode && sourceNode.type.startsWith('boundary-')) {
+          highlightNode(edge.sourceId, 350);
+        }
       }
 
       const totalLength = pathEl.getTotalLength();
