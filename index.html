@@ -25,6 +25,9 @@
         <button class="btn" id="btn-theme-toggle" title="Toggle Theme">
           <span>🌙</span> <span id="theme-label">Dark</span>
         </button>
+        <button class="btn" id="btn-simulate" title="Simulate Token Flow" style="border-color: var(--border-focus)">
+          <span>▶</span> <span id="sim-label">Pause Flow</span>
+        </button>
         <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
           <span>🧲</span> Grid Snap: <span id="snap-status">On</span>
         </button>
@@ -146,7 +149,8 @@
             targetId: 'gateway_check',
             sourcePort: 'right',
             targetPort: 'left',
-            routing: 'bezier'
+            routing: 'bezier',
+            animated: true
           },
           {
             id: 'e3',
@@ -215,7 +219,16 @@
       canvas.fitView();
     });
 
-    // 5. Grid Snap Toggle
+    // 5. Token Flow Simulation Toggle
+    const simBtn = document.getElementById('btn-simulate');
+    const simLabel = document.getElementById('sim-label');
+    simBtn.addEventListener('click', () => {
+      const isRunning = canvas.toggleSimulation();
+      simLabel.textContent = isRunning ? 'Pause Flow' : 'Play Flow';
+      simBtn.style.borderColor = isRunning ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6. Grid Snap Toggle
     const snapBtn = document.getElementById('btn-snap-toggle');
     const snapStatus = document.getElementById('snap-status');
     snapBtn.addEventListener('click', () => {
@@ -224,7 +237,7 @@
       snapBtn.style.borderColor = canvas.options.snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
     });
 
-    // 6. Theme Toggle (Dark / Light)
+    // 7. Theme Toggle (Dark / Light)
     const themeBtn = document.getElementById('btn-theme-toggle');
     const themeLabel = document.getElementById('theme-label');
     let isLight = false;
@@ -234,7 +247,7 @@
       themeLabel.textContent = isLight ? 'Light' : 'Dark';
     });
 
-    // 7. Export / Import Data
+    // 8. Export / Import Data
     document.getElementById('btn-export-json').addEventListener('click', () => {
       const data = canvas.exportData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -248,7 +261,15 @@
 
     document.getElementById('btn-import-json').addEventListener('click', () => {
       loadSampleWorkflow();
+      canvas.startSimulation();
+      simLabel.textContent = 'Pause Flow';
+      simBtn.style.borderColor = 'var(--border-focus)';
     });
+
+    // Start simulation automatically on initial load
+    setTimeout(() => {
+      canvas.startSimulation();
+    }, 200);
   </script>
 </body>
 </html>

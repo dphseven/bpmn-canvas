@@ -498,6 +498,203 @@ export class BpmnCanvas {
     }
   }
 
+  /* -------------------------------------------------------------
+   * Token Flow Simulation
+   * ----------------------------------------------------------- */
+  startSimulation(options = {}) {
+    if (this.simulationActive) return;
+
+    this.simulationActive = true;
+    this.simulationSpeed = options.speed || 1.0; // multiplier
+    this.emit('simulation:start');
+
+    if (!this.simTokenGroup) {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      this.simTokenGroup = document.createElementNS(svgNS, 'g');
+      this.simTokenGroup.classList.add('bpmn-sim-token');
+      this.simTokenGroup.style.display = 'none';
+
+      const glow = document.createElementNS(svgNS, 'circle');
+      glow.classList.add('bpmn-sim-token-glow');
+      glow.setAttribute('r', '7');
+
+      const core = document.createElementNS(svgNS, 'circle');
+      core.classList.add('bpmn-sim-token-core');
+      core.setAttribute('r', '3.5');
+
+      this.simTokenGroup.appendChild(glow);
+      this.simTokenGroup.appendChild(core);
+
+      if (this.handlesSvg) {
+        this.handlesSvg.appendChild(this.simTokenGroup);
+      }
+    }
+
+    this.runSimulationCycle();
+  }
+
+  stopSimulation() {
+    this.simulationActive = false;
+    if (this.simAnimationId) {
+      cancelAnimationFrame(this.simAnimationId);
+      this.simAnimationId = null;
+    }
+    if (this.simTimeoutId) {
+      clearTimeout(this.simTimeoutId);
+      this.simTimeoutId = null;
+    }
+    if (this.simTokenGroup) {
+      this.simTokenGroup.style.display = 'none';
+    }
+    // Remove active highlight from all nodes
+    this.nodes.forEach(n => {
+      if (n.domElement) n.domElement.classList.remove('sim-active');
+    });
+    this.emit('simulation:stop');
+  }
+
+  toggleSimulation() {
+    if (this.simulationActive) {
+      this.stopSimulation();
+      return false;
+    } else {
+      this.startSimulation();
+      return true;
+    }
+  }
+
+  findSimulationPath() {
+    // 1. Check if there are edges marked animated: true
+    const animatedEdges = Array.from(this.edges.values()).filter(e => e.animated);
+    if (animatedEdges.length > 0) {
+      // Find starting point among animated edges (a node with no incoming animated edge)
+      const targetIds = new Set(animatedEdges.map(e => e.targetId));
+      let currentEdge = animatedEdges.find(e => !targetIds.has(e.sourceId)) || animatedEdges[0];
+      const path = [];
+      const visited = new Set();
+
+      while (currentEdge && !visited.has(currentEdge.id)) {
+        visited.add(currentEdge.id);
+        path.push(currentEdge);
+        const nextTargetId = currentEdge.targetId;
+        currentEdge = animatedEdges.find(e => e.sourceId === nextTargetId);
+      }
+      if (path.length > 0) return path;
+    }
+
+    // 2. Otherwise find start-event node and traverse sequentially
+    const startNode = Array.from(this.nodes.values()).find(n => n.type === 'start-event') ||
+                      this.nodes.values().next().value;
+    if (!startNode) return [];
+
+    const path = [];
+    let currentNodeId = startNode.id;
+    const visitedEdges = new Set();
+
+    while (currentNodeId) {
+      const outgoing = Array.from(this.edges.values()).filter(e => e.sourceId === currentNodeId && !visitedEdges.has(e.id));
+      if (!outgoing.length) break;
+      // Prefer animated edge or first outgoing edge
+      const nextEdge = outgoing.find(e => e.animated) || outgoing[0];
+      visitedEdges.add(nextEdge.id);
+      path.push(nextEdge);
+      currentNodeId = nextEdge.targetId;
+    }
+
+    return path;
+  }
+
+  runSimulationCycle() {
+    if (!this.simulationActive) return;
+
+    const pathEdges = this.findSimulationPath();
+    if (!pathEdges.length) {
+      this.stopSimulation();
+      return;
+    }
+
+    let edgeIndex = 0;
+
+    const highlightNode = (nodeId, duration = 300) => {
+      const node = this.getNode(nodeId);
+      if (node && node.domElement) {
+        node.domElement.classList.add('sim-active');
+        setTimeout(() => {
+          if (node.domElement) node.domElement.classList.remove('sim-active');
+        }, duration);
+      }
+    };
+
+    const animateEdgeStep = () => {
+      if (!this.simulationActive) return;
+
+      if (edgeIndex >= pathEdges.length) {
+        // Reached end of path: pulse final node, pause 600ms, then loop
+        const lastEdge = pathEdges[pathEdges.length - 1];
+        if (lastEdge) highlightNode(lastEdge.targetId, 500);
+
+        this.simTimeoutId = setTimeout(() => {
+          if (this.simulationActive) {
+            edgeIndex = 0;
+            animateEdgeStep();
+          }
+        }, 700);
+        return;
+      }
+
+      const edge = pathEdges[edgeIndex];
+      const pathEl = edge.pathElement;
+      if (!pathEl || !pathEl.getTotalLength) {
+        edgeIndex++;
+        animateEdgeStep();
+        return;
+      }
+
+      // Highlight starting node of first edge
+      if (edgeIndex === 0) {
+        highlightNode(edge.sourceId, 300);
+      }
+
+      const totalLength = pathEl.getTotalLength();
+      // Speed: roughly 200 pixels per second scaled by simulationSpeed
+      const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
+      let startTime = null;
+
+      this.simTokenGroup.style.display = 'block';
+
+      const step = (timestamp) => {
+        if (!this.simulationActive) return;
+        if (!startTime) startTime = timestamp;
+
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const distance = progress * totalLength;
+        const point = pathEl.getPointAtLength(distance);
+
+        this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
+
+        if (progress < 1) {
+          this.simAnimationId = requestAnimationFrame(step);
+        } else {
+          // Token reached target node!
+          highlightNode(edge.targetId, 250);
+          edgeIndex++;
+
+          // Brief pause at each node (180ms) for visual rhythm
+          this.simTimeoutId = setTimeout(() => {
+            if (this.simulationActive) {
+              animateEdgeStep();
+            }
+          }, 180);
+        }
+      };
+
+      this.simAnimationId = requestAnimationFrame(step);
+    };
+
+    animateEdgeStep();
+  }
+
   on(event, handler) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
