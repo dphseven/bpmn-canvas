@@ -100,6 +100,9 @@ export class Inspector {
             <option value="manual-task" ${node.type === 'manual-task' || node.type === 'task' || node.type === 'activity' ? 'selected' : ''}>Manual Task</option>
             <option value="user-task" ${node.type === 'user-task' ? 'selected' : ''}>User Task</option>
             <option value="service-task" ${node.type === 'service-task' ? 'selected' : ''}>Service Task</option>
+            <option value="business-rule-task" ${node.type === 'business-rule-task' ? 'selected' : ''}>Business Rule Task (📊)</option>
+            <option value="script-task" ${node.type === 'script-task' ? 'selected' : ''}>Script Task (📜)</option>
+            <option value="subprocess" ${node.type === 'subprocess' ? 'selected' : ''}>Subprocess (⊞)</option>
           </optgroup>
           <optgroup label="Events">
             <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event (None)</option>

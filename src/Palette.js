@@ -121,6 +121,18 @@ export class Palette {
             <div class="palette-item-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">✋</div>
             <span class="palette-item-label">Manual Task</span>
           </div>
+          <div class="palette-item" draggable="true" data-type="business-rule-task">
+            <div class="palette-item-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">📊</div>
+            <span class="palette-item-label">Rule Task</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="script-task">
+            <div class="palette-item-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">📜</div>
+            <span class="palette-item-label">Script Task</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="subprocess">
+            <div class="palette-item-icon" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: bold; font-size: 13px;">⊞</div>
+            <span class="palette-item-label">Subprocess</span>
+          </div>
         </div>
       </div>
 

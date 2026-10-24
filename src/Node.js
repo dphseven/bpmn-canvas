@@ -38,6 +38,9 @@ export class BpmnNode {
       case 'user-task': return 'Review Order';
       case 'service-task': return 'Process Payment';
       case 'manual-task': return 'Manual Task';
+      case 'business-rule-task': return 'Evaluate Rules';
+      case 'script-task': return 'Execute Script';
+      case 'subprocess': return 'Subprocess';
       case 'activity':
       case 'task':
       default: return 'Manual Task';
@@ -47,12 +50,14 @@ export class BpmnNode {
   getDefaultWidth(type) {
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
+    if (type === 'subprocess') return 170;
     return 150;
   }
 
   getDefaultHeight(type) {
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
+    if (type === 'subprocess') return 95;
     return 80;
   }
 
@@ -194,9 +199,30 @@ export class BpmnNode {
         <div class="bpmn-gateway-floating-label">${this.label}</div>
       `;
     } else {
-      // Activity / Task
-      const icon = this.type === 'user-task' ? '👤' : (this.type === 'service-task' ? '⚙️' : '✋');
-      const badge = this.type === 'user-task' ? 'User Task' : (this.type === 'service-task' ? 'Service Task' : 'Manual Task');
+      // Activity / Task / Subprocess
+      let icon = '✋';
+      let badge = 'Manual Task';
+
+      if (this.type === 'user-task') {
+        icon = '👤';
+        badge = 'User Task';
+      } else if (this.type === 'service-task') {
+        icon = '⚙️';
+        badge = 'Service Task';
+      } else if (this.type === 'business-rule-task') {
+        icon = '📊';
+        badge = 'Rule Task';
+      } else if (this.type === 'script-task') {
+        icon = '📜';
+        badge = 'Script Task';
+      } else if (this.type === 'subprocess') {
+        icon = '⊞';
+        badge = 'Subprocess';
+      }
+
+      const subprocessMarker = (this.type === 'subprocess') 
+        ? `<div class="bpmn-subprocess-marker" title="Collapsed Subprocess"><span class="bpmn-subprocess-plus">+</span></div>` 
+        : '';
       
       this.domElement.innerHTML = `
         <div class="bpmn-activity-header">
@@ -204,6 +230,7 @@ export class BpmnNode {
           <span style="font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">${badge}</span>
         </div>
         <div class="bpmn-activity-label" spellcheck="false">${this.label}</div>
+        ${subprocessMarker}
       `;
 
     }

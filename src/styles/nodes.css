@@ -45,6 +45,9 @@
 .bpmn-node.bpmn-node-manual-task,
 .bpmn-node.bpmn-node-user-task,
 .bpmn-node.bpmn-node-service-task,
+.bpmn-node.bpmn-node-business-rule-task,
+.bpmn-node.bpmn-node-script-task,
+.bpmn-node.bpmn-node-subprocess,
 .bpmn-node.bpmn-node-send-task {
   width: 150px;
   min-height: 80px;
@@ -66,6 +69,9 @@
 .bpmn-node.bpmn-node-manual-task:hover,
 .bpmn-node.bpmn-node-user-task:hover,
 .bpmn-node.bpmn-node-service-task:hover,
+.bpmn-node.bpmn-node-business-rule-task:hover,
+.bpmn-node.bpmn-node-script-task:hover,
+.bpmn-node.bpmn-node-subprocess:hover,
 .bpmn-node.bpmn-node-send-task:hover {
   border-color: rgba(255, 255, 255, 0.35);
   box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.5);
@@ -125,6 +131,43 @@
 
 .bpmn-node-manual-task {
   border-top: 4px solid var(--accent-cyan) !important;
+}
+
+.bpmn-node-business-rule-task {
+  border-top: 4px solid var(--accent-amber) !important;
+}
+
+.bpmn-node-script-task {
+  border-top: 4px solid var(--accent-emerald) !important;
+}
+
+.bpmn-node-subprocess {
+  border-top: 4px solid #818cf8 !important;
+  border-style: solid;
+}
+
+/* Subprocess [+] Expand Box Marker */
+.bpmn-subprocess-marker {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.bpmn-subprocess-plus {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
 }
 
 .bpmn-node-task,
