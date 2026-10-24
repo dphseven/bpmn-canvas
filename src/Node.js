@@ -338,7 +338,11 @@ export class BpmnNode {
         if (this.domElement && this.canvas) {
           const currentHeight = this.domElement.offsetHeight;
           if (currentHeight && currentHeight !== this.height) {
+            const oldHeight = this.height;
             this.height = currentHeight;
+            if (this.canvas.updateAttachedBoundaryPositions) {
+              this.canvas.updateAttachedBoundaryPositions(this, this.width, oldHeight);
+            }
           }
           this.canvas.updateConnectedEdges(this.id);
         }

@@ -604,16 +604,29 @@ export class BpmnCanvas {
   }
 
   calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth = 36, boundaryHeight = 36) {
+    const hostW = hostNode.domElement ? (hostNode.domElement.offsetWidth || hostNode.width) : hostNode.width;
+    const hostH = hostNode.domElement ? (hostNode.domElement.offsetHeight || hostNode.height) : hostNode.height;
     const left = hostNode.x;
     const top = hostNode.y;
-    const right = hostNode.x + hostNode.width;
-    const bottom = hostNode.y + hostNode.height;
+    const right = hostNode.x + hostW;
+    const bottom = hostNode.y + hostH;
 
-    // Distances from center point to each of the 4 borders
-    const distBottom = Math.abs(centerY - bottom);
-    const distRight = Math.abs(centerX - right);
-    const distTop = Math.abs(centerY - top);
-    const distLeft = Math.abs(centerX - left);
+    // Measure distance from (centerX, centerY) to each of the 4 border segments
+    // Bottom border segment: [left, right] at y = bottom
+    const clampedBottomX = Math.max(left, Math.min(right, centerX));
+    const distBottom = Math.hypot(centerX - clampedBottomX, centerY - bottom);
+
+    // Right border segment: [top, bottom] at x = right
+    const clampedRightY = Math.max(top, Math.min(bottom, centerY));
+    const distRight = Math.hypot(centerX - right, centerY - clampedRightY);
+
+    // Top border segment: [left, right] at y = top
+    const clampedTopX = Math.max(left, Math.min(right, centerX));
+    const distTop = Math.hypot(centerX - clampedTopX, centerY - top);
+
+    // Left border segment: [top, bottom] at x = left
+    const clampedLeftY = Math.max(top, Math.min(bottom, centerY));
+    const distLeft = Math.hypot(centerX - left, centerY - clampedLeftY);
 
     const minDist = Math.min(distBottom, distRight, distTop, distLeft);
 
@@ -658,10 +671,12 @@ export class BpmnCanvas {
     this.nodes.forEach(node => {
       if (node.id === excludeId || !this.isActivityNode(node)) return;
 
+      const nodeW = node.domElement ? (node.domElement.offsetWidth || node.width) : node.width;
+      const nodeH = node.domElement ? (node.domElement.offsetHeight || node.height) : node.height;
       const left = node.x;
       const top = node.y;
-      const right = node.x + node.width;
-      const bottom = node.y + node.height;
+      const right = node.x + nodeW;
+      const bottom = node.y + nodeH;
 
       // Expand bounding box by threshold
       if (
@@ -702,6 +717,9 @@ export class BpmnCanvas {
 
   updateAttachedBoundaryPositions(hostNode, oldWidth, oldHeight) {
     if (!hostNode) return;
+    const hostW = hostNode.domElement ? (hostNode.domElement.offsetWidth || hostNode.width) : hostNode.width;
+    const hostH = hostNode.domElement ? (hostNode.domElement.offsetHeight || hostNode.height) : hostNode.height;
+
     this.nodes.forEach(node => {
       if (node.type.startsWith('boundary-') && node.data?.hostNodeId === hostNode.id) {
         const dockEdge = node.data.dockEdge || 'bottom';
@@ -710,10 +728,10 @@ export class BpmnCanvas {
 
         if (dockEdge === 'bottom') {
           // Bottom border shifted: stay centered on the new bottom edge
-          newY = hostNode.y + hostNode.height - node.height / 2;
+          newY = hostNode.y + hostH - node.height / 2;
         } else if (dockEdge === 'right') {
           // Right border shifted: stay centered on the new right edge
-          newX = hostNode.x + hostNode.width - node.width / 2;
+          newX = hostNode.x + hostW - node.width / 2;
         } else if (dockEdge === 'top') {
           newY = hostNode.y - node.height / 2;
         } else if (dockEdge === 'left') {
@@ -724,9 +742,9 @@ export class BpmnCanvas {
         const halfW = node.width / 2;
         const halfH = node.height / 2;
         if (dockEdge === 'bottom' || dockEdge === 'top') {
-          newX = Math.max(hostNode.x + halfW, Math.min(hostNode.x + hostNode.width - halfW, newX + halfW)) - halfW;
+          newX = Math.max(hostNode.x + halfW, Math.min(hostNode.x + hostW - halfW, newX + halfW)) - halfW;
         } else {
-          newY = Math.max(hostNode.y + halfH, Math.min(hostNode.y + hostNode.height - halfH, newY + halfH)) - halfH;
+          newY = Math.max(hostNode.y + halfH, Math.min(hostNode.y + hostH - halfH, newY + halfH)) - halfH;
         }
 
         node.setPosition(Math.round(newX), Math.round(newY));
