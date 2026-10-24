@@ -15,11 +15,11 @@ export class Palette {
         <div class="palette-heading">Events</div>
         <div class="palette-category">
           <div class="palette-item" draggable="true" data-type="start-event">
-            <div class="palette-item-icon" style="color: #10b981; border: 1.5px solid #10b981; border-radius: 50%;">▶</div>
+            <div class="palette-item-icon" style="border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">Start Event</span>
           </div>
           <div class="palette-item" draggable="true" data-type="end-event">
-            <div class="palette-item-icon" style="color: #f43f5e; border: 2.5px solid #f43f5e; border-radius: 50%;">■</div>
+            <div class="palette-item-icon" style="border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">End Event</span>
           </div>
           <div class="palette-item" draggable="true" data-type="intermediate-event">
@@ -73,7 +73,31 @@ export class Palette {
     const items = this.container.querySelectorAll('.palette-item');
     items.forEach(item => {
       item.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', item.dataset.type);
+        const rect = item.getBoundingClientRect();
+        const icon = item.querySelector('.palette-item-icon');
+
+        // Center of the icon relative to the palette-item
+        let grabOffsetX = 24;
+        let grabOffsetY = rect.height / 2;
+
+        if (icon) {
+          const iconRect = icon.getBoundingClientRect();
+          grabOffsetX = (iconRect.left + iconRect.width / 2) - rect.left;
+          grabOffsetY = (iconRect.top + iconRect.height / 2) - rect.top;
+          
+          // Set drag preview centered on the icon
+          if (e.dataTransfer.setDragImage) {
+            e.dataTransfer.setDragImage(item, grabOffsetX, grabOffsetY);
+          }
+        }
+
+        const payload = JSON.stringify({
+          type: item.dataset.type,
+          grabOffsetX,
+          grabOffsetY
+        });
+
+        e.dataTransfer.setData('text/plain', payload);
         e.dataTransfer.effectAllowed = 'copy';
       });
     });
@@ -86,8 +110,18 @@ export class Palette {
 
     canvasContainer.addEventListener('drop', (e) => {
       e.preventDefault();
-      const nodeType = e.dataTransfer.getData('text/plain');
-      if (!nodeType) return;
+      const rawData = e.dataTransfer.getData('text/plain');
+      if (!rawData) return;
+
+      let nodeType = rawData;
+      try {
+        const parsed = JSON.parse(rawData);
+        if (parsed && parsed.type) {
+          nodeType = parsed.type;
+        }
+      } catch (_) {
+        // Fallback for plain string
+      }
 
       const coords = this.canvas.clientToCanvas(e.clientX, e.clientY);
       const dummyNode = {

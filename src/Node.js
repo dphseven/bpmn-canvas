@@ -65,10 +65,10 @@ export class BpmnNode {
     if (this.type.includes('event')) {
       const isStart = this.type === 'start-event';
       const isEnd = this.type === 'end-event';
-      const icon = isStart ? '▶' : (isEnd ? '■' : '⏱');
+      const innerIcon = (!isStart && !isEnd) ? `<div class="bpmn-event-inner-icon">⏱</div>` : '';
       
       this.domElement.innerHTML = `
-        <div class="bpmn-event-inner-icon">${icon}</div>
+        ${innerIcon}
         <div class="bpmn-event-floating-label">${this.label}</div>
       `;
     } else if (this.type.includes('gateway')) {
