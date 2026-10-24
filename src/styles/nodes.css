@@ -1,0 +1,285 @@
+/* Base BPMN Node Container */
+.bpmn-node {
+  position: absolute;
+  user-select: none;
+  cursor: grab;
+  z-index: 20;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bpmn-node:active {
+  cursor: grabbing;
+}
+
+.bpmn-node.selected {
+  outline: none;
+  z-index: 25;
+}
+
+/* Selected Node Halo Effect */
+.bpmn-node.selected::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid var(--border-focus);
+  border-radius: inherit;
+  box-shadow: var(--shadow-glow);
+  pointer-events: none;
+  animation: pulseHalo 2s infinite ease-in-out;
+}
+
+@keyframes pulseHalo {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.4; }
+}
+
+/* 1. Activity / Task Node Styling */
+.bpmn-node.bpmn-node-task,
+.bpmn-node.bpmn-node-activity,
+.bpmn-node.bpmn-node-user-task,
+.bpmn-node.bpmn-node-service-task,
+.bpmn-node.bpmn-node-send-task {
+  width: 150px;
+  min-height: 80px;
+  border-radius: 12px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-sizing: border-box;
+}
+
+.bpmn-node.bpmn-node-task:hover,
+.bpmn-node.bpmn-node-activity:hover,
+.bpmn-node.bpmn-node-user-task:hover,
+.bpmn-node.bpmn-node-service-task:hover,
+.bpmn-node.bpmn-node-send-task:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.5);
+}
+
+.bpmn-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 100%;
+}
+
+.bpmn-activity-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.bpmn-activity-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  line-height: 1.35;
+  outline: none;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.bpmn-activity-label[contenteditable="true"]:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.bpmn-node-user-task {
+  border-top: 4px solid var(--accent-blue) !important;
+}
+
+.bpmn-node-service-task {
+  border-top: 4px solid var(--accent-violet) !important;
+}
+
+.bpmn-node-send-task {
+  border-top: 4px solid var(--accent-cyan) !important;
+}
+
+/* 2. Event Node Styling (Start, End, Intermediate) */
+.bpmn-node.bpmn-node-event,
+.bpmn-node.bpmn-node-start-event,
+.bpmn-node.bpmn-node-end-event,
+.bpmn-node.bpmn-node-intermediate-event {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.bpmn-node.bpmn-node-event:hover,
+.bpmn-node.bpmn-node-start-event:hover,
+.bpmn-node.bpmn-node-end-event:hover,
+.bpmn-node.bpmn-node-intermediate-event:hover {
+  filter: brightness(1.15);
+}
+
+.bpmn-node.bpmn-node-start-event {
+  border: 2.5px solid var(--accent-emerald) !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+}
+
+.bpmn-node.bpmn-node-start-event .bpmn-event-inner-icon {
+  color: var(--accent-emerald);
+}
+
+.bpmn-node.bpmn-node-end-event {
+  border: 4px solid var(--accent-rose) !important;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.3);
+}
+
+.bpmn-node-end-event .bpmn-event-inner-icon {
+  color: var(--accent-rose);
+}
+
+.bpmn-node-intermediate-event {
+  border: 2px double var(--accent-amber);
+  outline: 2px solid var(--accent-amber);
+  outline-offset: -5px;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+}
+
+.bpmn-node-intermediate-event .bpmn-event-inner-icon {
+  color: var(--accent-amber);
+}
+
+.bpmn-event-floating-label {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 3. Gateway Node Styling (Diamond) */
+.bpmn-node.bpmn-node-gateway,
+.bpmn-node.bpmn-node-gateway-exclusive,
+.bpmn-node.bpmn-node-gateway-parallel {
+  width: 56px;
+  height: 56px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.bpmn-gateway-diamond {
+  width: 44px;
+  height: 44px;
+  transform: rotate(45deg);
+  background: var(--bg-panel);
+  border: 2.5px solid var(--accent-amber);
+  border-radius: 6px;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.bpmn-node:hover .bpmn-gateway-diamond {
+  transform: rotate(45deg) scale(1.06);
+}
+
+.bpmn-gateway-icon {
+  transform: rotate(-45deg);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent-amber);
+  line-height: 1;
+}
+
+.bpmn-gateway-floating-label {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Ports / Connection Handles */
+.bpmn-port {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-focus);
+  position: absolute;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  cursor: crosshair;
+}
+
+.bpmn-node:hover .bpmn-port,
+.bpmn-node.selected .bpmn-port,
+.bpmn-canvas-surface.connecting .bpmn-port {
+  opacity: 0.85;
+}
+
+.bpmn-port:hover {
+  opacity: 1 !important;
+  transform: scale(1.5);
+  background: var(--border-focus);
+  box-shadow: 0 0 8px var(--border-focus);
+}
+
+.bpmn-port-top {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.bpmn-port-bottom {
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.bpmn-port-left {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.bpmn-port-right {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
