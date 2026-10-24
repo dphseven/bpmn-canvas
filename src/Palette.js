@@ -153,6 +153,25 @@ export class Palette {
           </div>
         </div>
       </div>
+
+      <div>
+        <div class="palette-heading">Artifacts</div>
+        <div class="palette-category">
+          <div class="palette-item" draggable="true" data-type="text-annotation">
+            <div class="palette-item-icon" style="color: #94a3b8; font-weight: 600; font-size: 14px; font-family: monospace;">[ T</div>
+            <span class="palette-item-label">Annotation</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="data-object">
+            <div class="palette-item-icon" style="color: #38bdf8;">
+              <svg width="13" height="16" viewBox="0 0 16 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M 2 2 L 10 2 L 14 6 L 14 18 L 2 18 Z" />
+                <polyline points="10,2 10,6 14,6" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Data Object</span>
+          </div>
+        </div>
+      </div>
     `;
 
     this.bindEvents();
@@ -213,10 +232,17 @@ export class Palette {
       }
 
       const coords = this.canvas.clientToCanvas(e.clientX, e.clientY);
-      const dummyNode = {
-        width: nodeType.includes('event') ? 52 : (nodeType.includes('gateway') ? 56 : 150),
-        height: nodeType.includes('event') ? 52 : (nodeType.includes('gateway') ? 56 : 80)
-      };
+      const dummyWidth = nodeType.includes('event') ? 52 
+        : (nodeType.includes('gateway') ? 56 
+        : (nodeType === 'text-annotation' ? 130 
+        : (nodeType === 'data-object' ? 60 
+        : (nodeType === 'subprocess' ? 170 : 150))));
+
+      const dummyHeight = nodeType.includes('event') ? 52 
+        : (nodeType.includes('gateway') ? 56 
+        : (nodeType === 'text-annotation' ? 50 
+        : (nodeType === 'data-object' ? 70 
+        : (nodeType === 'subprocess' ? 95 : 80))));
 
       let finalCenterX = coords.x;
       let finalCenterY = coords.y;
@@ -229,8 +255,8 @@ export class Palette {
       // Center dropped node on cursor / snap point
       const node = this.canvas.addNode({
         type: nodeType,
-        x: finalCenterX - dummyNode.width / 2,
-        y: finalCenterY - dummyNode.height / 2
+        x: finalCenterX - dummyWidth / 2,
+        y: finalCenterY - dummyHeight / 2
       });
 
       this.canvas.selectNode(node);

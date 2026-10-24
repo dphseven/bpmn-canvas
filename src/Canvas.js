@@ -333,25 +333,61 @@ export class BpmnCanvas {
         this.nodeDragOffsets.clear();
       }
 
+      const findTargetPort = (clientX, clientY, excludeNodeId) => {
+        const elemUnder = document.elementFromPoint(clientX, clientY);
+        if (!elemUnder) return null;
+
+        // 1. Direct hit on a port
+        if (elemUnder.classList.contains('bpmn-port')) {
+          const targetNodeId = elemUnder.dataset.nodeId;
+          const targetPort = elemUnder.dataset.port;
+          if (targetNodeId && targetNodeId !== excludeNodeId) {
+            return { targetNodeId, targetPort };
+          }
+        }
+
+        // 2. Hit on a node or its children
+        const nodeEl = elemUnder.closest('.bpmn-node');
+        if (nodeEl && nodeEl.id && nodeEl.id !== excludeNodeId) {
+          const targetNode = this.getNode(nodeEl.id);
+          if (targetNode) {
+            const mouseCanvas = this.clientToCanvas(clientX, clientY);
+            // Available ports for this node
+            const availablePorts = (targetNode.type === 'data-object')
+              ? ['top', 'right', 'left']
+              : ['top', 'right', 'bottom', 'left'];
+
+            let bestPort = availablePorts[0];
+            let bestDist = Infinity;
+            availablePorts.forEach(port => {
+              const pos = targetNode.getPortPosition(port);
+              const dist = Math.hypot(pos.x - mouseCanvas.x, pos.y - mouseCanvas.y);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestPort = port;
+              }
+            });
+
+            return { targetNodeId: targetNode.id, targetPort: bestPort };
+          }
+        }
+
+        return null;
+      };
+
       if (this.connectingFrom) {
         this.surface.classList.remove('connecting');
         this.connectionDraft.style.display = 'none';
 
-        // Check if dropped on a port
-        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
-        if (elemUnder && elemUnder.classList.contains('bpmn-port')) {
-          const targetNodeId = elemUnder.dataset.nodeId;
-          const targetPort = elemUnder.dataset.port;
-          
-          if (targetNodeId && targetNodeId !== this.connectingFrom.node.id) {
-            this.addEdge({
-              sourceId: this.connectingFrom.node.id,
-              targetId: targetNodeId,
-              sourcePort: this.connectingFrom.port,
-              targetPort: targetPort,
-              routing: this.options.defaultRouting
-            });
-          }
+        const connectionTarget = findTargetPort(e.clientX, e.clientY, this.connectingFrom.node.id);
+        if (connectionTarget) {
+          this.addEdge({
+            sourceId: this.connectingFrom.node.id,
+            targetId: connectionTarget.targetNodeId,
+            sourcePort: this.connectingFrom.port,
+            targetPort: connectionTarget.targetPort,
+            routing: this.options.defaultRouting
+          });
         }
 
         this.connectingFrom = null;
@@ -361,29 +397,22 @@ export class BpmnCanvas {
         this.surface.classList.remove('connecting');
         this.connectionDraft.style.display = 'none';
 
-        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
-        if (elemUnder && elemUnder.classList.contains('bpmn-port')) {
-          const targetNodeId = elemUnder.dataset.nodeId;
-          const targetPort = elemUnder.dataset.port;
-          const edge = this.reconnectingEdge.edge;
-          const isReconnectingSource = this.reconnectingEdge.endpoint === 'source';
+        const edge = this.reconnectingEdge.edge;
+        const isReconnectingSource = this.reconnectingEdge.endpoint === 'source';
+        const excludeNodeId = isReconnectingSource ? edge.targetId : edge.sourceId;
 
+        const connectionTarget = findTargetPort(e.clientX, e.clientY, excludeNodeId);
+        if (connectionTarget) {
           if (isReconnectingSource) {
-            // Cannot connect to the same node as target
-            if (targetNodeId && targetNodeId !== edge.targetId) {
-              this.updateEdgeEndpoints(edge.id, {
-                sourceId: targetNodeId,
-                sourcePort: targetPort
-              });
-            }
+            this.updateEdgeEndpoints(edge.id, {
+              sourceId: connectionTarget.targetNodeId,
+              sourcePort: connectionTarget.targetPort
+            });
           } else {
-            // Cannot connect to the same node as source
-            if (targetNodeId && targetNodeId !== edge.sourceId) {
-              this.updateEdgeEndpoints(edge.id, {
-                targetId: targetNodeId,
-                targetPort: targetPort
-              });
-            }
+            this.updateEdgeEndpoints(edge.id, {
+              targetId: connectionTarget.targetNodeId,
+              targetPort: connectionTarget.targetPort
+            });
           }
         }
 

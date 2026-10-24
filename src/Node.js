@@ -41,6 +41,8 @@ export class BpmnNode {
       case 'business-rule-task': return 'Evaluate Rules';
       case 'script-task': return 'Execute Script';
       case 'subprocess': return 'Subprocess';
+      case 'text-annotation': return 'Annotation text...';
+      case 'data-object': return 'Data Object';
       case 'activity':
       case 'task':
       default: return 'Manual Task';
@@ -51,6 +53,8 @@ export class BpmnNode {
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 170;
+    if (type === 'text-annotation') return 130;
+    if (type === 'data-object') return 60;
     return 150;
   }
 
@@ -58,6 +62,8 @@ export class BpmnNode {
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 95;
+    if (type === 'text-annotation') return 50;
+    if (type === 'data-object') return 70;
     return 80;
   }
 
@@ -78,11 +84,20 @@ export class BpmnNode {
         for (const entry of entries) {
           const borderBoxSize = entry.borderBoxSize && entry.borderBoxSize[0];
           const newHeight = borderBoxSize ? borderBoxSize.blockSize : entry.contentRect.height;
+          const newWidth = borderBoxSize ? borderBoxSize.inlineSize : entry.contentRect.width;
+
+          let changed = false;
           if (newHeight && Math.abs(newHeight - this.height) > 0.5) {
             this.height = Math.round(newHeight);
-            if (this.canvas) {
-              this.canvas.updateConnectedEdges(this.id);
-            }
+            changed = true;
+          }
+          if (newWidth && Math.abs(newWidth - this.width) > 0.5) {
+            this.width = Math.round(newWidth);
+            changed = true;
+          }
+
+          if (changed && this.canvas) {
+            this.canvas.updateConnectedEdges(this.id);
           }
         }
       });
@@ -198,6 +213,21 @@ export class BpmnNode {
         </div>
         <div class="bpmn-gateway-floating-label">${this.label}</div>
       `;
+    } else if (this.type === 'text-annotation') {
+      this.domElement.innerHTML = `
+        <div class="bpmn-annotation-bracket"></div>
+        <div class="bpmn-annotation-text" spellcheck="false">${this.label}</div>
+      `;
+    } else if (this.type === 'data-object') {
+      this.domElement.innerHTML = `
+        <div class="bpmn-data-object-icon">
+          <svg width="34" height="42" viewBox="0 0 16 20" fill="var(--bg-panel)" stroke="currentColor" stroke-width="1.5">
+            <path d="M 2 2 L 10 2 L 14 6 L 14 18 L 2 18 Z" />
+            <polyline points="10,2 10,6 14,6" fill="none" />
+          </svg>
+        </div>
+        <div class="bpmn-data-object-floating-label">${this.label}</div>
+      `;
     } else {
       // Activity / Task / Subprocess
       let icon = '✋';
@@ -235,16 +265,25 @@ export class BpmnNode {
 
     }
 
-    // Inline editing sync for all label elements (activities, events, gateways)
+    // Inline editing sync for all label elements (activities, events, gateways, artifacts)
     const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
                     this.domElement.querySelector('.bpmn-event-floating-label') ||
-                    this.domElement.querySelector('.bpmn-gateway-floating-label');
+                    this.domElement.querySelector('.bpmn-gateway-floating-label') ||
+                    this.domElement.querySelector('.bpmn-annotation-text') ||
+                    this.domElement.querySelector('.bpmn-data-object-floating-label');
     if (labelEl) {
       labelEl.setAttribute('spellcheck', 'false');
 
       labelEl.addEventListener('input', (e) => {
         this.label = e.target.innerText;
         this.canvas.emit('node:labelChange', { node: this, label: this.label });
+        if (this.domElement && this.canvas) {
+          const currentHeight = this.domElement.offsetHeight;
+          if (currentHeight && currentHeight !== this.height) {
+            this.height = currentHeight;
+          }
+          this.canvas.updateConnectedEdges(this.id);
+        }
       });
 
       labelEl.addEventListener('pointerdown', (e) => {
@@ -259,13 +298,23 @@ export class BpmnNode {
       });
 
       labelEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' || e.key === 'Enter') {
-          // For single-line floating labels on events/gateways, Enter also submits edit
-          if (e.key === 'Enter' && !this.type.includes('task') && !this.type.includes('activity')) {
-            e.preventDefault();
-          }
+        if (e.key === 'Escape') {
           labelEl.removeAttribute('contenteditable');
           labelEl.blur();
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          const isMultilineAllowed = this.type.includes('task') || this.type.includes('activity') || this.type === 'text-annotation';
+          if (e.shiftKey && isMultilineAllowed) {
+            // Allow Shift+Enter to insert newline
+            return;
+          }
+          if (!e.shiftKey) {
+            e.preventDefault();
+            labelEl.removeAttribute('contenteditable');
+            labelEl.blur();
+          }
         }
       });
     }
@@ -275,7 +324,11 @@ export class BpmnNode {
     // Remove existing ports if present (e.g. on re-render)
     this.domElement.querySelectorAll('.bpmn-port').forEach(p => p.remove());
 
-    const directions = ['top', 'right', 'bottom', 'left'];
+    // For data-object nodes, omit the bottom port so it doesn't conflict with the floating label
+    const directions = (this.type === 'data-object')
+      ? ['top', 'right', 'left']
+      : ['top', 'right', 'bottom', 'left'];
+
     directions.forEach(dir => {
       const port = document.createElement('div');
       port.className = `bpmn-port bpmn-port-${dir}`;
@@ -306,7 +359,9 @@ export class BpmnNode {
       if (e.target.classList.contains('bpmn-port')) return;
       const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
                       this.domElement.querySelector('.bpmn-event-floating-label') ||
-                      this.domElement.querySelector('.bpmn-gateway-floating-label');
+                      this.domElement.querySelector('.bpmn-gateway-floating-label') ||
+                      this.domElement.querySelector('.bpmn-annotation-text') ||
+                      this.domElement.querySelector('.bpmn-data-object-floating-label');
       if (labelEl) {
         labelEl.setAttribute('contenteditable', 'true');
         labelEl.focus();
@@ -360,7 +415,9 @@ export class BpmnNode {
     this.label = label;
     const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
                     this.domElement.querySelector('.bpmn-event-floating-label') ||
-                    this.domElement.querySelector('.bpmn-gateway-floating-label');
+                    this.domElement.querySelector('.bpmn-gateway-floating-label') ||
+                    this.domElement.querySelector('.bpmn-annotation-text') ||
+                    this.domElement.querySelector('.bpmn-data-object-floating-label');
     if (labelEl) {
       labelEl.innerText = label;
     }

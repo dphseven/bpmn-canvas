@@ -122,6 +122,10 @@ export class Inspector {
             <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
             <option value="gateway-parallel" ${node.type === 'gateway-parallel' ? 'selected' : ''}>Parallel Gateway (AND)</option>
           </optgroup>
+          <optgroup label="Artifacts">
+            <option value="text-annotation" ${node.type === 'text-annotation' ? 'selected' : ''}>Text Annotation ([ T)</option>
+            <option value="data-object" ${node.type === 'data-object' ? 'selected' : ''}>Data Object (📄)</option>
+          </optgroup>
         </select>
       </div>
 
