@@ -5,13 +5,15 @@
 export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
     this.id = id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel'
+    this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel', 'boundary-timer-event', 'boundary-error-event'
     this.label = label !== undefined ? label : this.getDefaultLabel(this.type);
     this.x = x || 100;
     this.y = y || 100;
     this.width = width || this.getDefaultWidth(this.type);
     this.height = height || this.getDefaultHeight(this.type);
-    this.data = data;
+    this.data = Object.assign({
+      interrupting: true
+    }, data);
     this.canvas = canvas;
     this.selected = false;
 
@@ -33,6 +35,10 @@ export class BpmnNode {
       case 'intermediate-timer-event': return 'Wait';
       case 'intermediate-message-event': return 'Message Received';
       case 'intermediate-signal-event': return 'Signal Received';
+      case 'boundary-timer-event': return 'Timeout';
+      case 'boundary-error-event': return 'Catch Error';
+      case 'boundary-message-event': return 'Message Boundary';
+      case 'boundary-signal-event': return 'Signal Boundary';
       case 'gateway-exclusive': return '';
       case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
@@ -50,6 +56,7 @@ export class BpmnNode {
   }
 
   getDefaultWidth(type) {
+    if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 170;
@@ -59,6 +66,7 @@ export class BpmnNode {
   }
 
   getDefaultHeight(type) {
+    if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 95;
@@ -87,6 +95,9 @@ export class BpmnNode {
           const newWidth = borderBoxSize ? borderBoxSize.inlineSize : entry.contentRect.width;
 
           let changed = false;
+          const oldHeight = this.height;
+          const oldWidth = this.width;
+
           if (newHeight && Math.abs(newHeight - this.height) > 0.5) {
             this.height = Math.round(newHeight);
             changed = true;
@@ -98,6 +109,9 @@ export class BpmnNode {
 
           if (changed && this.canvas) {
             this.canvas.updateConnectedEdges(this.id);
+            if (this.canvas.updateAttachedBoundaryPositions) {
+              this.canvas.updateAttachedBoundaryPositions(this, oldWidth, oldHeight);
+            }
           }
         }
       });
@@ -139,6 +153,42 @@ export class BpmnNode {
             </svg>
           </div>
         `;
+      } else if (this.type.startsWith('boundary-')) {
+        if (this.type === 'boundary-timer-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-timer-icon">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-error-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-error-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-message-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-message-icon">
+              <svg width="14" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                <polyline points="2,2 10,8.5 18,2" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-signal-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-signal-icon">
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="10,2 18,17 2,17" />
+              </svg>
+            </div>
+          `;
+        }
       } else if (!isStart && !isEnd) {
         if (this.type === 'intermediate-message-event') {
           innerIcon = `
@@ -203,6 +253,14 @@ export class BpmnNode {
         ${innerIcon}
         <div class="bpmn-event-floating-label">${this.label}</div>
       `;
+
+      if (this.type.startsWith('boundary-')) {
+        if (this.data.interrupting === false) {
+          this.domElement.classList.add('non-interrupting');
+        } else {
+          this.domElement.classList.remove('non-interrupting');
+        }
+      }
     } else if (this.type.includes('gateway')) {
       const isExclusive = this.type === 'gateway-exclusive';
       const icon = isExclusive ? '✕' : '+';
@@ -280,7 +338,11 @@ export class BpmnNode {
         if (this.domElement && this.canvas) {
           const currentHeight = this.domElement.offsetHeight;
           if (currentHeight && currentHeight !== this.height) {
+            const oldHeight = this.height;
             this.height = currentHeight;
+            if (this.canvas.updateAttachedBoundaryPositions) {
+              this.canvas.updateAttachedBoundaryPositions(this, this.width, oldHeight);
+            }
           }
           this.canvas.updateConnectedEdges(this.id);
         }
@@ -324,10 +386,30 @@ export class BpmnNode {
     // Remove existing ports if present (e.g. on re-render)
     this.domElement.querySelectorAll('.bpmn-port').forEach(p => p.remove());
 
-    // For data-object nodes, omit the bottom port so it doesn't conflict with the floating label
-    const directions = (this.type === 'data-object')
-      ? ['top', 'right', 'left']
-      : ['top', 'right', 'bottom', 'left'];
+    let directions = ['top', 'right', 'bottom', 'left'];
+
+    if (this.type === 'data-object') {
+      // Omit bottom port so it doesn't conflict with floating label
+      directions = ['top', 'right', 'left'];
+    } else if (this.type.startsWith('boundary-')) {
+      const dockEdge = this.data?.dockEdge;
+      if (dockEdge === 'bottom') {
+        // Buried edge is top, outbound facing edges are bottom, right, left
+        directions = ['bottom', 'right', 'left'];
+      } else if (dockEdge === 'right') {
+        // Buried edge is left, outbound facing edges are right, top, bottom
+        directions = ['right', 'top', 'bottom'];
+      } else if (dockEdge === 'top') {
+        // Buried edge is bottom, outbound facing edges are top, right, left
+        directions = ['top', 'right', 'left'];
+      } else if (dockEdge === 'left') {
+        // Buried edge is right, outbound facing edges are left, top, bottom
+        directions = ['left', 'top', 'bottom'];
+      } else {
+        // Floating / unattached boundary event: standard 4 ports
+        directions = ['right', 'bottom', 'top', 'left'];
+      }
+    }
 
     directions.forEach(dir => {
       const port = document.createElement('div');
@@ -421,11 +503,15 @@ export class BpmnNode {
     if (labelEl) {
       labelEl.innerText = label;
     }
-    // Update connected edges in case label change immediately expanded height
+    // Update connected edges and attached boundary events in case label change immediately expanded height
     if (this.domElement && this.canvas) {
       const currentHeight = this.domElement.offsetHeight;
       if (currentHeight && currentHeight !== this.height) {
+        const oldHeight = this.height;
         this.height = currentHeight;
+        if (this.canvas.updateAttachedBoundaryPositions) {
+          this.canvas.updateAttachedBoundaryPositions(this, this.width, oldHeight);
+        }
       }
       this.canvas.updateConnectedEdges(this.id);
     }
@@ -453,6 +539,18 @@ export class BpmnNode {
     this.renderContent();
     this.createPorts();
     this.canvas.updateConnectedEdges(this.id);
+  }
+
+  setInterrupting(interrupting) {
+    this.data.interrupting = !!interrupting;
+    if (this.type.startsWith('boundary-')) {
+      if (this.data.interrupting === false) {
+        this.domElement.classList.add('non-interrupting');
+      } else {
+        this.domElement.classList.remove('non-interrupting');
+      }
+    }
+    this.canvas.emit('node:update', this);
   }
 
   destroy() {

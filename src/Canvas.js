@@ -35,6 +35,7 @@ export class BpmnCanvas {
     this.draggedNode = null;
     this.dragStartPos = { x: 0, y: 0 };
     this.nodeDragOffsets = new Map(); // offsets for each selected node relative to the dragged node
+    this.attachedBoundaryOffsets = new Map(); // offsets for non-selected boundary events attached to dragged activities
     this.connectingFrom = null;
     this.reconnectingEdge = null; // { edge, endpoint: 'source' | 'target' }
 
@@ -277,6 +278,14 @@ export class BpmnCanvas {
               node.setPosition(node.x + deltaX, node.y + deltaY);
             }
           });
+
+          // Also move any boundary events attached to selected host nodes (if not already selected)
+          this.attachedBoundaryOffsets.forEach((offset, bId) => {
+            const bNode = this.getNode(bId);
+            if (bNode) {
+              bNode.setPosition(nextLeaderX + offset.dx, nextLeaderY + offset.dy);
+            }
+          });
         }
         return;
       }
@@ -329,8 +338,29 @@ export class BpmnCanvas {
       }
 
       if (this.draggedNode) {
+        const releasedNode = this.draggedNode;
         this.draggedNode = null;
         this.nodeDragOffsets.clear();
+        this.attachedBoundaryOffsets.clear();
+
+        // If a single boundary event was dragged, check if it docks to an activity or detaches
+        if (releasedNode.type.startsWith('boundary-') && this.selectedNodes.size === 1) {
+          const centerX = releasedNode.x + releasedNode.width / 2;
+          const centerY = releasedNode.y + releasedNode.height / 2;
+          const nearbyActivity = this.findActivityNear(centerX, centerY, 50, releasedNode.id);
+
+          if (nearbyActivity) {
+            this.attachBoundaryEvent(releasedNode, nearbyActivity, centerX, centerY);
+          } else {
+            // Dragged far away from any activity -> detach if previously attached
+            if (releasedNode.data?.hostNodeId) {
+              delete releasedNode.data.hostNodeId;
+              delete releasedNode.data.dockEdge;
+              releasedNode.createPorts();
+              this.emit('node:update', releasedNode);
+            }
+          }
+        }
       }
 
       const findTargetPort = (clientX, clientY, excludeNodeId) => {
@@ -341,6 +371,12 @@ export class BpmnCanvas {
         if (elemUnder.classList.contains('bpmn-port')) {
           const targetNodeId = elemUnder.dataset.nodeId;
           const targetPort = elemUnder.dataset.port;
+          const targetNode = this.getNode(targetNodeId);
+          const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
+          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
+            return null;
+          }
           if (targetNodeId && targetNodeId !== excludeNodeId) {
             return { targetNodeId, targetPort };
           }
@@ -350,6 +386,11 @@ export class BpmnCanvas {
         const nodeEl = elemUnder.closest('.bpmn-node');
         if (nodeEl && nodeEl.id && nodeEl.id !== excludeNodeId) {
           const targetNode = this.getNode(nodeEl.id);
+          const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
+          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
+            return null;
+          }
           if (targetNode) {
             const mouseCanvas = this.clientToCanvas(clientX, clientY);
             // Available ports for this node
@@ -472,6 +513,20 @@ export class BpmnCanvas {
         dy: node.y - leaderNode.y
       });
     });
+
+    // Also calculate offsets for any attached boundary events of selected activities (if not explicitly in selection)
+    this.attachedBoundaryOffsets.clear();
+    const selectedIds = new Set(Array.from(this.selectedNodes).map(n => n.id));
+    this.selectedNodes.forEach(selectedNode => {
+      this.nodes.forEach(n => {
+        if (n.type.startsWith('boundary-') && n.data?.hostNodeId === selectedNode.id && !selectedIds.has(n.id)) {
+          this.attachedBoundaryOffsets.set(n.id, {
+            dx: n.x - leaderNode.x,
+            dy: n.y - leaderNode.y
+          });
+        }
+      });
+    });
   }
 
   startConnecting(node, port, e) {
@@ -487,6 +542,13 @@ export class BpmnCanvas {
   updateEdgeEndpoints(edgeId, updates) {
     const edge = this.edges.get(edgeId);
     if (!edge) return;
+    if (updates.targetId) {
+      const targetNode = this.getNode(updates.targetId);
+      if (targetNode && targetNode.type.startsWith('boundary-')) {
+        console.warn('BPMN 2.0 Violation: Boundary events cannot have incoming sequence flows.');
+        return;
+      }
+    }
     edge.updateConnection(updates);
     this.emit('edge:reconnect', { edge, updates });
   }
@@ -502,6 +564,15 @@ export class BpmnCanvas {
   removeNode(id) {
     const node = this.nodes.get(id);
     if (!node) return;
+
+    // Cascade remove any boundary events attached to this node
+    const attachedBoundaryEvents = [];
+    this.nodes.forEach(n => {
+      if (n.data && n.data.hostNodeId === id) {
+        attachedBoundaryEvents.push(n.id);
+      }
+    });
+    attachedBoundaryEvents.forEach(bId => this.removeNode(bId));
 
     // Remove connected edges
     const edgesToRemove = [];
@@ -523,6 +594,166 @@ export class BpmnCanvas {
     this.emit('node:remove', id);
   }
 
+  isActivityNode(node) {
+    if (!node) return false;
+    const type = node.type || '';
+    if (type.startsWith('boundary-') || type.startsWith('start-') || type.startsWith('end-')) return false;
+    if (type.startsWith('intermediate-') || type.startsWith('gateway-')) return false;
+    if (type === 'text-annotation' || type === 'data-object') return false;
+    return true; // task, user-task, service-task, manual-task, business-rule-task, script-task, subprocess, send-task, activity
+  }
+
+  calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth = 36, boundaryHeight = 36) {
+    const hostW = hostNode.domElement ? (hostNode.domElement.offsetWidth || hostNode.width) : hostNode.width;
+    const hostH = hostNode.domElement ? (hostNode.domElement.offsetHeight || hostNode.height) : hostNode.height;
+    const left = hostNode.x;
+    const top = hostNode.y;
+    const right = hostNode.x + hostW;
+    const bottom = hostNode.y + hostH;
+
+    // Measure distance from (centerX, centerY) to each of the 4 border segments
+    // Bottom border segment: [left, right] at y = bottom
+    const clampedBottomX = Math.max(left, Math.min(right, centerX));
+    const distBottom = Math.hypot(centerX - clampedBottomX, centerY - bottom);
+
+    // Right border segment: [top, bottom] at x = right
+    const clampedRightY = Math.max(top, Math.min(bottom, centerY));
+    const distRight = Math.hypot(centerX - right, centerY - clampedRightY);
+
+    // Top border segment: [left, right] at y = top
+    const clampedTopX = Math.max(left, Math.min(right, centerX));
+    const distTop = Math.hypot(centerX - clampedTopX, centerY - top);
+
+    // Left border segment: [top, bottom] at x = left
+    const clampedLeftY = Math.max(top, Math.min(bottom, centerY));
+    const distLeft = Math.hypot(centerX - left, centerY - clampedLeftY);
+
+    const minDist = Math.min(distBottom, distRight, distTop, distLeft);
+
+    let dockedX = centerX;
+    let dockedY = centerY;
+    let dockEdge = 'bottom';
+    const halfW = boundaryWidth / 2;
+    const halfH = boundaryHeight / 2;
+
+    if (minDist === distBottom) {
+      dockEdge = 'bottom';
+      dockedY = bottom - halfH; // Center lies directly on bottom border line
+      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
+    } else if (minDist === distRight) {
+      dockEdge = 'right';
+      dockedX = right - halfW; // Center lies directly on right border line
+      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
+    } else if (minDist === distTop) {
+      dockEdge = 'top';
+      dockedY = top - halfH;
+      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
+    } else {
+      dockEdge = 'left';
+      dockedX = left - halfW;
+      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
+    }
+
+    return {
+      x: Math.round(dockedX),
+      y: Math.round(dockedY),
+      dockEdge,
+      hostNodeId: hostNode.id,
+      relativeOffsetX: Math.round(dockedX - left),
+      relativeOffsetY: Math.round(dockedY - top)
+    };
+  }
+
+  findActivityNear(centerX, centerY, threshold = 40, excludeId = null) {
+    let bestHost = null;
+    let bestDist = Infinity;
+
+    this.nodes.forEach(node => {
+      if (node.id === excludeId || !this.isActivityNode(node)) return;
+
+      const nodeW = node.domElement ? (node.domElement.offsetWidth || node.width) : node.width;
+      const nodeH = node.domElement ? (node.domElement.offsetHeight || node.height) : node.height;
+      const left = node.x;
+      const top = node.y;
+      const right = node.x + nodeW;
+      const bottom = node.y + nodeH;
+
+      // Expand bounding box by threshold
+      if (
+        centerX >= left - threshold &&
+        centerX <= right + threshold &&
+        centerY >= top - threshold &&
+        centerY <= bottom + threshold
+      ) {
+        // Distance to closest edge
+        const dist = Math.min(
+          Math.abs(centerX - left),
+          Math.abs(centerX - right),
+          Math.abs(centerY - top),
+          Math.abs(centerY - bottom)
+        );
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestHost = node;
+        }
+      }
+    });
+
+    return bestHost;
+  }
+
+  attachBoundaryEvent(boundaryNode, hostNode, centerX, centerY) {
+    const docking = this.calculateBoundaryDocking(hostNode, centerX, centerY, boundaryNode.width, boundaryNode.height);
+    boundaryNode.data = Object.assign(boundaryNode.data || {}, {
+      hostNodeId: hostNode.id,
+      dockEdge: docking.dockEdge,
+      relativeOffsetX: docking.relativeOffsetX,
+      relativeOffsetY: docking.relativeOffsetY
+    });
+    boundaryNode.setPosition(docking.x, docking.y);
+    boundaryNode.createPorts();
+    this.emit('node:update', boundaryNode);
+  }
+
+  updateAttachedBoundaryPositions(hostNode, oldWidth, oldHeight) {
+    if (!hostNode) return;
+    const hostW = hostNode.domElement ? (hostNode.domElement.offsetWidth || hostNode.width) : hostNode.width;
+    const hostH = hostNode.domElement ? (hostNode.domElement.offsetHeight || hostNode.height) : hostNode.height;
+
+    this.nodes.forEach(node => {
+      if (node.type.startsWith('boundary-') && node.data?.hostNodeId === hostNode.id) {
+        const dockEdge = node.data.dockEdge || 'bottom';
+        let newX = node.x;
+        let newY = node.y;
+
+        if (dockEdge === 'bottom') {
+          // Bottom border shifted: stay centered on the new bottom edge
+          newY = hostNode.y + hostH - node.height / 2;
+        } else if (dockEdge === 'right') {
+          // Right border shifted: stay centered on the new right edge
+          newX = hostNode.x + hostW - node.width / 2;
+        } else if (dockEdge === 'top') {
+          newY = hostNode.y - node.height / 2;
+        } else if (dockEdge === 'left') {
+          newX = hostNode.x - node.width / 2;
+        }
+
+        // Clamp along edge bounds
+        const halfW = node.width / 2;
+        const halfH = node.height / 2;
+        if (dockEdge === 'bottom' || dockEdge === 'top') {
+          newX = Math.max(hostNode.x + halfW, Math.min(hostNode.x + hostW - halfW, newX + halfW)) - halfW;
+        } else {
+          newY = Math.max(hostNode.y + halfH, Math.min(hostNode.y + hostH - halfH, newY + halfH)) - halfH;
+        }
+
+        node.setPosition(Math.round(newX), Math.round(newY));
+        node.data.relativeOffsetX = Math.round(node.x - hostNode.x);
+        node.data.relativeOffsetY = Math.round(node.y - hostNode.y);
+      }
+    });
+  }
+
   getNode(id) {
     return this.nodes.get(id);
   }
@@ -532,6 +763,13 @@ export class BpmnCanvas {
   }
 
   addEdge(config) {
+    // Validate BPMN 2.0 connection rule: Boundary events cannot have incoming sequence flows
+    const targetNode = this.getNode(config.targetId);
+    if (targetNode && targetNode.type.startsWith('boundary-')) {
+      console.warn('BPMN 2.0 Violation: Boundary events cannot have incoming sequence flows.');
+      return null;
+    }
+
     const edge = new BpmnEdge(config, this);
     this.edges.set(edge.id, edge);
     this.edgesContainer.appendChild(edge.groupElement);
@@ -838,13 +1076,29 @@ export class BpmnCanvas {
         visited.add(currentEdge.id);
         path.push(currentEdge);
         const nextTargetId = currentEdge.targetId;
-        currentEdge = animatedEdges.find(e => e.sourceId === nextTargetId);
+
+        // First look for direct outbound animated edge from target node
+        let nextEdge = animatedEdges.find(e => e.sourceId === nextTargetId && !visited.has(e.id));
+
+        // If no direct outbound edge, check if target node has an attached boundary event with an animated edge
+        if (!nextEdge) {
+          const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === nextTargetId);
+          for (const bNode of attachedBoundaryNodes) {
+            const bEdge = animatedEdges.find(e => e.sourceId === bNode.id && !visited.has(e.id));
+            if (bEdge) {
+              nextEdge = bEdge;
+              break;
+            }
+          }
+        }
+
+        currentEdge = nextEdge;
       }
       if (path.length > 0) return path;
     }
 
     // 2. Otherwise find start-event node and traverse sequentially
-    const startNode = Array.from(this.nodes.values()).find(n => n.type === 'start-event') ||
+    const startNode = Array.from(this.nodes.values()).find(n => n.type.startsWith('start-')) ||
                       this.nodes.values().next().value;
     if (!startNode) return [];
 
@@ -854,9 +1108,23 @@ export class BpmnCanvas {
 
     while (currentNodeId) {
       const outgoing = Array.from(this.edges.values()).filter(e => e.sourceId === currentNodeId && !visitedEdges.has(e.id));
-      if (!outgoing.length) break;
-      // Prefer animated edge or first outgoing edge
-      const nextEdge = outgoing.find(e => e.animated) || outgoing[0];
+      let nextEdge = outgoing.find(e => e.animated) || outgoing[0];
+
+      // If no direct outgoing edge from this node, check if it has an attached boundary event with outgoing edges
+      if (!nextEdge) {
+        const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === currentNodeId);
+        for (const bNode of attachedBoundaryNodes) {
+          const bOutgoing = Array.from(this.edges.values()).filter(e => e.sourceId === bNode.id && !visitedEdges.has(e.id));
+          const cand = bOutgoing.find(e => e.animated) || bOutgoing[0];
+          if (cand) {
+            nextEdge = cand;
+            break;
+          }
+        }
+      }
+
+      if (!nextEdge) break;
+
       visitedEdges.add(nextEdge.id);
       path.push(nextEdge);
       currentNodeId = nextEdge.targetId;
@@ -911,46 +1179,65 @@ export class BpmnCanvas {
         return;
       }
 
+      const startNextEdgeTraversal = () => {
+        const totalLength = pathEl.getTotalLength();
+        // Speed: roughly 200 pixels per second scaled by simulationSpeed
+        const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
+        let startTime = null;
+
+        this.simTokenGroup.style.display = 'block';
+
+        const step = (timestamp) => {
+          if (!this.simulationActive) return;
+          if (!startTime) startTime = timestamp;
+
+          const elapsed = timestamp - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const distance = progress * totalLength;
+          const point = pathEl.getPointAtLength(distance);
+
+          this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
+
+          if (progress < 1) {
+            this.simAnimationId = requestAnimationFrame(step);
+          } else {
+            // Token reached target node!
+            highlightNode(edge.targetId, 250);
+            edgeIndex++;
+
+            // Brief pause at each node (180ms) for visual rhythm
+            this.simTimeoutId = setTimeout(() => {
+              if (this.simulationActive) {
+                animateEdgeStep();
+              }
+            }, 180);
+          }
+        };
+
+        this.simAnimationId = requestAnimationFrame(step);
+      };
+
       // Highlight starting node of first edge
       if (edgeIndex === 0) {
         highlightNode(edge.sourceId, 300);
-      }
-
-      const totalLength = pathEl.getTotalLength();
-      // Speed: roughly 200 pixels per second scaled by simulationSpeed
-      const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
-      let startTime = null;
-
-      this.simTokenGroup.style.display = 'block';
-
-      const step = (timestamp) => {
-        if (!this.simulationActive) return;
-        if (!startTime) startTime = timestamp;
-
-        const elapsed = timestamp - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const distance = progress * totalLength;
-        const point = pathEl.getPointAtLength(distance);
-
-        this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
-
-        if (progress < 1) {
-          this.simAnimationId = requestAnimationFrame(step);
-        } else {
-          // Token reached target node!
-          highlightNode(edge.targetId, 250);
-          edgeIndex++;
-
-          // Brief pause at each node (180ms) for visual rhythm
+        startNextEdgeTraversal();
+      } else {
+        // If this edge begins from a boundary event, insert a clear pause (260ms) after task before boundary pulses
+        const sourceNode = this.getNode(edge.sourceId);
+        if (sourceNode && sourceNode.type.startsWith('boundary-')) {
           this.simTimeoutId = setTimeout(() => {
-            if (this.simulationActive) {
-              animateEdgeStep();
-            }
-          }, 180);
+            if (!this.simulationActive) return;
+            highlightNode(edge.sourceId, 350);
+            // After boundary pulses, start edge traversal
+            this.simTimeoutId = setTimeout(() => {
+              if (!this.simulationActive) return;
+              startNextEdgeTraversal();
+            }, 200);
+          }, 260);
+        } else {
+          startNextEdgeTraversal();
         }
-      };
-
-      this.simAnimationId = requestAnimationFrame(step);
+      }
     };
 
     animateEdgeStep();
