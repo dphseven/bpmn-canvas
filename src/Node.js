@@ -174,7 +174,7 @@ export class BpmnNode {
       // If currently editing text inside this node, let text interaction happen
       if (e.target.isContentEditable) return;
 
-      this.canvas.selectNode(this, e.shiftKey);
+      this.canvas.selectNode(this, { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey || e.metaKey });
       this.canvas.startDraggingNode(this, e);
       e.stopPropagation();
     });

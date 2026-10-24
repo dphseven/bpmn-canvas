@@ -34,6 +34,8 @@ export class Inspector {
         this.inspectNode(event.item);
       } else if (event.type === 'edge') {
         this.inspectEdge(event.item);
+      } else if (event.type === 'multi') {
+        this.inspectMulti(event.items);
       } else {
         this.hide();
       }
@@ -133,6 +135,36 @@ export class Inspector {
     const deleteBtn = this.container.querySelector('#btn-delete-element');
     deleteBtn.addEventListener('click', () => {
       this.canvas.removeNode(node.id);
+    });
+  }
+
+  inspectMulti(nodes) {
+    this.currentTarget = nodes;
+    this.targetType = 'multi';
+    this.container.classList.remove('hidden');
+
+    this.container.innerHTML = `
+      <div class="inspector-title">
+        <span>Multiple Elements</span>
+        <span class="inspector-badge">${nodes.length} Selected</span>
+      </div>
+
+      <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 12px 0;">
+        You have selected <strong>${nodes.length}</strong> shapes. Drag any selected shape to move them together, or press <kbd style="background: var(--bg-primary); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border-color);">Del</kbd> to delete.
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button class="btn" id="btn-delete-multi" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
+          Delete ${nodes.length} Elements
+        </button>
+      </div>
+    `;
+
+    const deleteBtn = this.container.querySelector('#btn-delete-multi');
+    deleteBtn.addEventListener('click', () => {
+      const ids = nodes.map(n => n.id);
+      ids.forEach(id => this.canvas.removeNode(id));
+      this.canvas.clearSelection();
     });
   }
 

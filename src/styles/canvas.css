@@ -10,11 +10,27 @@
   background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
   background-size: 24px 24px;
   background-position: 0 0;
+  cursor: default;
+}
+
+.bpmn-canvas-viewport.space-pressed {
   cursor: grab;
 }
 
 .bpmn-canvas-viewport.panning {
-  cursor: grabbing;
+  cursor: grabbing !important;
+}
+
+/* Rubberband Marquee Selection Box */
+.bpmn-marquee-selection {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-radius: 2px;
+  z-index: 50;
+  display: none;
+  box-sizing: border-box;
 }
 
 /* Transformed Container for Nodes and SVG */
