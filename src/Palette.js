@@ -277,6 +277,26 @@ export class Palette {
         finalCenterY = Math.round(finalCenterY / this.canvas.options.gridSize) * this.canvas.options.gridSize;
       }
       
+      // If dropping a boundary event, check if dropped on or near an activity
+      if (nodeType.startsWith('boundary-')) {
+        const nearbyActivity = this.canvas.findActivityNear(coords.x, coords.y, 60);
+        if (nearbyActivity) {
+          const docking = this.canvas.calculateBoundaryDocking(nearbyActivity, coords.x, coords.y, dummyWidth, dummyHeight);
+          const node = this.canvas.addNode({
+            type: nodeType,
+            x: docking.x,
+            y: docking.y,
+            data: {
+              hostNodeId: nearbyActivity.id,
+              dockEdge: docking.dockEdge,
+              interrupting: true
+            }
+          });
+          this.canvas.selectNode(node);
+          return;
+        }
+      }
+
       // Center dropped node on cursor / snap point
       const node = this.canvas.addNode({
         type: nodeType,

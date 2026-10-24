@@ -35,6 +35,7 @@ export class BpmnCanvas {
     this.draggedNode = null;
     this.dragStartPos = { x: 0, y: 0 };
     this.nodeDragOffsets = new Map(); // offsets for each selected node relative to the dragged node
+    this.attachedBoundaryOffsets = new Map(); // offsets for non-selected boundary events attached to dragged activities
     this.connectingFrom = null;
     this.reconnectingEdge = null; // { edge, endpoint: 'source' | 'target' }
 
@@ -277,6 +278,14 @@ export class BpmnCanvas {
               node.setPosition(node.x + deltaX, node.y + deltaY);
             }
           });
+
+          // Also move any boundary events attached to selected host nodes (if not already selected)
+          this.attachedBoundaryOffsets.forEach((offset, bId) => {
+            const bNode = this.getNode(bId);
+            if (bNode) {
+              bNode.setPosition(nextLeaderX + offset.dx, nextLeaderY + offset.dy);
+            }
+          });
         }
         return;
       }
@@ -329,8 +338,28 @@ export class BpmnCanvas {
       }
 
       if (this.draggedNode) {
+        const releasedNode = this.draggedNode;
         this.draggedNode = null;
         this.nodeDragOffsets.clear();
+        this.attachedBoundaryOffsets.clear();
+
+        // If a single boundary event was dragged, check if it docks to an activity or detaches
+        if (releasedNode.type.startsWith('boundary-') && this.selectedNodes.size === 1) {
+          const centerX = releasedNode.x + releasedNode.width / 2;
+          const centerY = releasedNode.y + releasedNode.height / 2;
+          const nearbyActivity = this.findActivityNear(centerX, centerY, 50, releasedNode.id);
+
+          if (nearbyActivity) {
+            this.attachBoundaryEvent(releasedNode, nearbyActivity, centerX, centerY);
+          } else {
+            // Dragged far away from any activity -> detach if previously attached
+            if (releasedNode.data?.hostNodeId) {
+              delete releasedNode.data.hostNodeId;
+              delete releasedNode.data.dockEdge;
+              this.emit('node:update', releasedNode);
+            }
+          }
+        }
       }
 
       const findTargetPort = (clientX, clientY, excludeNodeId) => {
@@ -472,6 +501,20 @@ export class BpmnCanvas {
         dy: node.y - leaderNode.y
       });
     });
+
+    // Also calculate offsets for any attached boundary events of selected activities (if not explicitly in selection)
+    this.attachedBoundaryOffsets.clear();
+    const selectedIds = new Set(Array.from(this.selectedNodes).map(n => n.id));
+    this.selectedNodes.forEach(selectedNode => {
+      this.nodes.forEach(n => {
+        if (n.type.startsWith('boundary-') && n.data?.hostNodeId === selectedNode.id && !selectedIds.has(n.id)) {
+          this.attachedBoundaryOffsets.set(n.id, {
+            dx: n.x - leaderNode.x,
+            dy: n.y - leaderNode.y
+          });
+        }
+      });
+    });
   }
 
   startConnecting(node, port, e) {
@@ -503,6 +546,15 @@ export class BpmnCanvas {
     const node = this.nodes.get(id);
     if (!node) return;
 
+    // Cascade remove any boundary events attached to this node
+    const attachedBoundaryEvents = [];
+    this.nodes.forEach(n => {
+      if (n.data && n.data.hostNodeId === id) {
+        attachedBoundaryEvents.push(n.id);
+      }
+    });
+    attachedBoundaryEvents.forEach(bId => this.removeNode(bId));
+
     // Remove connected edges
     const edgesToRemove = [];
     this.edges.forEach(edge => {
@@ -521,6 +573,107 @@ export class BpmnCanvas {
     node.destroy();
     this.nodes.delete(id);
     this.emit('node:remove', id);
+  }
+
+  isActivityNode(node) {
+    if (!node) return false;
+    const type = node.type || '';
+    if (type.startsWith('boundary-') || type.startsWith('start-') || type.startsWith('end-')) return false;
+    if (type.startsWith('intermediate-') || type.startsWith('gateway-')) return false;
+    if (type === 'text-annotation' || type === 'data-object') return false;
+    return true; // task, user-task, service-task, manual-task, business-rule-task, script-task, subprocess, send-task, activity
+  }
+
+  calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth = 36, boundaryHeight = 36) {
+    const left = hostNode.x;
+    const top = hostNode.y;
+    const right = hostNode.x + hostNode.width;
+    const bottom = hostNode.y + hostNode.height;
+
+    // Distances from center point to each of the 4 borders
+    const distBottom = Math.abs(centerY - bottom);
+    const distRight = Math.abs(centerX - right);
+    const distTop = Math.abs(centerY - top);
+    const distLeft = Math.abs(centerX - left);
+
+    const minDist = Math.min(distBottom, distRight, distTop, distLeft);
+
+    let dockedX = centerX;
+    let dockedY = centerY;
+    let dockEdge = 'bottom';
+    const halfW = boundaryWidth / 2;
+    const halfH = boundaryHeight / 2;
+
+    if (minDist === distBottom) {
+      dockEdge = 'bottom';
+      dockedY = bottom - halfH; // Center lies directly on bottom border line
+      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
+    } else if (minDist === distRight) {
+      dockEdge = 'right';
+      dockedX = right - halfW; // Center lies directly on right border line
+      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
+    } else if (minDist === distTop) {
+      dockEdge = 'top';
+      dockedY = top - halfH;
+      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
+    } else {
+      dockEdge = 'left';
+      dockedX = left - halfW;
+      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
+    }
+
+    return {
+      x: Math.round(dockedX),
+      y: Math.round(dockedY),
+      dockEdge,
+      hostNodeId: hostNode.id
+    };
+  }
+
+  findActivityNear(centerX, centerY, threshold = 40, excludeId = null) {
+    let bestHost = null;
+    let bestDist = Infinity;
+
+    this.nodes.forEach(node => {
+      if (node.id === excludeId || !this.isActivityNode(node)) return;
+
+      const left = node.x;
+      const top = node.y;
+      const right = node.x + node.width;
+      const bottom = node.y + node.height;
+
+      // Expand bounding box by threshold
+      if (
+        centerX >= left - threshold &&
+        centerX <= right + threshold &&
+        centerY >= top - threshold &&
+        centerY <= bottom + threshold
+      ) {
+        // Distance to closest edge
+        const dist = Math.min(
+          Math.abs(centerX - left),
+          Math.abs(centerX - right),
+          Math.abs(centerY - top),
+          Math.abs(centerY - bottom)
+        );
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestHost = node;
+        }
+      }
+    });
+
+    return bestHost;
+  }
+
+  attachBoundaryEvent(boundaryNode, hostNode, centerX, centerY) {
+    const docking = this.calculateBoundaryDocking(hostNode, centerX, centerY, boundaryNode.width, boundaryNode.height);
+    boundaryNode.data = Object.assign(boundaryNode.data || {}, {
+      hostNodeId: hostNode.id,
+      dockEdge: docking.dockEdge
+    });
+    boundaryNode.setPosition(docking.x, docking.y);
+    this.emit('node:update', boundaryNode);
   }
 
   getNode(id) {

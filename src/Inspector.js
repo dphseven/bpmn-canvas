@@ -141,6 +141,12 @@ export class Inspector {
         </div>
         <input type="checkbox" id="prop-boundary-interrupting" ${node.data.interrupting !== false ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
       </div>
+      <div class="inspector-field">
+        <label class="inspector-label">Host Activity</label>
+        <div style="font-size: 12px; font-weight: 500; color: ${node.data.hostNodeId ? 'var(--text-main)' : 'var(--text-muted)'}; display: flex; align-items: center; gap: 6px;">
+          <span>${node.data.hostNodeId ? `Attached to "${this.canvas.getNode(node.data.hostNodeId)?.label || node.data.hostNodeId}" (${node.data.dockEdge || 'border'})` : 'Floating / Unattached'}</span>
+        </div>
+      </div>
       ` : ''}
 
       <div style="display: flex; gap: 8px; margin-top: 10px;">
