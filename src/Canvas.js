@@ -356,6 +356,7 @@ export class BpmnCanvas {
             if (releasedNode.data?.hostNodeId) {
               delete releasedNode.data.hostNodeId;
               delete releasedNode.data.dockEdge;
+              releasedNode.createPorts();
               this.emit('node:update', releasedNode);
             }
           }
@@ -370,6 +371,11 @@ export class BpmnCanvas {
         if (elemUnder.classList.contains('bpmn-port')) {
           const targetNodeId = elemUnder.dataset.nodeId;
           const targetPort = elemUnder.dataset.port;
+          const targetNode = this.getNode(targetNodeId);
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows
+          if (targetNode && targetNode.type.startsWith('boundary-')) {
+            return null;
+          }
           if (targetNodeId && targetNodeId !== excludeNodeId) {
             return { targetNodeId, targetPort };
           }
@@ -379,6 +385,10 @@ export class BpmnCanvas {
         const nodeEl = elemUnder.closest('.bpmn-node');
         if (nodeEl && nodeEl.id && nodeEl.id !== excludeNodeId) {
           const targetNode = this.getNode(nodeEl.id);
+          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows
+          if (targetNode && targetNode.type.startsWith('boundary-')) {
+            return null;
+          }
           if (targetNode) {
             const mouseCanvas = this.clientToCanvas(clientX, clientY);
             // Available ports for this node
@@ -530,6 +540,13 @@ export class BpmnCanvas {
   updateEdgeEndpoints(edgeId, updates) {
     const edge = this.edges.get(edgeId);
     if (!edge) return;
+    if (updates.targetId) {
+      const targetNode = this.getNode(updates.targetId);
+      if (targetNode && targetNode.type.startsWith('boundary-')) {
+        console.warn('BPMN 2.0 Violation: Boundary events cannot have incoming sequence flows.');
+        return;
+      }
+    }
     edge.updateConnection(updates);
     this.emit('edge:reconnect', { edge, updates });
   }
@@ -673,6 +690,7 @@ export class BpmnCanvas {
       dockEdge: docking.dockEdge
     });
     boundaryNode.setPosition(docking.x, docking.y);
+    boundaryNode.createPorts();
     this.emit('node:update', boundaryNode);
   }
 
@@ -685,6 +703,13 @@ export class BpmnCanvas {
   }
 
   addEdge(config) {
+    // Validate BPMN 2.0 connection rule: Boundary events cannot have incoming sequence flows
+    const targetNode = this.getNode(config.targetId);
+    if (targetNode && targetNode.type.startsWith('boundary-')) {
+      console.warn('BPMN 2.0 Violation: Boundary events cannot have incoming sequence flows.');
+      return null;
+    }
+
     const edge = new BpmnEdge(config, this);
     this.edges.set(edge.id, edge);
     this.edgesContainer.appendChild(edge.groupElement);

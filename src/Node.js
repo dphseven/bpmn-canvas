@@ -357,10 +357,30 @@ export class BpmnNode {
     // Remove existing ports if present (e.g. on re-render)
     this.domElement.querySelectorAll('.bpmn-port').forEach(p => p.remove());
 
-    // For data-object nodes, omit the bottom port so it doesn't conflict with the floating label
-    const directions = (this.type === 'data-object')
-      ? ['top', 'right', 'left']
-      : ['top', 'right', 'bottom', 'left'];
+    let directions = ['top', 'right', 'bottom', 'left'];
+
+    if (this.type === 'data-object') {
+      // Omit bottom port so it doesn't conflict with floating label
+      directions = ['top', 'right', 'left'];
+    } else if (this.type.startsWith('boundary-')) {
+      const dockEdge = this.data?.dockEdge;
+      if (dockEdge === 'bottom') {
+        // Buried edge is top, outbound facing edges are bottom, right, left
+        directions = ['bottom', 'right', 'left'];
+      } else if (dockEdge === 'right') {
+        // Buried edge is left, outbound facing edges are right, top, bottom
+        directions = ['right', 'top', 'bottom'];
+      } else if (dockEdge === 'top') {
+        // Buried edge is bottom, outbound facing edges are top, right, left
+        directions = ['top', 'right', 'left'];
+      } else if (dockEdge === 'left') {
+        // Buried edge is right, outbound facing edges are left, top, bottom
+        directions = ['left', 'top', 'bottom'];
+      } else {
+        // Floating / unattached boundary event: standard 4 ports
+        directions = ['right', 'bottom', 'top', 'left'];
+      }
+    }
 
     directions.forEach(dir => {
       const port = document.createElement('div');
