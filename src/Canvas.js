@@ -701,12 +701,14 @@ export class BpmnCanvas {
 
     const oldWidth = subprocessNode.width;
     const oldHeight = subprocessNode.height;
+    let targetW = oldWidth;
+    let targetH = oldHeight;
 
     if (expanded) {
       // Find all contained children to determine minimum expanded container size
       const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
-      let targetW = 420;
-      let targetH = 260;
+      targetW = 420;
+      targetH = 260;
 
       if (children.length > 0) {
         let maxRight = subprocessNode.x + targetW;
@@ -727,12 +729,83 @@ export class BpmnCanvas {
       subprocessNode.height = targetH;
       subprocessNode.domElement.style.width = `${targetW}px`;
       subprocessNode.domElement.style.minHeight = `${targetH}px`;
+
+      // Calculate expansion deltas
+      const deltaW = targetW - oldWidth;
+      const deltaH = targetH - oldHeight;
+
+      // Anchor to mid-left: keep left edge and vertical center unchanged
+      const newY = Math.round(subprocessNode.y - deltaH / 2);
+      const shiftSubprocessY = newY - subprocessNode.y;
+      subprocessNode.setPosition(subprocessNode.x, newY);
+      subprocessNode.data.expansionYShift = shiftSubprocessY;
+
+      // Push surrounding external nodes outward
+      if (deltaW > 0 || deltaH > 0) {
+        const pushedOffsets = {};
+        const oldRight = subprocessNode.x + oldWidth;
+        const newBottom = subprocessNode.y + targetH;
+        const childIds = new Set(Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId).map(n => n.id));
+
+        this.nodes.forEach(node => {
+          // Skip self, child nodes inside this subprocess, and boundary events attached to them
+          if (node.id === subprocessId) return;
+          if (childIds.has(node.id)) return;
+          if (node.data?.hostNodeId === subprocessId || childIds.has(node.data?.hostNodeId)) return;
+
+          const nodeCenterX = node.x + node.width / 2;
+          const nodeCenterY = node.y + node.height / 2;
+
+          let shiftX = 0;
+          let shiftY = 0;
+
+          // In horizontal BPMN flows, expanding a node pushes all downstream elements to the right.
+          // Any node whose center is to the right of the subprocess shifts by deltaW.
+          // Any node directly underneath the expanded subprocess shifts down to clear the bottom edge.
+          if (nodeCenterX >= oldRight - 10) {
+            shiftX = deltaW;
+          } else if (node.x + node.width > subprocessNode.x && node.x < subprocessNode.x + targetW) {
+            if (node.y < newBottom + 20 && nodeCenterY > subprocessNode.y + targetH / 2) {
+              shiftY = Math.round(newBottom + 30 - node.y);
+            }
+          }
+
+          if (shiftX !== 0 || shiftY !== 0) {
+            pushedOffsets[node.id] = { dx: shiftX, dy: shiftY };
+            node.setPosition(node.x + shiftX, node.y + shiftY);
+            if (this.updateAttachedBoundaryPositions) {
+              this.updateAttachedBoundaryPositions(node, node.width, node.height);
+            }
+          }
+        });
+
+        subprocessNode.data.pushedOffsets = pushedOffsets;
+      }
     } else {
+      // Revert mid-left anchor shift for the subprocess itself
+      if (subprocessNode.data.expansionYShift) {
+        subprocessNode.setPosition(subprocessNode.x, subprocessNode.y - subprocessNode.data.expansionYShift);
+        delete subprocessNode.data.expansionYShift;
+      }
+
       // Collapsed: restore standard compact dimensions
       subprocessNode.width = 170;
       subprocessNode.height = 95;
       subprocessNode.domElement.style.width = `${170}px`;
       subprocessNode.domElement.style.minHeight = `${95}px`;
+
+      // Revert pushed surrounding nodes back to their original positions
+      const pushedOffsets = subprocessNode.data.pushedOffsets || {};
+      Object.entries(pushedOffsets).forEach(([nodeId, offset]) => {
+        const node = this.getNode(nodeId);
+        if (node) {
+          node.setPosition(node.x - offset.dx, node.y - offset.dy);
+          if (this.updateAttachedBoundaryPositions) {
+            this.updateAttachedBoundaryPositions(node, node.width, node.height);
+          }
+        }
+      });
+      delete subprocessNode.data.pushedOffsets;
     }
 
     subprocessNode.renderContent();
@@ -749,6 +822,22 @@ export class BpmnCanvas {
 
     this.emit('node:update', subprocessNode);
     this.emitSelectionChange();
+
+    // If simulation is running, restart the cycle cleanly so it immediately reflects the path changes
+    if (this.simulationActive) {
+      if (this.simAnimationId) {
+        cancelAnimationFrame(this.simAnimationId);
+        this.simAnimationId = null;
+      }
+      if (this.simTimeoutId) {
+        clearTimeout(this.simTimeoutId);
+        this.simTimeoutId = null;
+      }
+      this.nodes.forEach(n => {
+        if (n.domElement) n.domElement.classList.remove('sim-active');
+      });
+      this.runSimulationCycle();
+    }
   }
 
   updateSubprocessChildrenVisibility(subprocessId, visible) {
@@ -1255,8 +1344,24 @@ export class BpmnCanvas {
   }
 
   findSimulationPath() {
-    // 1. Check if there are edges marked animated: true
-    const animatedEdges = Array.from(this.edges.values()).filter(e => e.animated);
+    // Collect IDs of nodes that are hidden inside collapsed subprocesses
+    const hiddenChildIds = new Set();
+    this.nodes.forEach(n => {
+      if (n.data?.parentId) {
+        const parent = this.getNode(n.data.parentId);
+        if (parent && (!parent.data?.expanded)) {
+          hiddenChildIds.add(n.id);
+        }
+      }
+    });
+
+    // 1. Check if there are edges marked animated: true (excluding hidden collapsed internal edges)
+    const animatedEdges = Array.from(this.edges.values()).filter(e => {
+      if (!e.animated) return false;
+      if (hiddenChildIds.has(e.sourceId) || hiddenChildIds.has(e.targetId)) return false;
+      return true;
+    });
+
     if (animatedEdges.length > 0) {
       // Find starting point among animated edges (a node with no incoming animated edge)
       const targetIds = new Set(animatedEdges.map(e => e.targetId));
@@ -1271,6 +1376,36 @@ export class BpmnCanvas {
 
         // First look for direct outbound animated edge from target node
         let nextEdge = animatedEdges.find(e => e.sourceId === nextTargetId && !visited.has(e.id));
+
+        // If target node is an expanded subprocess with internal children, route through its internal flow
+        const targetNode = this.getNode(nextTargetId);
+        if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
+          const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
+          const childIds = new Set(childNodes.map(n => n.id));
+          if (childIds.size > 0) {
+            // Find internal start node (start event or node with no incoming internal edge)
+            const internalEdges = animatedEdges.filter(e => childIds.has(e.sourceId) || childIds.has(e.targetId));
+            const internalTargetIds = new Set(internalEdges.map(e => e.targetId));
+            const internalStartNode = childNodes.find(n => n.type.startsWith('start-')) ||
+                                     childNodes.find(n => !internalTargetIds.has(n.id)) ||
+                                     childNodes[0];
+
+            if (internalStartNode) {
+              let internalEdge = animatedEdges.find(e => e.sourceId === internalStartNode.id && !visited.has(e.id));
+              let lastInternalTargetId = internalStartNode.id;
+
+              while (internalEdge && !visited.has(internalEdge.id)) {
+                visited.add(internalEdge.id);
+                path.push(internalEdge);
+                lastInternalTargetId = internalEdge.targetId;
+                internalEdge = animatedEdges.find(e => e.sourceId === lastInternalTargetId && childIds.has(e.targetId) && !visited.has(e.id));
+              }
+
+              // After traversing internal flow, find exit edge from subprocess or last internal node
+              nextEdge = animatedEdges.find(e => (e.sourceId === targetNode.id || e.sourceId === lastInternalTargetId) && !childIds.has(e.targetId) && !visited.has(e.id));
+            }
+          }
+        }
 
         // If no direct outbound edge, check if target node has an attached boundary event with an animated edge
         if (!nextEdge) {
@@ -1290,7 +1425,8 @@ export class BpmnCanvas {
     }
 
     // 2. Otherwise find start-event node and traverse sequentially
-    const startNode = Array.from(this.nodes.values()).find(n => n.type.startsWith('start-')) ||
+    const startNode = Array.from(this.nodes.values()).find(n => n.type.startsWith('start-') && !n.data?.parentId) ||
+                      Array.from(this.nodes.values()).find(n => n.type.startsWith('start-')) ||
                       this.nodes.values().next().value;
     if (!startNode) return [];
 
@@ -1299,7 +1435,33 @@ export class BpmnCanvas {
     const visitedEdges = new Set();
 
     while (currentNodeId) {
-      const outgoing = Array.from(this.edges.values()).filter(e => e.sourceId === currentNodeId && !visitedEdges.has(e.id));
+      const targetNode = this.getNode(currentNodeId);
+
+      // If current node is an expanded subprocess, traverse its internal children
+      if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
+        const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
+        const childIds = new Set(childNodes.map(n => n.id));
+        if (childIds.size > 0) {
+          const internalStart = childNodes.find(n => n.type.startsWith('start-')) || childNodes[0];
+          let intCurrentId = internalStart.id;
+
+          while (intCurrentId) {
+            const intOutgoing = Array.from(this.edges.values()).filter(e => e.sourceId === intCurrentId && childIds.has(e.targetId) && !visitedEdges.has(e.id));
+            const nextIntEdge = intOutgoing.find(e => e.animated) || intOutgoing[0];
+            if (!nextIntEdge) break;
+
+            visitedEdges.add(nextIntEdge.id);
+            path.push(nextIntEdge);
+            intCurrentId = nextIntEdge.targetId;
+          }
+        }
+      }
+
+      const outgoing = Array.from(this.edges.values()).filter(e => {
+        if (e.sourceId !== currentNodeId || visitedEdges.has(e.id)) return false;
+        if (hiddenChildIds.has(e.targetId)) return false;
+        return true;
+      });
       let nextEdge = outgoing.find(e => e.animated) || outgoing[0];
 
       // If no direct outgoing edge from this node, check if it has an attached boundary event with outgoing edges

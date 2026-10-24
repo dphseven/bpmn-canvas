@@ -149,7 +149,7 @@
 
 /* Expanded Subprocess Container Styling */
 .bpmn-node-subprocess.expanded {
-  z-index: 10; /* Container stays below contained child nodes (z-index 20) */
+  z-index: 5; /* Container stays below SVG edges (z-index 15) and contained child nodes (z-index 20) */
   align-items: stretch;
   justify-content: flex-start;
   flex-direction: column;
@@ -163,7 +163,7 @@
 }
 
 .bpmn-node-subprocess.expanded.selected {
-  z-index: 12;
+  z-index: 7;
   border-color: var(--accent-primary) !important;
   border-style: solid !important;
 }
