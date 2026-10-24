@@ -51,7 +51,7 @@
   left: 0;
   overflow: visible;
   pointer-events: none;
-  z-index: 10;
+  z-index: 15;
 }
 
 .bpmn-edge-path {
@@ -249,4 +249,12 @@
   box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 16px rgba(56, 189, 248, 0.75) !important;
   transform: rotate(45deg) scale(1.08) !important;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+/* For Expanded Subprocesses: Glow the container border */
+.bpmn-node.bpmn-node-subprocess.expanded.sim-active {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px var(--border-focus), 0 0 24px rgba(129, 140, 248, 0.55), inset 0 0 16px rgba(129, 140, 248, 0.2) !important;
+  transform: none !important;
+  z-index: 6 !important;
 }

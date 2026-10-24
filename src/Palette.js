@@ -314,12 +314,26 @@ export class Palette {
         }
       }
 
+      // Check if dropped inside an expanded subprocess
+      let nodeData = {};
+      if (nodeType !== 'subprocess') {
+        const targetSubprocess = this.canvas.findSubprocessAt(finalCenterX, finalCenterY);
+        if (targetSubprocess) {
+          nodeData.parentId = targetSubprocess.id;
+        }
+      }
+
       // Center dropped node on cursor / snap point
       const node = this.canvas.addNode({
         type: nodeType,
         x: finalCenterX - dummyWidth / 2,
-        y: finalCenterY - dummyHeight / 2
+        y: finalCenterY - dummyHeight / 2,
+        data: nodeData
       });
+
+      if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
+        this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
+      }
 
       this.canvas.selectNode(node);
     });
