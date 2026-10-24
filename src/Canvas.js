@@ -496,6 +496,10 @@ export class BpmnCanvas {
     if (data.edges) {
       data.edges.forEach(e => this.addEdge(e));
     }
+
+    if (data.autoFit !== false) {
+      this.fitView();
+    }
   }
 
   /* -------------------------------------------------------------
