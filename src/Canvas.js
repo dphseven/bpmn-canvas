@@ -15,7 +15,7 @@ export class BpmnCanvas {
       zoomSpeed: 0.0015,
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
-      snapToGrid: false
+      snapToGrid: true
     }, options);
 
     // Transform State
