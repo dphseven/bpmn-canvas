@@ -101,6 +101,17 @@ export class BpmnEdge {
 
     this.haloElement.addEventListener('pointerdown', selectHandler);
     this.pathElement.addEventListener('pointerdown', selectHandler);
+    this.labelGroup.addEventListener('pointerdown', selectHandler);
+
+    // Double-click to edit label
+    const dblClickHandler = (e) => {
+      e.stopPropagation();
+      this.openLabelEditor();
+    };
+
+    this.haloElement.addEventListener('dblclick', dblClickHandler);
+    this.pathElement.addEventListener('dblclick', dblClickHandler);
+    this.labelGroup.addEventListener('dblclick', dblClickHandler);
 
     this.sourceHandleGroup.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -113,6 +124,62 @@ export class BpmnEdge {
       this.canvas.selectEdge(this);
       this.canvas.startReconnecting(this, 'target', e);
     });
+  }
+
+  openLabelEditor() {
+    this.closeLabelEditor();
+
+    const sourceNode = this.canvas.getNode(this.sourceId);
+    const targetNode = this.canvas.getNode(this.targetId);
+    if (!sourceNode || !targetNode) return;
+
+    const p1 = sourceNode.getPortPosition(this.sourcePort);
+    const p2 = targetNode.getPortPosition(this.targetPort);
+    const mid = Router.getMidpoint(p1, p2);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'bpmn-edge-inline-editor';
+    input.value = this.label || '';
+    input.placeholder = 'Label...';
+    input.style.left = `${mid.x}px`;
+    input.style.top = `${mid.y}px`;
+
+    const commitChange = () => {
+      const newLabel = input.value.trim();
+      this.setLabel(newLabel);
+      this.canvas.emit('edge:labelChange', { edge: this, label: newLabel });
+      this.closeLabelEditor();
+    };
+
+    input.addEventListener('pointerdown', (e) => e.stopPropagation());
+    input.addEventListener('dblclick', (e) => e.stopPropagation());
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitChange();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeLabelEditor();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      commitChange();
+    });
+
+    this.canvas.surface.appendChild(input);
+    this.inlineEditor = input;
+    input.focus();
+    input.select();
+  }
+
+  closeLabelEditor() {
+    if (this.inlineEditor && this.inlineEditor.parentNode) {
+      this.inlineEditor.parentNode.removeChild(this.inlineEditor);
+    }
+    this.inlineEditor = null;
   }
 
   render() {
@@ -153,11 +220,17 @@ export class BpmnEdge {
     }
 
     // Update label position if label exists
+    const mid = Router.getMidpoint(p1, p2);
     if (this.label) {
-      const mid = Router.getMidpoint(p1, p2);
       this.renderLabel(mid);
     } else {
       this.labelGroup.innerHTML = '';
+    }
+
+    // Update active inline editor position if open
+    if (this.inlineEditor) {
+      this.inlineEditor.style.left = `${mid.x}px`;
+      this.inlineEditor.style.top = `${mid.y}px`;
     }
   }
 
@@ -235,6 +308,7 @@ export class BpmnEdge {
   }
 
   destroy() {
+    this.closeLabelEditor();
     if (this.handlesGroup && this.handlesGroup.parentNode) {
       this.handlesGroup.parentNode.removeChild(this.handlesGroup);
     }

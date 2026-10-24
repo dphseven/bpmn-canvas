@@ -48,6 +48,15 @@ export class Inspector {
       }
     });
 
+    this.canvas.on('edge:labelChange', ({ edge, label }) => {
+      if (this.currentTarget === edge) {
+        const input = this.container.querySelector('#prop-edge-label');
+        if (input && input !== document.activeElement) {
+          input.value = label;
+        }
+      }
+    });
+
     this.canvas.on('edge:update', (edge) => {
       if (this.currentTarget === edge) {
         this.inspectEdge(edge);
