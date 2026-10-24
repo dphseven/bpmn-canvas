@@ -74,10 +74,13 @@
       defaultRouting: 'bezier',
       snapToGrid: true
     });
+    window.canvas = canvas;
 
     // 2. Initialize Palette & Inspector
     const palette = new Palette(document.getElementById('palette-container'), canvas);
     const inspector = new Inspector(document.getElementById('inspector-container'), canvas);
+    window.palette = palette;
+    window.inspector = inspector;
 
     // 3. Load Rich Sample Workflow
     function loadSampleWorkflow() {

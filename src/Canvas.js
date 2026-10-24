@@ -36,6 +36,7 @@ export class BpmnCanvas {
     this.dragStartPos = { x: 0, y: 0 };
     this.nodeDragOffsets = new Map(); // offsets for each selected node relative to the dragged node
     this.attachedBoundaryOffsets = new Map(); // offsets for non-selected boundary events attached to dragged activities
+    this.containedChildOffsets = new Map(); // offsets for non-selected child nodes inside dragged expanded subprocesses
     this.connectingFrom = null;
     this.reconnectingEdge = null; // { edge, endpoint: 'source' | 'target' }
 
@@ -286,6 +287,14 @@ export class BpmnCanvas {
               bNode.setPosition(nextLeaderX + offset.dx, nextLeaderY + offset.dy);
             }
           });
+
+          // Also move any child nodes contained in selected expanded subprocesses
+          this.containedChildOffsets.forEach((offset, cId) => {
+            const cNode = this.getNode(cId);
+            if (cNode) {
+              cNode.setPosition(nextLeaderX + offset.dx, nextLeaderY + offset.dy);
+            }
+          });
         }
         return;
       }
@@ -342,6 +351,7 @@ export class BpmnCanvas {
         this.draggedNode = null;
         this.nodeDragOffsets.clear();
         this.attachedBoundaryOffsets.clear();
+        this.containedChildOffsets.clear();
 
         // If a single boundary event was dragged, check if it docks to an activity or detaches
         if (releasedNode.type.startsWith('boundary-') && this.selectedNodes.size === 1) {
@@ -357,6 +367,26 @@ export class BpmnCanvas {
               delete releasedNode.data.hostNodeId;
               delete releasedNode.data.dockEdge;
               releasedNode.createPorts();
+              this.emit('node:update', releasedNode);
+            }
+          }
+        } else if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
+          // If a non-subprocess node was dragged, check if dropped inside an expanded subprocess
+          const centerX = releasedNode.x + releasedNode.width / 2;
+          const centerY = releasedNode.y + releasedNode.height / 2;
+          const targetSubprocess = this.findSubprocessAt(centerX, centerY, releasedNode.id);
+
+          if (targetSubprocess) {
+            if (releasedNode.data?.parentId !== targetSubprocess.id) {
+              releasedNode.data = Object.assign(releasedNode.data || {}, {
+                parentId: targetSubprocess.id
+              });
+              this.emit('node:update', releasedNode);
+            }
+          } else {
+            // Dragged completely outside any expanded subprocess -> detach if previously nested
+            if (releasedNode.data?.parentId) {
+              delete releasedNode.data.parentId;
               this.emit('node:update', releasedNode);
             }
           }
@@ -527,6 +557,30 @@ export class BpmnCanvas {
         }
       });
     });
+
+    // Also calculate offsets for contained child nodes of any selected expanded subprocesses (if not explicitly in selection)
+    this.containedChildOffsets.clear();
+    this.selectedNodes.forEach(selectedNode => {
+      if (selectedNode.type === 'subprocess' && selectedNode.data?.expanded) {
+        this.nodes.forEach(n => {
+          if (n.data?.parentId === selectedNode.id && !selectedIds.has(n.id)) {
+            this.containedChildOffsets.set(n.id, {
+              dx: n.x - leaderNode.x,
+              dy: n.y - leaderNode.y
+            });
+            // And any boundary events on the child node
+            this.nodes.forEach(b => {
+              if (b.type.startsWith('boundary-') && b.data?.hostNodeId === n.id && !selectedIds.has(b.id)) {
+                this.attachedBoundaryOffsets.set(b.id, {
+                  dx: b.x - leaderNode.x,
+                  dy: b.y - leaderNode.y
+                });
+              }
+            });
+          }
+        });
+      }
+    });
   }
 
   startConnecting(node, port, e) {
@@ -565,6 +619,15 @@ export class BpmnCanvas {
     const node = this.nodes.get(id);
     if (!node) return;
 
+    // Cascade remove any child nodes contained inside this subprocess
+    const containedChildNodes = [];
+    this.nodes.forEach(n => {
+      if (n.data && n.data.parentId === id) {
+        containedChildNodes.push(n.id);
+      }
+    });
+    containedChildNodes.forEach(cId => this.removeNode(cId));
+
     // Cascade remove any boundary events attached to this node
     const attachedBoundaryEvents = [];
     this.nodes.forEach(n => {
@@ -592,6 +655,130 @@ export class BpmnCanvas {
     node.destroy();
     this.nodes.delete(id);
     this.emit('node:remove', id);
+  }
+
+  findSubprocessAt(x, y, excludeId = null) {
+    let bestSubprocess = null;
+    let smallestArea = Infinity;
+
+    this.nodes.forEach(node => {
+      if (node.id === excludeId || node.type !== 'subprocess' || !node.data?.expanded) return;
+
+      const nodeW = node.domElement ? (node.domElement.offsetWidth || node.width) : node.width;
+      const nodeH = node.domElement ? (node.domElement.offsetHeight || node.height) : node.height;
+      const left = node.x;
+      const top = node.y;
+      const right = node.x + nodeW;
+      const bottom = node.y + nodeH;
+
+      if (x >= left && x <= right && y >= top && y <= bottom) {
+        const area = nodeW * nodeH;
+        if (area < smallestArea) {
+          smallestArea = area;
+          bestSubprocess = node;
+        }
+      }
+    });
+
+    return bestSubprocess;
+  }
+
+  toggleSubprocessExpanded(subprocessId) {
+    const subprocessNode = this.getNode(subprocessId);
+    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+
+    const isExpanded = !subprocessNode.data?.expanded;
+    this.setSubprocessExpanded(subprocessId, isExpanded);
+  }
+
+  setSubprocessExpanded(subprocessId, expanded) {
+    const subprocessNode = this.getNode(subprocessId);
+    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+
+    subprocessNode.data = Object.assign(subprocessNode.data || {}, {
+      expanded: !!expanded
+    });
+
+    const oldWidth = subprocessNode.width;
+    const oldHeight = subprocessNode.height;
+
+    if (expanded) {
+      // Find all contained children to determine minimum expanded container size
+      const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
+      let targetW = 420;
+      let targetH = 260;
+
+      if (children.length > 0) {
+        let maxRight = subprocessNode.x + targetW;
+        let maxBottom = subprocessNode.y + targetH;
+
+        children.forEach(child => {
+          const childW = child.domElement ? (child.domElement.offsetWidth || child.width) : child.width;
+          const childH = child.domElement ? (child.domElement.offsetHeight || child.height) : child.height;
+          maxRight = Math.max(maxRight, child.x + childW + 30);
+          maxBottom = Math.max(maxBottom, child.y + childH + 30);
+        });
+
+        targetW = Math.max(targetW, maxRight - subprocessNode.x);
+        targetH = Math.max(targetH, maxBottom - subprocessNode.y);
+      }
+
+      subprocessNode.width = targetW;
+      subprocessNode.height = targetH;
+      subprocessNode.domElement.style.width = `${targetW}px`;
+      subprocessNode.domElement.style.minHeight = `${targetH}px`;
+    } else {
+      // Collapsed: restore standard compact dimensions
+      subprocessNode.width = 170;
+      subprocessNode.height = 95;
+      subprocessNode.domElement.style.width = `${170}px`;
+      subprocessNode.domElement.style.minHeight = `${95}px`;
+    }
+
+    subprocessNode.renderContent();
+    subprocessNode.createPorts();
+
+    // Show/hide child nodes & internal edges
+    this.updateSubprocessChildrenVisibility(subprocessId, expanded);
+
+    // Update attached boundary positions & edges
+    if (this.updateAttachedBoundaryPositions) {
+      this.updateAttachedBoundaryPositions(subprocessNode, oldWidth, oldHeight);
+    }
+    this.updateConnectedEdges(subprocessId);
+
+    this.emit('node:update', subprocessNode);
+    this.emitSelectionChange();
+  }
+
+  updateSubprocessChildrenVisibility(subprocessId, visible) {
+    const childIds = new Set();
+    this.nodes.forEach(n => {
+      if (n.data?.parentId === subprocessId) {
+        childIds.add(n.id);
+        if (n.domElement) {
+          n.domElement.style.display = visible ? 'flex' : 'none';
+        }
+      }
+    });
+
+    // Also hide/show boundary events attached to child nodes
+    this.nodes.forEach(n => {
+      if (n.type.startsWith('boundary-') && childIds.has(n.data?.hostNodeId)) {
+        if (n.domElement) {
+          n.domElement.style.display = visible ? 'flex' : 'none';
+        }
+      }
+    });
+
+    // Hide/show edges whose source or target is a contained child
+    this.edges.forEach(edge => {
+      if (childIds.has(edge.sourceId) || childIds.has(edge.targetId)) {
+        if (edge.groupElement) {
+          edge.groupElement.style.display = visible ? '' : 'none';
+        }
+      }
+    });
   }
 
   isActivityNode(node) {
@@ -830,6 +1017,8 @@ export class BpmnCanvas {
   selectAll() {
     this.clearSelection();
     this.nodes.forEach(node => {
+      // Do not select child nodes that are currently hidden inside a collapsed subprocess
+      if (node.domElement && node.domElement.style.display === 'none') return;
       this.selectedNodes.add(node);
       node.setSelected(true);
     });
@@ -840,6 +1029,9 @@ export class BpmnCanvas {
     const baseSet = (isCumulative && this.initialSelectedOnMarquee) ? this.initialSelectedOnMarquee : new Set();
 
     this.nodes.forEach(node => {
+      // Do not select child nodes that are currently hidden inside a collapsed subprocess
+      if (node.domElement && node.domElement.style.display === 'none') return;
+
       const nodeMinX = node.x;
       const nodeMinY = node.y;
       const nodeMaxX = node.x + node.width;

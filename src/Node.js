@@ -308,18 +308,37 @@ export class BpmnNode {
         badge = 'Subprocess';
       }
 
-      const subprocessMarker = (this.type === 'subprocess') 
-        ? `<div class="bpmn-subprocess-marker" title="Collapsed Subprocess"><span class="bpmn-subprocess-plus">+</span></div>` 
-        : '';
-      
-      this.domElement.innerHTML = `
-        <div class="bpmn-activity-header">
-          <span class="bpmn-activity-icon">${icon}</span>
-          <span style="font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">${badge}</span>
-        </div>
-        <div class="bpmn-activity-label" spellcheck="false">${this.label}</div>
-        ${subprocessMarker}
-      `;
+      if (this.type === 'subprocess' && this.data && this.data.expanded) {
+        this.domElement.classList.add('expanded');
+        this.domElement.innerHTML = `
+          <div class="bpmn-subprocess-header">
+            <div class="bpmn-subprocess-title-wrap">
+              <span class="bpmn-activity-icon" style="color: #818cf8;">${icon}</span>
+              <span class="bpmn-activity-label" spellcheck="false" style="font-weight: 600; font-size: 13px; color: var(--text-main); margin: 0; text-align: left;">${this.label}</span>
+            </div>
+            <div class="bpmn-subprocess-marker-header" title="Collapse Subprocess">
+              <span class="bpmn-subprocess-plus">−</span>
+            </div>
+          </div>
+          <div class="bpmn-subprocess-subcanvas-area"></div>
+        `;
+      } else {
+        if (this.type === 'subprocess') {
+          this.domElement.classList.remove('expanded');
+        }
+        const subprocessMarker = (this.type === 'subprocess') 
+          ? `<div class="bpmn-subprocess-marker" title="Expand Subprocess"><span class="bpmn-subprocess-plus">+</span></div>` 
+          : '';
+        
+        this.domElement.innerHTML = `
+          <div class="bpmn-activity-header">
+            <span class="bpmn-activity-icon">${icon}</span>
+            <span style="font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">${badge}</span>
+          </div>
+          <div class="bpmn-activity-label" spellcheck="false">${this.label}</div>
+          ${subprocessMarker}
+        `;
+      }
 
     }
 
@@ -429,6 +448,17 @@ export class BpmnNode {
   bindEvents() {
     this.domElement.addEventListener('pointerdown', (e) => {
       if (e.target.classList.contains('bpmn-port')) return;
+      // If clicking subprocess expand/collapse toggle
+      const marker = e.target.closest('.bpmn-subprocess-marker') || e.target.closest('.bpmn-subprocess-marker-header');
+      if (marker) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (this.canvas && this.canvas.toggleSubprocessExpanded) {
+          this.canvas.toggleSubprocessExpanded(this.id);
+        }
+        return;
+      }
+
       // If currently editing text inside this node, let text interaction happen
       if (e.target.isContentEditable) return;
 

@@ -151,6 +151,29 @@ export class Inspector {
       </div>
       ` : ''}
 
+      ${node.type === 'subprocess' ? `
+      <div class="inspector-field" style="margin-top: 6px;">
+        <label class="inspector-label">Subprocess View</label>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <button class="btn" id="btn-toggle-subprocess" style="width: 100%; justify-content: center; background: rgba(129, 140, 248, 0.15); border-color: rgba(129, 140, 248, 0.35); color: #c7d2fe;">
+            ${node.data.expanded ? '− Contract (Collapse)' : '+ Expand Subprocess'}
+          </button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          ${node.data.expanded ? 'Expanded view shows contained child nodes and inner canvas.' : 'Collapsed view hides inner items into a compact marker.'}
+        </div>
+      </div>
+      ` : ''}
+
+      ${node.data?.parentId ? `
+      <div class="inspector-field" style="margin-top: 6px;">
+        <label class="inspector-label">Contained In</label>
+        <div style="font-size: 12px; font-weight: 500; color: #818cf8; display: flex; align-items: center; gap: 6px;">
+          <span>Subprocess: "${this.canvas.getNode(node.data.parentId)?.label || node.data.parentId}"</span>
+        </div>
+      </div>
+      ` : ''}
+
       <div style="display: flex; gap: 8px; margin-top: 10px;">
         <button class="btn" id="btn-delete-element" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
           Delete Element
@@ -174,6 +197,14 @@ export class Inspector {
     if (interruptingCheckbox) {
       interruptingCheckbox.addEventListener('change', (e) => {
         node.setInterrupting(e.target.checked);
+        this.inspectNode(node);
+      });
+    }
+
+    const toggleSubprocessBtn = this.container.querySelector('#btn-toggle-subprocess');
+    if (toggleSubprocessBtn) {
+      toggleSubprocessBtn.addEventListener('click', () => {
+        this.canvas.toggleSubprocessExpanded(node.id);
         this.inspectNode(node);
       });
     }
