@@ -107,6 +107,29 @@ export class Palette {
       </div>
 
       <div>
+        <div class="palette-heading">Boundary Events</div>
+        <div class="palette-category">
+          <div class="palette-item" draggable="true" data-type="boundary-timer-event">
+            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Boundary Timer</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="boundary-error-event">
+            <div class="palette-item-icon" style="color: #f43f5e; border: 1.5px solid #f43f5e; outline: 1px solid #f43f5e; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+            <span class="palette-item-label">Boundary Error</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
         <div class="palette-heading">Activities</div>
         <div class="palette-category">
           <div class="palette-item" draggable="true" data-type="user-task">
@@ -232,17 +255,19 @@ export class Palette {
       }
 
       const coords = this.canvas.clientToCanvas(e.clientX, e.clientY);
-      const dummyWidth = nodeType.includes('event') ? 52 
+      const dummyWidth = nodeType.startsWith('boundary-') ? 36
+        : (nodeType.includes('event') ? 52 
         : (nodeType.includes('gateway') ? 56 
         : (nodeType === 'text-annotation' ? 130 
         : (nodeType === 'data-object' ? 60 
-        : (nodeType === 'subprocess' ? 170 : 150))));
+        : (nodeType === 'subprocess' ? 170 : 150)))));
 
-      const dummyHeight = nodeType.includes('event') ? 52 
+      const dummyHeight = nodeType.startsWith('boundary-') ? 36
+        : (nodeType.includes('event') ? 52 
         : (nodeType.includes('gateway') ? 56 
         : (nodeType === 'text-annotation' ? 50 
         : (nodeType === 'data-object' ? 70 
-        : (nodeType === 'subprocess' ? 95 : 80))));
+        : (nodeType === 'subprocess' ? 95 : 80)))));
 
       let finalCenterX = coords.x;
       let finalCenterY = coords.y;

@@ -5,13 +5,15 @@
 export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
     this.id = id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel'
+    this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel', 'boundary-timer-event', 'boundary-error-event'
     this.label = label !== undefined ? label : this.getDefaultLabel(this.type);
     this.x = x || 100;
     this.y = y || 100;
     this.width = width || this.getDefaultWidth(this.type);
     this.height = height || this.getDefaultHeight(this.type);
-    this.data = data;
+    this.data = Object.assign({
+      interrupting: true
+    }, data);
     this.canvas = canvas;
     this.selected = false;
 
@@ -33,6 +35,8 @@ export class BpmnNode {
       case 'intermediate-timer-event': return 'Wait';
       case 'intermediate-message-event': return 'Message Received';
       case 'intermediate-signal-event': return 'Signal Received';
+      case 'boundary-timer-event': return 'Timeout';
+      case 'boundary-error-event': return 'Catch Error';
       case 'gateway-exclusive': return '';
       case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
@@ -50,6 +54,7 @@ export class BpmnNode {
   }
 
   getDefaultWidth(type) {
+    if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 170;
@@ -59,6 +64,7 @@ export class BpmnNode {
   }
 
   getDefaultHeight(type) {
+    if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
     if (type === 'subprocess') return 95;
@@ -139,6 +145,25 @@ export class BpmnNode {
             </svg>
           </div>
         `;
+      } else if (this.type.startsWith('boundary-')) {
+        if (this.type === 'boundary-timer-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-timer-icon">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <polyline points="10,5 10,10 13.5,10" />
+              </svg>
+            </div>
+          `;
+        } else if (this.type === 'boundary-error-event') {
+          innerIcon = `
+            <div class="bpmn-event-inner-icon bpmn-boundary-error-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+          `;
+        }
       } else if (!isStart && !isEnd) {
         if (this.type === 'intermediate-message-event') {
           innerIcon = `
@@ -203,6 +228,14 @@ export class BpmnNode {
         ${innerIcon}
         <div class="bpmn-event-floating-label">${this.label}</div>
       `;
+
+      if (this.type.startsWith('boundary-')) {
+        if (this.data.interrupting === false) {
+          this.domElement.classList.add('non-interrupting');
+        } else {
+          this.domElement.classList.remove('non-interrupting');
+        }
+      }
     } else if (this.type.includes('gateway')) {
       const isExclusive = this.type === 'gateway-exclusive';
       const icon = isExclusive ? '✕' : '+';
@@ -453,6 +486,18 @@ export class BpmnNode {
     this.renderContent();
     this.createPorts();
     this.canvas.updateConnectedEdges(this.id);
+  }
+
+  setInterrupting(interrupting) {
+    this.data.interrupting = !!interrupting;
+    if (this.type.startsWith('boundary-')) {
+      if (this.data.interrupting === false) {
+        this.domElement.classList.add('non-interrupting');
+      } else {
+        this.domElement.classList.remove('non-interrupting');
+      }
+    }
+    this.canvas.emit('node:update', this);
   }
 
   destroy() {

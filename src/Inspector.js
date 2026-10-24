@@ -122,12 +122,26 @@ export class Inspector {
             <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
             <option value="gateway-parallel" ${node.type === 'gateway-parallel' ? 'selected' : ''}>Parallel Gateway (AND)</option>
           </optgroup>
+          <optgroup label="Boundary Events">
+            <option value="boundary-timer-event" ${node.type === 'boundary-timer-event' ? 'selected' : ''}>Boundary Timer Event (⏱)</option>
+            <option value="boundary-error-event" ${node.type === 'boundary-error-event' ? 'selected' : ''}>Boundary Error Event (⚡)</option>
+          </optgroup>
           <optgroup label="Artifacts">
             <option value="text-annotation" ${node.type === 'text-annotation' ? 'selected' : ''}>Text Annotation ([ T)</option>
             <option value="data-object" ${node.type === 'data-object' ? 'selected' : ''}>Data Object (📄)</option>
           </optgroup>
         </select>
       </div>
+
+      ${node.type.startsWith('boundary-') ? `
+      <div class="inspector-field" style="flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px; padding: 6px 0;">
+        <div>
+          <label class="inspector-label" for="prop-boundary-interrupting" style="cursor: pointer; font-weight: 600;">Interrupting</label>
+          <div style="font-size: 11px; color: var(--text-muted);">${node.data.interrupting !== false ? 'Aborts parent activity' : 'Parallel non-interrupting trigger'}</div>
+        </div>
+        <input type="checkbox" id="prop-boundary-interrupting" ${node.data.interrupting !== false ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
+      </div>
+      ` : ''}
 
       <div style="display: flex; gap: 8px; margin-top: 10px;">
         <button class="btn" id="btn-delete-element" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
@@ -147,6 +161,14 @@ export class Inspector {
       node.setType(e.target.value);
       this.inspectNode(node); // refresh badge and attributes
     });
+
+    const interruptingCheckbox = this.container.querySelector('#prop-boundary-interrupting');
+    if (interruptingCheckbox) {
+      interruptingCheckbox.addEventListener('change', (e) => {
+        node.setInterrupting(e.target.checked);
+        this.inspectNode(node);
+      });
+    }
 
     const deleteBtn = this.container.querySelector('#btn-delete-element');
     deleteBtn.addEventListener('click', () => {

@@ -271,6 +271,63 @@
   font-size: 14px;
 }
 
+/* Boundary Events (Compact 36px double-concentric rings) */
+.bpmn-node.bpmn-node-boundary-timer-event,
+.bpmn-node.bpmn-node-boundary-error-event {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 24;
+}
+
+/* Boundary Timer Event: Gold/Amber concentric rings */
+.bpmn-node.bpmn-node-boundary-timer-event {
+  border: 1.8px solid var(--accent-amber) !important;
+  outline: 1.5px solid var(--accent-amber);
+  outline-offset: -4px;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+}
+
+.bpmn-node.bpmn-node-boundary-timer-event .bpmn-boundary-timer-icon {
+  color: var(--accent-amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Boundary Error Event: Rose/Red concentric rings */
+.bpmn-node.bpmn-node-boundary-error-event {
+  border: 1.8px solid var(--accent-rose) !important;
+  outline: 1.5px solid var(--accent-rose);
+  outline-offset: -4px;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
+}
+
+.bpmn-node.bpmn-node-boundary-error-event .bpmn-boundary-error-icon {
+  color: var(--accent-rose);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Non-Interrupting Boundary Events: BPMN 2.0 Dashed Double Rings */
+.bpmn-node.bpmn-node-boundary-timer-event.non-interrupting,
+.bpmn-node.bpmn-node-boundary-error-event.non-interrupting {
+  border-style: dashed !important;
+  outline-style: dashed !important;
+}
+
+.bpmn-node.bpmn-node-boundary-timer-event .bpmn-event-floating-label,
+.bpmn-node.bpmn-node-boundary-error-event .bpmn-event-floating-label {
+  top: 40px;
+}
+
 .bpmn-event-floating-label {
   position: absolute;
   top: 58px;
