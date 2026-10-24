@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BPMN Canvas Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/styles/ui.css" />
+  <link rel="stylesheet" href="src/styles/canvas.css" />
+  <link rel="stylesheet" href="src/styles/nodes.css" />
+</head>
+<body>
+  <div id="app-container">
+    <!-- Header Navigation -->
+    <header class="top-nav">
+      <div class="brand-section">
+        <span class="brand-badge">BPMN Canvas</span>
+        <span class="brand-title">Workflow Studio</span>
+        <span class="brand-subtitle">Native HTML + SVG Architecture</span>
+      </div>
+
+      <div class="nav-actions">
+        <button class="btn" id="btn-theme-toggle" title="Toggle Theme">
+          <span>🌙</span> <span id="theme-label">Dark</span>
+        </button>
+        <button class="btn" id="btn-snap-toggle" title="Snap to Grid">
+          <span>🧲</span> Grid Snap: <span id="snap-status">Off</span>
+        </button>
+        <button class="btn" id="btn-export-json">
+          <span>📥</span> Export JSON
+        </button>
+        <button class="btn" id="btn-import-json">
+          <span>📤</span> Load Demo
+        </button>
+        <button class="btn btn-primary" id="btn-fit-view">
+          <span>🎯</span> Fit View
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-workspace">
+      <!-- Drag & Drop Node Palette -->
+      <aside id="palette-container"></aside>
+
+      <!-- Infinite Interactive Canvas -->
+      <div id="canvas-container"></div>
+
+      <!-- Live Properties Inspector -->
+      <aside id="inspector-container"></aside>
+
+      <!-- Floating Viewport Navigation Toolbar -->
+      <div class="floating-controls">
+        <button class="control-btn" id="ctrl-zoom-out" title="Zoom Out">−</button>
+        <span class="zoom-indicator" id="ctrl-zoom-level">100%</span>
+        <button class="control-btn" id="ctrl-zoom-in" title="Zoom In">+</button>
+        <div class="control-divider"></div>
+        <button class="control-btn" id="ctrl-reset-view" title="Reset View (100%)">⟲</button>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { BpmnCanvas, Palette, Inspector } from './src/index.js';
+
+    // 1. Initialize Canvas
+    const canvasContainer = document.getElementById('canvas-container');
+    const canvas = new BpmnCanvas(canvasContainer, {
+      defaultRouting: 'bezier',
+      snapToGrid: false
+    });
+
+    // 2. Initialize Palette & Inspector
+    const palette = new Palette(document.getElementById('palette-container'), canvas);
+    const inspector = new Inspector(document.getElementById('inspector-container'), canvas);
+
+    // 3. Load Rich Sample Workflow
+    function loadSampleWorkflow() {
+      const sample = {
+        nodes: [
+          {
+            id: 'start_node',
+            type: 'start-event',
+            label: 'Order Placed',
+            x: 96,
+            y: 214 // Center Y = 240
+          },
+          {
+            id: 'task_review',
+            type: 'user-task',
+            label: 'Review Order Details',
+            x: 240,
+            y: 200 // Center Y = 240
+          },
+          {
+            id: 'gateway_check',
+            type: 'gateway-exclusive',
+            label: 'Approved?',
+            x: 480,
+            y: 212 // Center Y = 240
+          },
+          {
+            id: 'task_process',
+            type: 'service-task',
+            label: 'Charge Credit Card',
+            x: 648,
+            y: 100 // Center Y = 140
+          },
+          {
+            id: 'task_reject',
+            type: 'task',
+            label: 'Send Rejection Notice',
+            x: 648,
+            y: 300 // Center Y = 340
+          },
+          {
+            id: 'end_success',
+            type: 'end-event',
+            label: 'Order Fulfilled',
+            x: 888,
+            y: 114 // Center Y = 140
+          },
+          {
+            id: 'end_fail',
+            type: 'end-event',
+            label: 'Order Cancelled',
+            x: 888,
+            y: 314 // Center Y = 340
+          }
+        ],
+        edges: [
+          {
+            id: 'e1',
+            sourceId: 'start_node',
+            targetId: 'task_review',
+            sourcePort: 'right',
+            targetPort: 'left',
+            routing: 'bezier',
+            animated: true
+          },
+          {
+            id: 'e2',
+            sourceId: 'task_review',
+            targetId: 'gateway_check',
+            sourcePort: 'right',
+            targetPort: 'left',
+            routing: 'bezier'
+          },
+          {
+            id: 'e3',
+            sourceId: 'gateway_check',
+            targetId: 'task_process',
+            sourcePort: 'right',
+            targetPort: 'left',
+            label: 'Yes',
+            routing: 'bezier',
+            animated: true
+          },
+          {
+            id: 'e4',
+            sourceId: 'gateway_check',
+            targetId: 'task_reject',
+            sourcePort: 'bottom',
+            targetPort: 'left',
+            label: 'No',
+            routing: 'bezier'
+          },
+          {
+            id: 'e5',
+            sourceId: 'task_process',
+            targetId: 'end_success',
+            sourcePort: 'right',
+            targetPort: 'left',
+            routing: 'bezier',
+            animated: true
+          },
+          {
+            id: 'e6',
+            sourceId: 'task_reject',
+            targetId: 'end_fail',
+            sourcePort: 'right',
+            targetPort: 'left',
+            routing: 'bezier'
+          }
+        ]
+      };
+
+      canvas.loadData(sample);
+      setTimeout(() => canvas.fitView(), 50);
+    }
+
+    loadSampleWorkflow();
+
+    // 4. Viewport Controls & Indicators
+    const zoomLevelEl = document.getElementById('ctrl-zoom-level');
+    canvas.on('viewport:change', ({ zoom }) => {
+      zoomLevelEl.textContent = `${Math.round(zoom * 100)}%`;
+    });
+
+    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
+      canvas.setZoom(canvas.zoom * 1.2);
+    });
+
+    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
+      canvas.setZoom(canvas.zoom / 1.2);
+    });
+
+    document.getElementById('ctrl-reset-view').addEventListener('click', () => {
+      canvas.resetViewport();
+    });
+
+    document.getElementById('btn-fit-view').addEventListener('click', () => {
+      canvas.fitView();
+    });
+
+    // 5. Grid Snap Toggle
+    const snapBtn = document.getElementById('btn-snap-toggle');
+    const snapStatus = document.getElementById('snap-status');
+    snapBtn.addEventListener('click', () => {
+      canvas.options.snapToGrid = !canvas.options.snapToGrid;
+      snapStatus.textContent = canvas.options.snapToGrid ? 'On' : 'Off';
+      snapBtn.style.borderColor = canvas.options.snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6. Theme Toggle (Dark / Light)
+    const themeBtn = document.getElementById('btn-theme-toggle');
+    const themeLabel = document.getElementById('theme-label');
+    let isLight = false;
+    themeBtn.addEventListener('click', () => {
+      isLight = !isLight;
+      document.body.classList.toggle('theme-light', isLight);
+      themeLabel.textContent = isLight ? 'Light' : 'Dark';
+    });
+
+    // 7. Export / Import Data
+    document.getElementById('btn-export-json').addEventListener('click', () => {
+      const data = canvas.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bpmn-workflow.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('btn-import-json').addEventListener('click', () => {
+      loadSampleWorkflow();
+    });
+  </script>
+</body>
+</html>
