@@ -100,12 +100,17 @@
   white-space: normal;
   margin-top: 8px;
   width: 100%;
-}
-
-.bpmn-activity-label[contenteditable="true"]:focus {
-  background: rgba(255, 255, 255, 0.08);
+  cursor: inherit;
   border-radius: 4px;
   padding: 2px 4px;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.bpmn-activity-label[contenteditable="true"] {
+  cursor: text;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px var(--border-focus);
 }
 
 .bpmn-node-user-task {
@@ -174,7 +179,20 @@
   font-weight: 500;
   color: var(--text-muted);
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 0.15s ease;
+  outline: none;
+}
+
+.bpmn-event-floating-label[contenteditable="true"],
+.bpmn-gateway-floating-label[contenteditable="true"] {
+  cursor: text;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 1px var(--border-focus);
 }
 
 /* 3. Gateway Node Styling (Diamond) */
@@ -222,7 +240,12 @@
   font-weight: 500;
   color: var(--text-muted);
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 0.15s ease;
+  outline: none;
 }
 
 /* Ports / Connection Handles */

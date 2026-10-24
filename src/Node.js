@@ -6,7 +6,7 @@ export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
     this.id = id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel'
-    this.label = label || this.getDefaultLabel(this.type);
+    this.label = label !== undefined ? label : this.getDefaultLabel(this.type);
     this.x = x || 100;
     this.y = y || 100;
     this.width = width || this.getDefaultWidth(this.type);
@@ -24,8 +24,8 @@ export class BpmnNode {
       case 'start-event': return 'Start';
       case 'end-event': return 'End';
       case 'intermediate-event': return 'Wait';
-      case 'gateway-exclusive': return 'X';
-      case 'gateway-parallel': return '+';
+      case 'gateway-exclusive': return '';
+      case 'gateway-parallel': return '';
       case 'user-task': return 'Review Order';
       case 'service-task': return 'Process Payment';
       case 'activity':
@@ -107,21 +107,44 @@ export class BpmnNode {
           <span class="bpmn-activity-icon">${icon}</span>
           <span style="font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">${badge}</span>
         </div>
-        <div class="bpmn-activity-label" contenteditable="true" spellcheck="false">${this.label}</div>
+        <div class="bpmn-activity-label" spellcheck="false">${this.label}</div>
       `;
 
-      // Inline editing sync
-      const labelEl = this.domElement.querySelector('.bpmn-activity-label');
-      if (labelEl) {
-        labelEl.addEventListener('input', (e) => {
-          this.label = e.target.innerText;
-          this.canvas.emit('node:labelChange', { node: this, label: this.label });
-        });
-        labelEl.addEventListener('pointerdown', (e) => {
-          // Allow text selection without dragging node
+    }
+
+    // Inline editing sync for all label elements (activities, events, gateways)
+    const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
+                    this.domElement.querySelector('.bpmn-event-floating-label') ||
+                    this.domElement.querySelector('.bpmn-gateway-floating-label');
+    if (labelEl) {
+      labelEl.setAttribute('spellcheck', 'false');
+
+      labelEl.addEventListener('input', (e) => {
+        this.label = e.target.innerText;
+        this.canvas.emit('node:labelChange', { node: this, label: this.label });
+      });
+
+      labelEl.addEventListener('pointerdown', (e) => {
+        if (labelEl.getAttribute('contenteditable') === 'true') {
+          // In editing mode, allow text selection and cursor movement without dragging the node
           e.stopPropagation();
-        });
-      }
+        }
+      });
+
+      labelEl.addEventListener('blur', () => {
+        labelEl.removeAttribute('contenteditable');
+      });
+
+      labelEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Enter') {
+          // For single-line floating labels on events/gateways, Enter also submits edit
+          if (e.key === 'Enter' && !this.type.includes('task') && !this.type.includes('activity')) {
+            e.preventDefault();
+          }
+          labelEl.removeAttribute('contenteditable');
+          labelEl.blur();
+        }
+      });
     }
   }
 
@@ -148,9 +171,31 @@ export class BpmnNode {
   bindEvents() {
     this.domElement.addEventListener('pointerdown', (e) => {
       if (e.target.classList.contains('bpmn-port')) return;
+      // If currently editing text inside this node, let text interaction happen
+      if (e.target.isContentEditable) return;
+
       this.canvas.selectNode(this, e.shiftKey);
       this.canvas.startDraggingNode(this, e);
       e.stopPropagation();
+    });
+
+    this.domElement.addEventListener('dblclick', (e) => {
+      if (e.target.classList.contains('bpmn-port')) return;
+      const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
+                      this.domElement.querySelector('.bpmn-event-floating-label') ||
+                      this.domElement.querySelector('.bpmn-gateway-floating-label');
+      if (labelEl) {
+        labelEl.setAttribute('contenteditable', 'true');
+        labelEl.focus();
+
+        // Select all text on double click entry for easy editing
+        const range = document.createRange();
+        range.selectNodeContents(labelEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        e.stopPropagation();
+      }
     });
   }
 
