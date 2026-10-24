@@ -57,6 +57,22 @@ export class BpmnNode {
     this.renderContent();
     this.createPorts();
     this.bindEvents();
+
+    if (window.ResizeObserver) {
+      this.resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const borderBoxSize = entry.borderBoxSize && entry.borderBoxSize[0];
+          const newHeight = borderBoxSize ? borderBoxSize.blockSize : entry.contentRect.height;
+          if (newHeight && Math.abs(newHeight - this.height) > 0.5) {
+            this.height = Math.round(newHeight);
+            if (this.canvas) {
+              this.canvas.updateConnectedEdges(this.id);
+            }
+          }
+        }
+      });
+      this.resizeObserver.observe(this.domElement);
+    }
   }
 
   renderContent() {
@@ -110,6 +126,9 @@ export class BpmnNode {
   }
 
   createPorts() {
+    // Remove existing ports if present (e.g. on re-render)
+    this.domElement.querySelectorAll('.bpmn-port').forEach(p => p.remove());
+
     const directions = ['top', 'right', 'bottom', 'left'];
     directions.forEach(dir => {
       const port = document.createElement('div');
@@ -148,15 +167,15 @@ export class BpmnNode {
   }
 
   getPortPosition(portName) {
-    const w = this.width;
-    const h = this.height;
+    const actualWidth = this.domElement ? (this.domElement.offsetWidth || this.width) : this.width;
+    const actualHeight = this.domElement ? (this.domElement.offsetHeight || this.height) : this.height;
 
     switch (portName) {
-      case 'top': return { x: this.x + w / 2, y: this.y };
-      case 'right': return { x: this.x + w, y: this.y + h / 2 };
-      case 'bottom': return { x: this.x + w / 2, y: this.y + h };
-      case 'left': return { x: this.x, y: this.y + h / 2 };
-      default: return { x: this.x + w / 2, y: this.y + h / 2 };
+      case 'top': return { x: this.x + actualWidth / 2, y: this.y };
+      case 'right': return { x: this.x + actualWidth, y: this.y + actualHeight / 2 };
+      case 'bottom': return { x: this.x + actualWidth / 2, y: this.y + actualHeight };
+      case 'left': return { x: this.x, y: this.y + actualHeight / 2 };
+      default: return { x: this.x + actualWidth / 2, y: this.y + actualHeight / 2 };
     }
   }
 
@@ -176,6 +195,14 @@ export class BpmnNode {
                     this.domElement.querySelector('.bpmn-gateway-floating-label');
     if (labelEl) {
       labelEl.innerText = label;
+    }
+    // Update connected edges in case label change immediately expanded height
+    if (this.domElement && this.canvas) {
+      const currentHeight = this.domElement.offsetHeight;
+      if (currentHeight && currentHeight !== this.height) {
+        this.height = currentHeight;
+      }
+      this.canvas.updateConnectedEdges(this.id);
     }
   }
 
@@ -204,6 +231,9 @@ export class BpmnNode {
   }
 
   destroy() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
     if (this.domElement && this.domElement.parentNode) {
       this.domElement.parentNode.removeChild(this.domElement);
     }
