@@ -331,6 +331,10 @@ export class Palette {
         data: nodeData
       });
 
+      if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
+        this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
+      }
+
       this.canvas.selectNode(node);
     });
   }

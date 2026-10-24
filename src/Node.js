@@ -321,6 +321,7 @@ export class BpmnNode {
             </div>
           </div>
           <div class="bpmn-subprocess-subcanvas-area"></div>
+          <div class="bpmn-subprocess-resize-handle" title="Drag to resize subcanvas"></div>
         `;
       } else {
         if (this.type === 'subprocess') {
@@ -448,6 +449,17 @@ export class BpmnNode {
   bindEvents() {
     this.domElement.addEventListener('pointerdown', (e) => {
       if (e.target.classList.contains('bpmn-port')) return;
+
+      // If clicking subprocess resize handle
+      if (e.target.classList.contains('bpmn-subprocess-resize-handle')) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (this.canvas && this.canvas.startResizingSubprocess) {
+          this.canvas.startResizingSubprocess(this, e);
+        }
+        return;
+      }
+
       // If clicking subprocess expand/collapse toggle
       const marker = e.target.closest('.bpmn-subprocess-marker') || e.target.closest('.bpmn-subprocess-marker-header');
       if (marker) {

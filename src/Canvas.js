@@ -37,6 +37,7 @@ export class BpmnCanvas {
     this.nodeDragOffsets = new Map(); // offsets for each selected node relative to the dragged node
     this.attachedBoundaryOffsets = new Map(); // offsets for non-selected boundary events attached to dragged activities
     this.containedChildOffsets = new Map(); // offsets for non-selected child nodes inside dragged expanded subprocesses
+    this.resizingSubprocess = null; // { node, startWidth, startHeight, mouseStartX, mouseStartY }
     this.connectingFrom = null;
     this.reconnectingEdge = null; // { edge, endpoint: 'source' | 'target' }
 
@@ -248,7 +249,65 @@ export class BpmnCanvas {
         return;
       }
 
-      // 3. Dragging node(s)
+      // 3. Resizing expanded subprocess container
+      if (this.resizingSubprocess) {
+        const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
+        const { node, startWidth, startHeight, mouseStartX, mouseStartY } = this.resizingSubprocess;
+
+        const deltaX = mouseCanvas.x - mouseStartX;
+        const deltaY = mouseCanvas.y - mouseStartY;
+
+        let newW = Math.max(340, Math.round(startWidth + deltaX));
+        let newH = Math.max(180, Math.round(startHeight + deltaY));
+
+        if (this.options.snapToGrid) {
+          newW = Math.round(newW / this.options.gridSize) * this.options.gridSize;
+          newH = Math.round(newH / this.options.gridSize) * this.options.gridSize;
+        }
+
+        // Also ensure it does not shrink smaller than contained children + padding
+        const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === node.id);
+        children.forEach(child => {
+          const childW = child.domElement ? (child.domElement.offsetWidth || child.width) : child.width;
+          const childH = child.domElement ? (child.domElement.offsetHeight || child.height) : child.height;
+          newW = Math.max(newW, Math.round(child.x + childW + 30 - node.x));
+          newH = Math.max(newH, Math.round(child.y + childH + 30 - node.y));
+        });
+
+        if (newW !== node.width || newH !== node.height) {
+          const oldW = node.width;
+          const oldH = node.height;
+          node.width = newW;
+          node.height = newH;
+          node.domElement.style.width = `${newW}px`;
+          node.domElement.style.minHeight = `${newH}px`;
+
+          const totalDeltaW = newW - startWidth;
+
+          // Shift downstream nodes strictly 1-to-1 with the resize handle movement
+          const startPositions = this.resizingSubprocess.downstreamNodeStartPositions;
+          if (startPositions) {
+            startPositions.forEach(({ startX, startY }, nId) => {
+              const targetNode = this.getNode(nId);
+              if (targetNode) {
+                targetNode.setPosition(startX + totalDeltaW, startY);
+                if (this.updateAttachedBoundaryPositions) {
+                  this.updateAttachedBoundaryPositions(targetNode, targetNode.width, targetNode.height);
+                }
+              }
+            });
+          }
+
+          node.createPorts();
+          this.updateConnectedEdges(node.id);
+          if (this.updateAttachedBoundaryPositions) {
+            this.updateAttachedBoundaryPositions(node, oldW, oldH);
+          }
+        }
+        return;
+      }
+
+      // 4. Dragging node(s)
       if (this.draggedNode) {
         const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
         let nextLeaderX = mouseCanvas.x - this.dragStartPos.offsetX;
@@ -383,6 +442,9 @@ export class BpmnCanvas {
               });
               this.emit('node:update', releasedNode);
             }
+
+            // Auto-grow subprocess container if the dropped node extends near or beyond boundaries
+            this.ensureSubprocessEnclosesChildren(targetSubprocess.id);
           } else {
             // Dragged completely outside any expanded subprocess -> detach if previously nested
             if (releasedNode.data?.parentId) {
@@ -391,6 +453,22 @@ export class BpmnCanvas {
             }
           }
         }
+      }
+
+      if (this.resizingSubprocess) {
+        const { node, startWidth, downstreamNodeStartPositions } = this.resizingSubprocess;
+        const totalDeltaW = node.width - startWidth;
+
+        if (totalDeltaW !== 0 && downstreamNodeStartPositions) {
+          if (!node.data.pushedOffsets) node.data.pushedOffsets = {};
+          downstreamNodeStartPositions.forEach((_, nId) => {
+            const existing = node.data.pushedOffsets[nId] || { dx: 0, dy: 0 };
+            node.data.pushedOffsets[nId] = { dx: existing.dx + totalDeltaW, dy: existing.dy };
+          });
+        }
+
+        this.resizingSubprocess = null;
+        this.emit('node:update', node);
       }
 
       const findTargetPort = (clientX, clientY, excludeNodeId) => {
@@ -581,6 +659,117 @@ export class BpmnCanvas {
         });
       }
     });
+  }
+
+  startResizingSubprocess(node, e) {
+    const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
+    const downstreamNodeStartPositions = new Map();
+    const rightEdge = node.x + node.width;
+    const childIds = new Set(Array.from(this.nodes.values()).filter(n => n.data?.parentId === node.id).map(n => n.id));
+
+    this.nodes.forEach(n => {
+      if (n.id === node.id || childIds.has(n.id) || n.data?.hostNodeId === node.id || childIds.has(n.data?.hostNodeId)) return;
+      if (n.x + n.width / 2 >= rightEdge - 15) {
+        downstreamNodeStartPositions.set(n.id, { startX: n.x, startY: n.y });
+      }
+    });
+
+    this.resizingSubprocess = {
+      node,
+      startWidth: node.width,
+      startHeight: node.height,
+      mouseStartX: mouseCanvas.x,
+      mouseStartY: mouseCanvas.y,
+      downstreamNodeStartPositions
+    };
+    this.selectNode(node);
+  }
+
+  pushSurroundingNodesOnResize(subprocessNode, deltaW, deltaH = 0) {
+    if (deltaW <= 0 && deltaH <= 0) return;
+
+    if (!subprocessNode.data.pushedOffsets) {
+      subprocessNode.data.pushedOffsets = {};
+    }
+
+    const pushedOffsets = subprocessNode.data.pushedOffsets;
+    const rightEdge = subprocessNode.x + subprocessNode.width - deltaW;
+    const bottomEdge = subprocessNode.y + subprocessNode.height - deltaH;
+    const childIds = new Set(Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessNode.id).map(n => n.id));
+
+    this.nodes.forEach(node => {
+      // Skip self, contained children, and attached boundary events
+      if (node.id === subprocessNode.id) return;
+      if (childIds.has(node.id)) return;
+      if (node.data?.hostNodeId === subprocessNode.id || childIds.has(node.data?.hostNodeId)) return;
+
+      const nodeCenterX = node.x + node.width / 2;
+      const nodeCenterY = node.y + node.height / 2;
+
+      let shiftX = 0;
+      let shiftY = 0;
+
+      // In horizontal BPMN flows, any node downstream to the right shifts by deltaW
+      if (nodeCenterX >= rightEdge - 15) {
+        shiftX = deltaW;
+      } else if (node.x + node.width > subprocessNode.x && node.x < subprocessNode.x + subprocessNode.width) {
+        if (deltaH > 0 && nodeCenterY >= bottomEdge - 15) {
+          shiftY = deltaH;
+        }
+      }
+
+      if (shiftX !== 0 || shiftY !== 0) {
+        const existing = pushedOffsets[node.id] || { dx: 0, dy: 0 };
+        pushedOffsets[node.id] = { dx: existing.dx + shiftX, dy: existing.dy + shiftY };
+        node.setPosition(node.x + shiftX, node.y + shiftY);
+        if (this.updateAttachedBoundaryPositions) {
+          this.updateAttachedBoundaryPositions(node, node.width, node.height);
+        }
+      }
+    });
+  }
+
+  ensureSubprocessEnclosesChildren(subprocessId) {
+    const subprocessNode = this.getNode(subprocessId);
+    if (!subprocessNode || subprocessNode.type !== 'subprocess' || !subprocessNode.data?.expanded) return;
+
+    const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
+    if (!children.length) return;
+
+    let maxRight = subprocessNode.x + subprocessNode.width;
+    let maxBottom = subprocessNode.y + subprocessNode.height;
+
+    children.forEach(child => {
+      const childW = child.domElement ? (child.domElement.offsetWidth || child.width) : child.width;
+      const childH = child.domElement ? (child.domElement.offsetHeight || child.height) : child.height;
+      maxRight = Math.max(maxRight, child.x + childW + 35);
+      maxBottom = Math.max(maxBottom, child.y + childH + 35);
+    });
+
+    const targetW = Math.max(subprocessNode.width, maxRight - subprocessNode.x);
+    const targetH = Math.max(subprocessNode.height, maxBottom - subprocessNode.y);
+
+    if (targetW !== subprocessNode.width || targetH !== subprocessNode.height) {
+      const oldW = subprocessNode.width;
+      const oldH = subprocessNode.height;
+      subprocessNode.width = targetW;
+      subprocessNode.height = targetH;
+      subprocessNode.domElement.style.width = `${targetW}px`;
+      subprocessNode.domElement.style.minHeight = `${targetH}px`;
+
+      const deltaW = targetW - oldW;
+      const deltaH = targetH - oldH;
+
+      // Push surrounding downstream nodes to prevent overlap on auto-growth
+      this.pushSurroundingNodesOnResize(subprocessNode, deltaW, deltaH);
+
+      subprocessNode.createPorts();
+      this.updateConnectedEdges(subprocessNode.id);
+      if (this.updateAttachedBoundaryPositions) {
+        this.updateAttachedBoundaryPositions(subprocessNode, oldW, oldH);
+      }
+      this.emit('node:update', subprocessNode);
+    }
   }
 
   startConnecting(node, port, e) {
