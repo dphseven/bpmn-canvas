@@ -74,6 +74,12 @@ export class BpmnCanvas {
     this.connectionDraft = this.svg.querySelector('#connection-draft');
 
     this.surface.appendChild(this.svg);
+
+    // Dedicated top SVG layer for endpoint reconnection handles so they always sit above nodes and ports
+    this.handlesSvg = document.createElementNS(svgNS, 'svg');
+    this.handlesSvg.classList.add('bpmn-handles-layer');
+    this.surface.appendChild(this.handlesSvg);
+
     this.container.appendChild(this.surface);
 
     this.applyTransform();
@@ -380,6 +386,7 @@ export class BpmnCanvas {
     this.clearSelection();
     this.selectedEdge = edge;
     edge.setSelected(true);
+    this.surface.classList.add('edge-selected');
     this.emit('selection:change', { type: 'edge', item: edge });
   }
 
@@ -392,6 +399,7 @@ export class BpmnCanvas {
       this.selectedEdge.setSelected(false);
       this.selectedEdge = null;
     }
+    this.surface.classList.remove('edge-selected');
     this.emit('selection:change', { type: 'none' });
   }
 

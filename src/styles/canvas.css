@@ -113,30 +113,44 @@
   dominant-baseline: central;
 }
 
+/* Top SVG Layer for Interactive Handles */
+.bpmn-handles-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 50;
+}
+
 /* Edge Endpoint Reconnection Handles */
+.bpmn-edge-handle-wrapper {
+  pointer-events: all;
+  cursor: grab;
+}
+
+.bpmn-edge-handle-halo {
+  fill: transparent;
+  stroke: transparent;
+  cursor: grab;
+}
+
 .bpmn-edge-handle {
-  display: none;
   fill: var(--bg-primary);
   stroke: var(--border-focus);
   stroke-width: 2.5px;
   cursor: grab;
-  pointer-events: all;
-  transition: transform 0.15s ease, fill 0.15s ease, stroke-width 0.15s ease;
+  transition: transform 0.15s ease, fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
-.bpmn-edge.selected .bpmn-edge-handle {
-  display: block;
-}
-
-.bpmn-edge-handle:hover {
-  cursor: grab;
+.bpmn-edge-handle-wrapper:hover .bpmn-edge-handle {
   fill: var(--border-focus);
-  transform-origin: center;
   stroke: #ffffff;
   stroke-width: 3px;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.9));
+  transform-origin: center;
 }
 
-.bpmn-edge-handle:active {
+.bpmn-edge-handle-wrapper:active {
   cursor: grabbing;
 }

@@ -49,20 +49,45 @@ export class BpmnEdge {
     this.labelGroup = document.createElementNS(svgNS, 'g');
     this.labelGroup.classList.add('bpmn-edge-label-group');
 
-    // Interactive endpoint handles for dragging/reconnecting source and target
-    this.sourceHandle = document.createElementNS(svgNS, 'circle');
-    this.sourceHandle.classList.add('bpmn-edge-handle', 'bpmn-edge-handle-source');
-    this.sourceHandle.setAttribute('r', '6');
+    // Interactive endpoint handles group in the dedicated top handlesSvg layer
+    this.handlesGroup = document.createElementNS(svgNS, 'g');
+    this.handlesGroup.classList.add('bpmn-edge-handles-group');
+    this.handlesGroup.style.display = 'none';
 
+    // Source handle group (halo + visual center)
+    this.sourceHandleGroup = document.createElementNS(svgNS, 'g');
+    this.sourceHandleGroup.classList.add('bpmn-edge-handle-wrapper', 'bpmn-edge-handle-source');
+    this.sourceHalo = document.createElementNS(svgNS, 'circle');
+    this.sourceHalo.classList.add('bpmn-edge-handle-halo');
+    this.sourceHalo.setAttribute('r', '14');
+    this.sourceHandle = document.createElementNS(svgNS, 'circle');
+    this.sourceHandle.classList.add('bpmn-edge-handle');
+    this.sourceHandle.setAttribute('r', '6');
+    this.sourceHandleGroup.appendChild(this.sourceHalo);
+    this.sourceHandleGroup.appendChild(this.sourceHandle);
+
+    // Target handle group (halo + visual center)
+    this.targetHandleGroup = document.createElementNS(svgNS, 'g');
+    this.targetHandleGroup.classList.add('bpmn-edge-handle-wrapper', 'bpmn-edge-handle-target');
+    this.targetHalo = document.createElementNS(svgNS, 'circle');
+    this.targetHalo.classList.add('bpmn-edge-handle-halo');
+    this.targetHalo.setAttribute('r', '14');
     this.targetHandle = document.createElementNS(svgNS, 'circle');
-    this.targetHandle.classList.add('bpmn-edge-handle', 'bpmn-edge-handle-target');
+    this.targetHandle.classList.add('bpmn-edge-handle');
     this.targetHandle.setAttribute('r', '6');
+    this.targetHandleGroup.appendChild(this.targetHalo);
+    this.targetHandleGroup.appendChild(this.targetHandle);
+
+    this.handlesGroup.appendChild(this.sourceHandleGroup);
+    this.handlesGroup.appendChild(this.targetHandleGroup);
+
+    if (this.canvas.handlesSvg) {
+      this.canvas.handlesSvg.appendChild(this.handlesGroup);
+    }
 
     this.groupElement.appendChild(this.haloElement);
     this.groupElement.appendChild(this.pathElement);
     this.groupElement.appendChild(this.labelGroup);
-    this.groupElement.appendChild(this.sourceHandle);
-    this.groupElement.appendChild(this.targetHandle);
 
     this.bindEvents();
     this.render();
@@ -77,13 +102,13 @@ export class BpmnEdge {
     this.haloElement.addEventListener('pointerdown', selectHandler);
     this.pathElement.addEventListener('pointerdown', selectHandler);
 
-    this.sourceHandle.addEventListener('pointerdown', (e) => {
+    this.sourceHandleGroup.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.canvas.selectEdge(this);
       this.canvas.startReconnecting(this, 'source', e);
     });
 
-    this.targetHandle.addEventListener('pointerdown', (e) => {
+    this.targetHandleGroup.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.canvas.selectEdge(this);
       this.canvas.startReconnecting(this, 'target', e);
@@ -109,14 +134,22 @@ export class BpmnEdge {
     this.pathElement.setAttribute('d', d);
     this.haloElement.setAttribute('d', d);
 
-    // Position source & target endpoint handles
+    // Position source & target endpoint handles and hit halos
     if (this.sourceHandle) {
       this.sourceHandle.setAttribute('cx', p1.x);
       this.sourceHandle.setAttribute('cy', p1.y);
     }
+    if (this.sourceHalo) {
+      this.sourceHalo.setAttribute('cx', p1.x);
+      this.sourceHalo.setAttribute('cy', p1.y);
+    }
     if (this.targetHandle) {
       this.targetHandle.setAttribute('cx', p2.x);
       this.targetHandle.setAttribute('cy', p2.y);
+    }
+    if (this.targetHalo) {
+      this.targetHalo.setAttribute('cx', p2.x);
+      this.targetHalo.setAttribute('cy', p2.y);
     }
 
     // Update label position if label exists
@@ -167,9 +200,15 @@ export class BpmnEdge {
     if (selected) {
       this.groupElement.classList.add('selected');
       this.pathElement.setAttribute('marker-end', 'url(#arrowhead-selected)');
+      if (this.handlesGroup) {
+        this.handlesGroup.style.display = 'block';
+      }
     } else {
       this.groupElement.classList.remove('selected');
       this.pathElement.setAttribute('marker-end', 'url(#arrowhead)');
+      if (this.handlesGroup) {
+        this.handlesGroup.style.display = 'none';
+      }
     }
   }
 
@@ -193,6 +232,9 @@ export class BpmnEdge {
   }
 
   destroy() {
+    if (this.handlesGroup && this.handlesGroup.parentNode) {
+      this.handlesGroup.parentNode.removeChild(this.handlesGroup);
+    }
     if (this.groupElement && this.groupElement.parentNode) {
       this.groupElement.parentNode.removeChild(this.groupElement);
     }

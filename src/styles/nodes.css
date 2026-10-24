@@ -263,9 +263,17 @@
 }
 
 .bpmn-node:hover .bpmn-port,
-.bpmn-node.selected .bpmn-port,
-.bpmn-canvas-surface.connecting .bpmn-port {
+.bpmn-node.selected .bpmn-port {
   opacity: 0.85;
+}
+
+/* While an edge is selected, suppress greedy node port hover unless actively dragging to reconnect */
+.bpmn-canvas-surface.edge-selected .bpmn-node:hover .bpmn-port {
+  opacity: 0;
+}
+
+.bpmn-canvas-surface.connecting .bpmn-port {
+  opacity: 0.85 !important;
 }
 
 .bpmn-port:hover {
