@@ -1805,8 +1805,10 @@ export class BpmnCanvas {
         highlightNode(edge.sourceId, 300);
         startNextEdgeTraversal();
       } else {
-        // If this edge begins from a boundary event, insert a clear pause (260ms) after task before boundary pulses
+        const prevEdge = pathEdges[edgeIndex - 1];
         const sourceNode = this.getNode(edge.sourceId);
+
+        // If this edge begins from a boundary event, insert a clear pause (260ms) after task before boundary pulses
         if (sourceNode && sourceNode.type.startsWith('boundary-')) {
           this.simTimeoutId = setTimeout(() => {
             if (!this.simulationActive) return;
@@ -1817,6 +1819,17 @@ export class BpmnCanvas {
               startNextEdgeTraversal();
             }, 200);
           }, 260);
+        } else if (prevEdge && prevEdge.targetId !== edge.sourceId) {
+          // If entering an internal subprocess flow (e.g. prevEdge targeted the subprocess container,
+          // and this edge begins from the internal start event), pulse the internal start event!
+          this.simTimeoutId = setTimeout(() => {
+            if (!this.simulationActive) return;
+            highlightNode(edge.sourceId, 300);
+            this.simTimeoutId = setTimeout(() => {
+              if (!this.simulationActive) return;
+              startNextEdgeTraversal();
+            }, 180);
+          }, 120);
         } else {
           startNextEdgeTraversal();
         }
