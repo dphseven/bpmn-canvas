@@ -16,13 +16,13 @@ export class Palette {
         <div class="palette-category">
           <!-- Start Event (with Flyout Subtypes) -->
           <div class="palette-item palette-has-sub" draggable="true" data-type="start-event">
-            <div class="palette-item-icon" style="border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;"></div>
+            <div class="palette-item-icon palette-icon-start-event"></div>
             <span class="palette-item-label">Start Event</span>
             <span class="palette-expand-arrow">▶</span>
             <div class="palette-sub-menu">
               <div class="palette-sub-heading">Start Triggers</div>
               <div class="palette-sub-item" draggable="true" data-type="start-timer-event">
-                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-start-sub">
                   <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="10" cy="10" r="8" />
                     <polyline points="10,5 10,10 13.5,10" />
@@ -31,7 +31,7 @@ export class Palette {
                 <span class="palette-item-label">Timer Start</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="start-message-event">
-                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-start-sub">
                   <svg width="11" height="8" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
                     <polyline points="2,2 10,8.5 18,2" />
@@ -40,7 +40,7 @@ export class Palette {
                 <span class="palette-item-label">Message Start</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="start-signal-event">
-                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-start-sub">
                   <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="10,2 18,17 2,17" />
                   </svg>
@@ -52,13 +52,13 @@ export class Palette {
 
           <!-- Intermediate Event (with Flyout Subtypes) -->
           <div class="palette-item palette-has-sub" draggable="true" data-type="intermediate-event">
-            <div class="palette-item-icon" style="border: 2px double #f59e0b; outline: 1.5px solid #f59e0b; outline-offset: -4px; border-radius: 50%; width: 22px; height: 22px;"></div>
+            <div class="palette-item-icon palette-icon-intermediate-event"></div>
             <span class="palette-item-label">Intermediate Event</span>
             <span class="palette-expand-arrow">▶</span>
             <div class="palette-sub-menu">
               <div class="palette-sub-heading">Catch / Throw</div>
               <div class="palette-sub-item" draggable="true" data-type="intermediate-timer-event">
-                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-intermediate-sub">
                   <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="10" cy="10" r="8" />
                     <polyline points="10,5 10,10 13.5,10" />
@@ -67,7 +67,7 @@ export class Palette {
                 <span class="palette-item-label">Timer</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="intermediate-message-event">
-                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-intermediate-sub">
                   <svg width="13" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
                     <polyline points="2,2 10,8.5 18,2" />
@@ -76,7 +76,7 @@ export class Palette {
                 <span class="palette-item-label">Message</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="intermediate-signal-event">
-                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-intermediate-sub">
                   <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="10,2 18,17 2,17" />
                   </svg>
@@ -84,7 +84,7 @@ export class Palette {
                 <span class="palette-item-label">Signal</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="boundary-error-event">
-                <div class="palette-item-icon" style="color: #f43f5e; border: 1.5px solid #f43f5e; outline: 1px solid #f43f5e; outline-offset: -3px; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-intermediate-error">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
@@ -96,13 +96,13 @@ export class Palette {
 
           <!-- End Event (with Flyout Subtypes) -->
           <div class="palette-item palette-has-sub" draggable="true" data-type="end-event">
-            <div class="palette-item-icon" style="border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;"></div>
+            <div class="palette-item-icon palette-icon-end-event"></div>
             <span class="palette-item-label">End Event</span>
             <span class="palette-expand-arrow">▶</span>
             <div class="palette-sub-menu">
               <div class="palette-sub-heading">End Results</div>
               <div class="palette-sub-item" draggable="true" data-type="end-error-event">
-                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-end-sub">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
@@ -110,7 +110,7 @@ export class Palette {
                 <span class="palette-item-label">Error End</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="end-terminate-event">
-                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-end-sub">
                   <svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor">
                     <circle cx="10" cy="10" r="7" />
                   </svg>
@@ -118,7 +118,7 @@ export class Palette {
                 <span class="palette-item-label">Terminate End</span>
               </div>
               <div class="palette-sub-item" draggable="true" data-type="end-message-event">
-                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                <div class="palette-item-icon palette-icon-end-sub">
                   <svg width="11" height="8" viewBox="0 0 20 15" fill="currentColor">
                     <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
                     <polygon points="2,2 10,8.5 18,2" />
@@ -135,27 +135,27 @@ export class Palette {
         <div class="palette-heading">Activities</div>
         <div class="palette-category">
           <div class="palette-item" draggable="true" data-type="user-task">
-            <div class="palette-item-icon" style="background: rgba(59, 130, 246, 0.2); color: #38bdf8;">👤</div>
+            <div class="palette-item-icon palette-icon-user-task">👤</div>
             <span class="palette-item-label">User Task</span>
           </div>
           <div class="palette-item" draggable="true" data-type="service-task">
-            <div class="palette-item-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">⚙️</div>
+            <div class="palette-item-icon palette-icon-service-task">⚙️</div>
             <span class="palette-item-label">Service Task</span>
           </div>
           <div class="palette-item" draggable="true" data-type="manual-task">
-            <div class="palette-item-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">✋</div>
+            <div class="palette-item-icon palette-icon-manual-task">✋</div>
             <span class="palette-item-label">Manual Task</span>
           </div>
           <div class="palette-item" draggable="true" data-type="business-rule-task">
-            <div class="palette-item-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">📊</div>
+            <div class="palette-item-icon palette-icon-rule-task">📊</div>
             <span class="palette-item-label">Rule Task</span>
           </div>
           <div class="palette-item" draggable="true" data-type="script-task">
-            <div class="palette-item-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">📜</div>
+            <div class="palette-item-icon palette-icon-script-task">📜</div>
             <span class="palette-item-label">Script Task</span>
           </div>
           <div class="palette-item" draggable="true" data-type="subprocess">
-            <div class="palette-item-icon" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: bold; font-size: 13px;">⊞</div>
+            <div class="palette-item-icon palette-icon-subprocess">⊞</div>
             <span class="palette-item-label">Subprocess</span>
           </div>
         </div>
@@ -165,14 +165,14 @@ export class Palette {
         <div class="palette-heading">Gateways</div>
         <div class="palette-category">
           <div class="palette-item" draggable="true" data-type="gateway-exclusive">
-            <div class="palette-item-icon" style="color: #f59e0b; font-weight: bold; transform: rotate(45deg); border: 1.5px solid #f59e0b; width: 18px; height: 18px; margin: 4px;">
-              <span style="transform: rotate(-45deg); display: block; font-size: 11px;">✕</span>
+            <div class="palette-item-icon palette-icon-gateway">
+              <span class="palette-icon-gateway-symbol">✕</span>
             </div>
             <span class="palette-item-label">Exclusive (XOR)</span>
           </div>
           <div class="palette-item" draggable="true" data-type="gateway-parallel">
-            <div class="palette-item-icon" style="color: #f59e0b; font-weight: bold; transform: rotate(45deg); border: 1.5px solid #f59e0b; width: 18px; height: 18px; margin: 4px;">
-              <span style="transform: rotate(-45deg); display: block; font-size: 11px;">+</span>
+            <div class="palette-item-icon palette-icon-gateway">
+              <span class="palette-icon-gateway-symbol">+</span>
             </div>
             <span class="palette-item-label">Parallel (AND)</span>
           </div>
@@ -183,11 +183,11 @@ export class Palette {
         <div class="palette-heading">Artifacts</div>
         <div class="palette-category">
           <div class="palette-item" draggable="true" data-type="text-annotation">
-            <div class="palette-item-icon" style="color: #94a3b8; font-weight: 600; font-size: 14px; font-family: monospace;">[ T</div>
+            <div class="palette-item-icon palette-icon-annotation">[ T</div>
             <span class="palette-item-label">Annotation</span>
           </div>
           <div class="palette-item" draggable="true" data-type="data-object">
-            <div class="palette-item-icon" style="color: #38bdf8;">
+            <div class="palette-item-icon palette-icon-data-object">
               <svg width="13" height="16" viewBox="0 0 16 20" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M 2 2 L 10 2 L 14 6 L 14 18 L 2 18 Z" />
                 <polyline points="10,2 10,6 14,6" />
