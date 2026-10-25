@@ -1,73 +1,38 @@
 :root {
-  /* BPMN Canvas Namespaced Tokens (Client Overridable) */
-  --bpmn-bg-primary: var(--bg-primary, #0f172a);
-  --bpmn-bg-secondary: var(--bg-secondary, #1e293b);
-  --bpmn-bg-surface: var(--bg-surface, #1e293b88);
-  --bpmn-bg-panel: var(--bg-panel, rgba(30, 41, 59, 0.75));
-  --bpmn-border-color: var(--border-color, rgba(255, 255, 255, 0.08));
-  --bpmn-border-focus: var(--border-focus, #38bdf8);
-  --bpmn-text-main: var(--text-main, #f8fafc);
-  --bpmn-text-muted: var(--text-muted, #94a3b8);
-  --bpmn-text-subtle: var(--text-subtle, #64748b);
-  --bpmn-accent-cyan: var(--accent-cyan, #06b6d4);
-  --bpmn-accent-blue: var(--accent-blue, #3b82f6);
-  --bpmn-accent-violet: var(--accent-violet, #8b5cf6);
-  --bpmn-accent-emerald: var(--accent-emerald, #10b981);
-  --bpmn-accent-amber: var(--accent-amber, #f59e0b);
-  --bpmn-accent-rose: var(--accent-rose, #f43f5e);
-  --bpmn-grid-dot: var(--grid-dot, rgba(255, 255, 255, 0.1));
-  --bpmn-shadow-card: var(--shadow-card, 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3));
-  --bpmn-shadow-glow: var(--shadow-glow, 0 0 20px rgba(56, 189, 248, 0.35));
-  --bpmn-transition-smooth: var(--transition-smooth, all 0.2s cubic-bezier(0.16, 1, 0.3, 1));
-
-  /* Legacy aliases for backwards compatibility */
-  --bg-primary: var(--bpmn-bg-primary);
-  --bg-secondary: var(--bpmn-bg-secondary);
-  --bg-surface: var(--bpmn-bg-surface);
-  --bg-panel: var(--bpmn-bg-panel);
-  --border-color: var(--bpmn-border-color);
-  --border-focus: var(--bpmn-border-focus);
-  --text-main: var(--bpmn-text-main);
-  --text-muted: var(--bpmn-text-muted);
-  --text-subtle: var(--bpmn-text-subtle);
-  --accent-cyan: var(--bpmn-accent-cyan);
-  --accent-blue: var(--bpmn-accent-blue);
-  --accent-violet: var(--bpmn-accent-violet);
-  --accent-emerald: var(--bpmn-accent-emerald);
-  --accent-amber: var(--bpmn-accent-amber);
-  --accent-rose: var(--bpmn-accent-rose);
-  --grid-dot: var(--bpmn-grid-dot);
-  --shadow-card: var(--bpmn-shadow-card);
-  --shadow-glow: var(--bpmn-shadow-glow);
-  --transition-smooth: var(--bpmn-transition-smooth);
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-surface: #1e293b88;
+  --bg-panel: rgba(30, 41, 59, 0.75);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: #38bdf8;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --accent-cyan: #06b6d4;
+  --accent-blue: #3b82f6;
+  --accent-violet: #8b5cf6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --grid-dot: rgba(255, 255, 255, 0.1);
+  --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.35);
+  --transition-smooth: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.theme-light, [data-bpmn-theme="light"] {
-  --bpmn-bg-primary: #f8fafc;
-  --bpmn-bg-secondary: #f1f5f9;
-  --bpmn-bg-surface: #ffffffcc;
-  --bpmn-bg-panel: rgba(255, 255, 255, 0.85);
-  --bpmn-border-color: rgba(0, 0, 0, 0.08);
-  --bpmn-border-focus: #0284c7;
-  --bpmn-text-main: #0f172a;
-  --bpmn-text-muted: #64748b;
-  --bpmn-text-subtle: #94a3b8;
-  --bpmn-grid-dot: rgba(0, 0, 0, 0.08);
-  --bpmn-shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --bpmn-shadow-glow: 0 0 20px rgba(2, 132, 199, 0.25);
-
-  --bg-primary: var(--bpmn-bg-primary);
-  --bg-secondary: var(--bpmn-bg-secondary);
-  --bg-surface: var(--bpmn-bg-surface);
-  --bg-panel: var(--bpmn-bg-panel);
-  --border-color: var(--bpmn-border-color);
-  --border-focus: var(--bpmn-border-focus);
-  --text-main: var(--bpmn-text-main);
-  --text-muted: var(--bpmn-text-muted);
-  --text-subtle: var(--bpmn-text-subtle);
-  --grid-dot: var(--bpmn-grid-dot);
-  --shadow-card: var(--bpmn-shadow-card);
-  --shadow-glow: var(--bpmn-shadow-glow);
+.theme-light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-surface: #ffffffcc;
+  --bg-panel: rgba(255, 255, 255, 0.85);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-focus: #0284c7;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --grid-dot: rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.25);
 }
 
 * {
