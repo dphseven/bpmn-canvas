@@ -128,6 +128,7 @@ export class BpmnEdge {
 
   openLabelEditor() {
     this.closeLabelEditor();
+    if (this.canvas && !this.canvas.hasCapability('allowLabelEdit')) return;
 
     const sourceNode = this.canvas.getNode(this.sourceId);
     const targetNode = this.canvas.getNode(this.targetId);

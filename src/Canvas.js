@@ -720,7 +720,10 @@ export class BpmnCanvas {
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
 
+      if (!this.hasCapability('allowKeyboardShortcuts')) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!this.hasCapability('allowDelete')) return;
         if (this.selectedNodes.size > 0) {
           const ids = Array.from(this.selectedNodes).map(n => n.id);
           this.batchOperation(() => {
@@ -734,6 +737,7 @@ export class BpmnCanvas {
       } else if (e.key === 'Escape') {
         this.clearSelection();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        if (!this.hasCapability('allowKeyboardShortcuts')) return;
         e.preventDefault();
         if (e.shiftKey) {
           this.redo();
@@ -741,6 +745,7 @@ export class BpmnCanvas {
           this.undo();
         }
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        if (!this.hasCapability('allowKeyboardShortcuts')) return;
         e.preventDefault();
         this.redo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
@@ -799,11 +804,13 @@ export class BpmnCanvas {
     const allowDrag = !readOnly && caps.allowDrag !== false;
     const allowConnect = !readOnly && caps.allowConnect !== false;
     const allowReconnect = !readOnly && caps.allowReconnect !== false;
+    const allowLabelEdit = !readOnly && caps.allowLabelEdit !== false;
 
     this.container.classList.toggle('readonly', readOnly);
     this.container.classList.toggle('no-drag', !allowDrag);
     this.container.classList.toggle('no-connect', !allowConnect);
     this.container.classList.toggle('no-reconnect', !allowReconnect);
+    this.container.classList.toggle('no-label-edit', !allowLabelEdit);
   }
 
   /**
@@ -1044,6 +1051,7 @@ export class BpmnCanvas {
   }
 
   removeNode(id) {
+    if (!this.hasCapability('allowDelete')) return;
     const node = this.nodes.get(id);
     if (!node) return;
 
@@ -1617,6 +1625,7 @@ export class BpmnCanvas {
   }
 
   removeEdge(id) {
+    if (!this.hasCapability('allowDelete')) return;
     this.pushHistory();
     const edge = this.edges.get(id);
     if (!edge) return;
@@ -1741,6 +1750,24 @@ export class BpmnCanvas {
 
     this.surface.classList.remove('edge-selected');
     this.emit('selection:change', { type: 'none' });
+  }
+
+  /**
+   * Delete currently selected nodes and edges if allowDelete capability permits
+   */
+  deleteSelection() {
+    if (!this.hasCapability('allowDelete')) return;
+
+    if (this.selectedNodes.size > 0) {
+      const ids = Array.from(this.selectedNodes).map(n => n.id);
+      this.batchOperation(() => {
+        ids.forEach(id => this.removeNode(id));
+      });
+      this.clearSelection();
+    } else if (this.selectedEdge) {
+      this.removeEdge(this.selectedEdge.id);
+      this.clearSelection();
+    }
   }
 
   setZoom(zoomFactor) {

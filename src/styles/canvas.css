@@ -292,3 +292,8 @@
 .bpmn-canvas-viewport.no-reconnect .bpmn-handles-layer {
   display: none !important;
 }
+
+.bpmn-canvas-viewport.readonly .bpmn-edge-label-group,
+.bpmn-canvas-viewport.no-label-edit .bpmn-edge-label-group {
+  cursor: default !important;
+}
