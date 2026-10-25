@@ -1,6 +1,7 @@
 import { BpmnNode } from './Node.js';
 import { BpmnEdge } from './Edge.js';
 import { Router } from './router.js';
+import { NodeTypeRegistry } from './NodeTypeRegistry.js';
 
 /**
  * Core Canvas Engine for BPMN Canvas
@@ -54,6 +55,9 @@ export class BpmnCanvas {
     this.panY = 0;
     this.isPanning = false;
     this.panStart = { x: 0, y: 0 };
+
+    // Node Type Registry
+    this.registry = options.registry || new NodeTypeRegistry();
 
     // Selection & Data Stores
     this.nodes = new Map();

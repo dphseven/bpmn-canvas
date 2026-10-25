@@ -1,208 +1,125 @@
+import { NodeTypeRegistry } from './NodeTypeRegistry.js';
+
 /**
  * Drag and Drop Palette for BPMN shapes
+ * Dynamically rendered from NodeTypeRegistry with support for category,
+ * type, and subtype filtering.
  */
 export class Palette {
-  constructor(containerElement, canvas) {
+  constructor(containerElement, canvas, options = {}) {
     this.container = containerElement;
     this.canvas = canvas;
-    this.init();
+    this.options = options || {};
+    this.registry = this.options.registry || (canvas && canvas.registry) || new NodeTypeRegistry();
+    this.filter = this.options.filter || null;
+
+    this.container.classList.add('palette-panel');
+    this.render();
+    this.bindCanvasDropEvents();
   }
 
-  init() {
-    this.container.classList.add('palette-panel');
-    this.container.innerHTML = `
-      <div>
-        <div class="palette-heading">Events</div>
-        <div class="palette-category">
-          <!-- Start Event (with Flyout Subtypes) -->
-          <div class="palette-item palette-has-sub" draggable="true" data-type="start-event">
-            <div class="palette-item-icon palette-icon-start-event"></div>
-            <span class="palette-item-label">Start Event</span>
-            <span class="palette-expand-arrow">▶</span>
-            <div class="palette-sub-menu">
-              <div class="palette-sub-heading">Start Triggers</div>
-              <div class="palette-sub-item" draggable="true" data-type="start-timer-event">
-                <div class="palette-item-icon palette-icon-start-sub">
-                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8" />
-                    <polyline points="10,5 10,10 13.5,10" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Timer Start</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="start-message-event">
-                <div class="palette-item-icon palette-icon-start-sub">
-                  <svg width="11" height="8" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                    <polyline points="2,2 10,8.5 18,2" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Message Start</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="start-signal-event">
-                <div class="palette-item-icon palette-icon-start-sub">
-                  <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="10,2 18,17 2,17" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Signal Start</span>
-              </div>
-            </div>
-          </div>
+  /**
+   * Set or update palette filter configuration and re-render.
+   *
+   * @param {Object|null} filterConfig
+   * @param {string[]} [filterConfig.excludeCategories]
+   * @param {string[]} [filterConfig.includeCategories]
+   * @param {string[]} [filterConfig.excludeTypes]
+   * @param {string[]} [filterConfig.includeTypes]
+   * @param {Object.<string, string[]>} [filterConfig.allowedSubtypes]
+   * @param {Object.<string, string[]>} [filterConfig.excludeSubtypes]
+   */
+  setFilter(filterConfig) {
+    this.filter = filterConfig || null;
+    this.render();
+  }
 
-          <!-- Intermediate Event (with Flyout Subtypes) -->
-          <div class="palette-item palette-has-sub" draggable="true" data-type="intermediate-event">
-            <div class="palette-item-icon palette-icon-intermediate-event"></div>
-            <span class="palette-item-label">Intermediate Event</span>
-            <span class="palette-expand-arrow">▶</span>
-            <div class="palette-sub-menu">
-              <div class="palette-sub-heading">Catch / Throw</div>
-              <div class="palette-sub-item" draggable="true" data-type="intermediate-timer-event">
-                <div class="palette-item-icon palette-icon-intermediate-sub">
-                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8" />
-                    <polyline points="10,5 10,10 13.5,10" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Timer</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="intermediate-message-event">
-                <div class="palette-item-icon palette-icon-intermediate-sub">
-                  <svg width="13" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                    <polyline points="2,2 10,8.5 18,2" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Message</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="intermediate-signal-event">
-                <div class="palette-item-icon palette-icon-intermediate-sub">
-                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="10,2 18,17 2,17" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Signal</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="boundary-error-event">
-                <div class="palette-item-icon palette-icon-intermediate-error">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Error Catch</span>
-              </div>
-            </div>
-          </div>
+  /**
+   * Returns current active filter
+   */
+  getFilter() {
+    return this.filter;
+  }
 
-          <!-- End Event (with Flyout Subtypes) -->
-          <div class="palette-item palette-has-sub" draggable="true" data-type="end-event">
-            <div class="palette-item-icon palette-icon-end-event"></div>
-            <span class="palette-item-label">End Event</span>
-            <span class="palette-expand-arrow">▶</span>
-            <div class="palette-sub-menu">
-              <div class="palette-sub-heading">End Results</div>
-              <div class="palette-sub-item" draggable="true" data-type="end-error-event">
-                <div class="palette-item-icon palette-icon-end-sub">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Error End</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="end-terminate-event">
-                <div class="palette-item-icon palette-icon-end-sub">
-                  <svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor">
-                    <circle cx="10" cy="10" r="7" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Terminate End</span>
-              </div>
-              <div class="palette-sub-item" draggable="true" data-type="end-message-event">
-                <div class="palette-item-icon palette-icon-end-sub">
-                  <svg width="11" height="8" viewBox="0 0 20 15" fill="currentColor">
-                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
-                    <polygon points="2,2 10,8.5 18,2" />
-                  </svg>
-                </div>
-                <span class="palette-item-label">Message End</span>
-              </div>
-            </div>
+  /**
+   * Re-renders palette categories and items based on registry and active filter
+   */
+  render() {
+    const tree = this.registry.getPaletteTree(this.filter || {});
+    this.container.innerHTML = this.buildPaletteHtml(tree);
+    this.bindItemDragEvents();
+  }
+
+  /**
+   * Builds the HTML string for categories, items, and flyout sub-menus
+   */
+  buildPaletteHtml(tree) {
+    if (!tree || tree.length === 0) {
+      return `<div style="padding: 16px; font-size: 12px; color: var(--text-muted); text-align: center;">No palette items available</div>`;
+    }
+
+    return tree.map(category => {
+      const itemsHtml = category.items.map(item => this.renderItemHtml(item)).join('');
+      return `
+        <div>
+          <div class="palette-heading">${category.label}</div>
+          <div class="palette-category">
+            ${itemsHtml}
           </div>
         </div>
-      </div>
+      `;
+    }).join('');
+  }
 
-      <div>
-        <div class="palette-heading">Activities</div>
-        <div class="palette-category">
-          <div class="palette-item" draggable="true" data-type="user-task">
-            <div class="palette-item-icon palette-icon-user-task">👤</div>
-            <span class="palette-item-label">User Task</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="service-task">
-            <div class="palette-item-icon palette-icon-service-task">⚙️</div>
-            <span class="palette-item-label">Service Task</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="manual-task">
-            <div class="palette-item-icon palette-icon-manual-task">✋</div>
-            <span class="palette-item-label">Manual Task</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="business-rule-task">
-            <div class="palette-item-icon palette-icon-rule-task">📊</div>
-            <span class="palette-item-label">Rule Task</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="script-task">
-            <div class="palette-item-icon palette-icon-script-task">📜</div>
-            <span class="palette-item-label">Script Task</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="subprocess">
-            <div class="palette-item-icon palette-icon-subprocess">⊞</div>
-            <span class="palette-item-label">Subprocess</span>
-          </div>
-        </div>
-      </div>
+  /**
+   * Renders single palette item HTML (with sub-menu flyout if activeSubtypes exist)
+   */
+  renderItemHtml(item) {
+    const hasSubtypes = Array.isArray(item.activeSubtypes) && item.activeSubtypes.length > 0;
+    const subClass = hasSubtypes ? ' palette-has-sub' : '';
+    const arrowHtml = hasSubtypes ? '<span class="palette-expand-arrow">▶</span>' : '';
 
-      <div>
-        <div class="palette-heading">Gateways</div>
-        <div class="palette-category">
-          <div class="palette-item" draggable="true" data-type="gateway-exclusive">
-            <div class="palette-item-icon palette-icon-gateway">
-              <span class="palette-icon-gateway-symbol">✕</span>
+    let subMenuHtml = '';
+    if (hasSubtypes) {
+      const subHeading = item.subHeading ? `<div class="palette-sub-heading">${item.subHeading}</div>` : '';
+      const subItemsHtml = item.activeSubtypes.map(subItem => {
+        const subIconInner = subItem.iconSvg || subItem.symbolHtml || subItem.icon || '';
+        return `
+          <div class="palette-sub-item" draggable="true" data-type="${subItem.type}">
+            <div class="palette-item-icon ${subItem.iconClass || ''}">
+              ${subIconInner}
             </div>
-            <span class="palette-item-label">Exclusive (XOR)</span>
+            <span class="palette-item-label">${subItem.label}</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="gateway-parallel">
-            <div class="palette-item-icon palette-icon-gateway">
-              <span class="palette-icon-gateway-symbol">+</span>
-            </div>
-            <span class="palette-item-label">Parallel (AND)</span>
-          </div>
-        </div>
-      </div>
+        `;
+      }).join('');
 
-      <div>
-        <div class="palette-heading">Artifacts</div>
-        <div class="palette-category">
-          <div class="palette-item" draggable="true" data-type="text-annotation">
-            <div class="palette-item-icon palette-icon-annotation">[ T</div>
-            <span class="palette-item-label">Annotation</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="data-object">
-            <div class="palette-item-icon palette-icon-data-object">
-              <svg width="13" height="16" viewBox="0 0 16 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M 2 2 L 10 2 L 14 6 L 14 18 L 2 18 Z" />
-                <polyline points="10,2 10,6 14,6" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Data Object</span>
-          </div>
+      subMenuHtml = `
+        <div class="palette-sub-menu">
+          ${subHeading}
+          ${subItemsHtml}
         </div>
+      `;
+    }
+
+    const iconInner = item.iconSvg || item.symbolHtml || item.icon || '';
+
+    return `
+      <div class="palette-item${subClass}" draggable="true" data-type="${item.type}">
+        <div class="palette-item-icon ${item.iconClass || ''}">
+          ${iconInner}
+        </div>
+        <span class="palette-item-label">${item.label}</span>
+        ${arrowHtml}
+        ${subMenuHtml}
       </div>
     `;
-
-    this.bindEvents();
   }
 
-  bindEvents() {
+  /**
+   * Binds dragstart listeners for all rendered palette items and flyout sub-items
+   */
+  bindItemDragEvents() {
     const items = this.container.querySelectorAll('.palette-item, .palette-sub-item');
     items.forEach(item => {
       item.addEventListener('dragstart', (e) => {
@@ -218,7 +135,7 @@ export class Palette {
           const iconRect = icon.getBoundingClientRect();
           grabOffsetX = (iconRect.left + iconRect.width / 2) - rect.left;
           grabOffsetY = (iconRect.top + iconRect.height / 2) - rect.top;
-          
+
           // Set drag preview centered on the icon
           if (e.dataTransfer.setDragImage) {
             e.dataTransfer.setDragImage(item, grabOffsetX, grabOffsetY);
@@ -235,7 +152,12 @@ export class Palette {
         e.dataTransfer.effectAllowed = 'copy';
       });
     });
+  }
 
+  /**
+   * Binds dragover and drop handlers on the canvas container
+   */
+  bindCanvasDropEvents() {
     const canvasContainer = this.canvas.container;
     canvasContainer.addEventListener('dragover', (e) => {
       if (this.canvas.options?.capabilities?.readOnly) {
@@ -265,19 +187,9 @@ export class Palette {
       }
 
       const coords = this.canvas.clientToCanvas(e.clientX, e.clientY);
-      const dummyWidth = nodeType.startsWith('boundary-') ? 36
-        : (nodeType.includes('event') ? 52 
-        : (nodeType.includes('gateway') ? 56 
-        : (nodeType === 'text-annotation' ? 130 
-        : (nodeType === 'data-object' ? 60 
-        : (nodeType === 'subprocess' ? 170 : 150)))));
-
-      const dummyHeight = nodeType.startsWith('boundary-') ? 36
-        : (nodeType.includes('event') ? 52 
-        : (nodeType.includes('gateway') ? 56 
-        : (nodeType === 'text-annotation' ? 50 
-        : (nodeType === 'data-object' ? 70 
-        : (nodeType === 'subprocess' ? 95 : 80)))));
+      const dims = this.registry.getDefaultDimensions(nodeType);
+      const dummyWidth = dims.width;
+      const dummyHeight = dims.height;
 
       let finalCenterX = coords.x;
       let finalCenterY = coords.y;
@@ -286,7 +198,7 @@ export class Palette {
         finalCenterX = Math.round(finalCenterX / this.canvas.options.gridSize) * this.canvas.options.gridSize;
         finalCenterY = Math.round(finalCenterY / this.canvas.options.gridSize) * this.canvas.options.gridSize;
       }
-      
+
       // Helper: Map an event type to a boundary event type if valid in BPMN 2.0
       const getBoundaryTypeFor = (type) => {
         if (type.startsWith('boundary-')) return type;
@@ -294,7 +206,7 @@ export class Palette {
         if (type.includes('message')) return 'boundary-message-event';
         if (type.includes('signal')) return 'boundary-signal-event';
         if (type.includes('error')) return 'boundary-error-event';
-        return null; // Not a boundary-compatible event type (e.g. generic start, generic end, terminate)
+        return null; // Not a boundary-compatible event type
       };
 
       // Check if dropped near or on an activity with a boundary-compatible event
@@ -331,8 +243,8 @@ export class Palette {
 
       // Center dropped node on cursor / snap point
       let node;
-      const nearbyEdge = this.canvas.canSplitEdgeWithNode({ type: nodeType }) 
-        ? this.canvas.findEdgeNear(finalCenterX, finalCenterY, 35) 
+      const nearbyEdge = this.canvas.canSplitEdgeWithNode({ type: nodeType })
+        ? this.canvas.findEdgeNear(finalCenterX, finalCenterY, 35)
         : null;
 
       if (nearbyEdge) {
