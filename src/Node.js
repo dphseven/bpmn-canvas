@@ -4,6 +4,7 @@
 
 export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
+    this.canvas = canvas;
     this.id = id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel', 'boundary-timer-event', 'boundary-error-event'
     this.label = label !== undefined ? label : this.getDefaultLabel(this.type);
@@ -14,7 +15,6 @@ export class BpmnNode {
     this.data = Object.assign({
       interrupting: true
     }, data);
-    this.canvas = canvas;
     this.selected = false;
 
     this.domElement = null;
@@ -22,6 +22,12 @@ export class BpmnNode {
   }
 
   getDefaultLabel(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.defaultLabel !== undefined) {
+        return def.defaultLabel;
+      }
+    }
     switch (type) {
       case 'start-event': return 'Start';
       case 'start-timer-event': return 'Scheduled';
@@ -56,6 +62,12 @@ export class BpmnNode {
   }
 
   getDefaultWidth(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.width) {
+        return def.width;
+      }
+    }
     if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
@@ -66,6 +78,12 @@ export class BpmnNode {
   }
 
   getDefaultHeight(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.height) {
+        return def.height;
+      }
+    }
     if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
@@ -77,7 +95,12 @@ export class BpmnNode {
 
   initDOM() {
     this.domElement = document.createElement('div');
-    this.domElement.className = `bpmn-node bpmn-node-${this.type}`;
+    const def = this.canvas?.registry?.get(this.type);
+    const category = def?.category;
+    const isCustom = !this.type.startsWith('boundary-') && !this.type.includes('event') && !this.type.includes('gateway') && this.type !== 'subprocess' && this.type !== 'text-annotation' && this.type !== 'data-object';
+    const isActivity = category === 'activities' || isCustom;
+
+    this.domElement.className = `bpmn-node bpmn-node-${this.type}${isActivity ? ' bpmn-node-activity' : ''}`;
     this.domElement.id = this.id;
     this.domElement.style.width = `${this.width}px`;
     this.domElement.style.minHeight = `${this.height}px`;
@@ -290,6 +313,16 @@ export class BpmnNode {
       // Activity / Task / Subprocess
       let icon = '✋';
       let badge = 'Manual Task';
+
+      const customDef = this.canvas?.registry?.get(this.type);
+      if (customDef) {
+        if (customDef.icon || customDef.iconSvg || customDef.symbolHtml) {
+          icon = customDef.iconSvg || customDef.symbolHtml || customDef.icon;
+        }
+        if (customDef.badge || customDef.label) {
+          badge = customDef.badge || customDef.label;
+        }
+      }
 
       if (this.type === 'user-task') {
         icon = '👤';
@@ -575,7 +608,12 @@ export class BpmnNode {
 
     this.domElement.style.width = `${this.width}px`;
     this.domElement.style.minHeight = `${this.height}px`;
-    this.domElement.className = `bpmn-node bpmn-node-${this.type}`;
+    const def = this.canvas?.registry?.get(this.type);
+    const category = def?.category;
+    const isCustom = !this.type.startsWith('boundary-') && !this.type.includes('event') && !this.type.includes('gateway') && this.type !== 'subprocess' && this.type !== 'text-annotation' && this.type !== 'data-object';
+    const isActivity = category === 'activities' || isCustom;
+
+    this.domElement.className = `bpmn-node bpmn-node-${this.type}${isActivity ? ' bpmn-node-activity' : ''}`;
     if (this.selected) this.domElement.classList.add('selected');
     
     this.updatePosition();
