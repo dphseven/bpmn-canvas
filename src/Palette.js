@@ -324,18 +324,42 @@ export class Palette {
       }
 
       // Center dropped node on cursor / snap point
-      const node = this.canvas.addNode({
-        type: nodeType,
-        x: finalCenterX - dummyWidth / 2,
-        y: finalCenterY - dummyHeight / 2,
-        data: nodeData
-      });
+      let node;
+      const nearbyEdge = this.canvas.canSplitEdgeWithNode({ type: nodeType }) 
+        ? this.canvas.findEdgeNear(finalCenterX, finalCenterY, 35) 
+        : null;
 
-      if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
-        this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
+      if (nearbyEdge) {
+        this.canvas.batchOperation(() => {
+          node = this.canvas.addNode({
+            type: nodeType,
+            x: finalCenterX - dummyWidth / 2,
+            y: finalCenterY - dummyHeight / 2,
+            data: nodeData
+          });
+
+          if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
+            this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
+          }
+
+          this.canvas.splitEdgeWithNode(nearbyEdge.id, node.id);
+        });
+      } else {
+        node = this.canvas.addNode({
+          type: nodeType,
+          x: finalCenterX - dummyWidth / 2,
+          y: finalCenterY - dummyHeight / 2,
+          data: nodeData
+        });
+
+        if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
+          this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
+        }
       }
 
-      this.canvas.selectNode(node);
+      if (node) {
+        this.canvas.selectNode(node);
+      }
     });
   }
 }

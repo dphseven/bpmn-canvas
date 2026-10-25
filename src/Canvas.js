@@ -90,14 +90,26 @@ export class BpmnCanvas {
     let editDebounceTimer = null;
     let editPreState = null;
 
+    this.clearEditDebounce = () => {
+      if (editDebounceTimer) {
+        clearTimeout(editDebounceTimer);
+        editDebounceTimer = null;
+      }
+      editPreState = null;
+    };
+
     const handleEditChange = () => {
-      if (this.isPerformingHistoryAction) return;
+      if (this.isPerformingHistoryAction || this.isBatching) return;
       if (!editPreState) {
         // Capture snapshot before this sequence of keystrokes/edits
         editPreState = this.undoStack[this.undoStack.length - 1] || this.snapshotState();
       }
       if (editDebounceTimer) clearTimeout(editDebounceTimer);
       editDebounceTimer = setTimeout(() => {
+        if (this.isPerformingHistoryAction || this.isBatching) {
+          this.clearEditDebounce();
+          return;
+        }
         if (editPreState && editPreState !== this.snapshotState()) {
           this.pushHistory(editPreState);
         }
@@ -497,6 +509,19 @@ export class BpmnCanvas {
             if (releasedNode.data?.parentId) {
               delete releasedNode.data.parentId;
               this.emit('node:update', releasedNode);
+            }
+          }
+
+          // Check if single released node is dropped onto an existing sequence flow edge
+          if (this.selectedNodes.size === 1 && this.canSplitEdgeWithNode(releasedNode)) {
+            const centerX = releasedNode.x + releasedNode.width / 2;
+            const centerY = releasedNode.y + releasedNode.height / 2;
+            const nearbyEdge = this.findEdgeNear(centerX, centerY, 35, releasedNode.id);
+            if (nearbyEdge) {
+              const baselineDragState = this.dragInitialState;
+              this.splitEdgeWithNode(nearbyEdge.id, releasedNode.id, baselineDragState);
+              // splitEdgeWithNode pushed history with baselineDragState
+              this.dragInitialState = null;
             }
           }
         }
@@ -1205,6 +1230,136 @@ export class BpmnCanvas {
     };
   }
 
+  /**
+   * Finds the closest edge within maxDistance of given canvas coordinates (x, y).
+   * Optionally excludes edges connected to excludeNodeId.
+   */
+  findEdgeNear(x, y, maxDistance = 30, excludeNodeId = null) {
+    let bestEdge = null;
+    let minDistance = Infinity;
+
+    this.edges.forEach(edge => {
+      if (excludeNodeId && (edge.sourceId === excludeNodeId || edge.targetId === excludeNodeId)) {
+        return;
+      }
+
+      const pathEl = edge.pathElement;
+      if (!pathEl || !pathEl.getTotalLength) return;
+
+      const totalLen = pathEl.getTotalLength();
+      if (totalLen <= 0) return;
+
+      // Sample along path points to find closest distance to (x, y)
+      const samples = Math.max(15, Math.min(50, Math.floor(totalLen / 10)));
+      for (let i = 0; i <= samples; i++) {
+        const pt = pathEl.getPointAtLength((i / samples) * totalLen);
+        const dist = Math.hypot(pt.x - x, pt.y - y);
+        if (dist < minDistance && dist <= maxDistance) {
+          minDistance = dist;
+          bestEdge = edge;
+        }
+      }
+    });
+
+    return bestEdge;
+  }
+
+  /**
+   * Determines if a node can be inserted into an existing sequence flow edge.
+   * Boundary events, text annotations, data objects, pure start events, and pure end events cannot split edges into through-flows.
+   */
+  canSplitEdgeWithNode(node) {
+    if (!node || !node.type) return false;
+    const t = node.type;
+    if (t.startsWith('boundary-')) return false;
+    if (t === 'text-annotation' || t === 'data-object') return false;
+    if (t.startsWith('start-')) return false;
+    if (t.startsWith('end-')) return false;
+    return true;
+  }
+
+  /**
+   * Drops/inserts a node as an intermediate step into an existing edge:
+   * - Preserves the original edge's label on the incoming edge into the inserted shape.
+   * - Creates an outgoing edge from the inserted shape to original target.
+   * - Preserves routing style and animation settings.
+   * - Removes the original edge.
+   * - Wrapped in batchOperation so undo/redo is completely atomic.
+   */
+  splitEdgeWithNode(edgeId, nodeId, preCapturedState = null) {
+    const edge = this.edges.get(edgeId);
+    const node = this.getNode(nodeId);
+    if (!edge || !node) return false;
+    if (!this.canSplitEdgeWithNode(node)) return false;
+
+    // Do not split an edge that already connects to this node
+    if (edge.sourceId === nodeId || edge.targetId === nodeId) return false;
+
+    return this.batchOperation(() => {
+      const sourceId = edge.sourceId;
+      const targetId = edge.targetId;
+      const sourcePort = edge.sourcePort || 'right';
+      const targetPort = edge.targetPort || 'left';
+      const originalLabel = edge.label || '';
+      const routing = edge.routing || this.options.defaultRouting;
+      const animated = Boolean(edge.animated);
+
+      // Determine appropriate ports for the inserted node based on relative positions
+      const srcNode = this.getNode(sourceId);
+      const tgtNode = this.getNode(targetId);
+
+      let inPort = 'left';
+      let outPort = 'right';
+
+      if (srcNode && tgtNode) {
+        const dx = tgtNode.x - srcNode.x;
+        const dy = tgtNode.y - srcNode.y;
+        // If flow is predominantly vertical (e.g. top to bottom or bottom to top)
+        if (Math.abs(dy) > Math.abs(dx) * 1.5) {
+          if (dy > 0) {
+            inPort = 'top';
+            outPort = 'bottom';
+          } else {
+            inPort = 'bottom';
+            outPort = 'top';
+          }
+        }
+      }
+
+      // Remove the original edge
+      this.removeEdge(edge.id);
+
+      // Edge 1: Original source -> newly inserted node (inherits label, routing, animation)
+      const edge1 = this.addEdge({
+        sourceId,
+        targetId: node.id,
+        sourcePort,
+        targetPort: inPort,
+        label: originalLabel,
+        routing,
+        animated
+      });
+
+      // Edge 2: Newly inserted node -> original target (unlabeled, inherits routing, animation)
+      const edge2 = this.addEdge({
+        sourceId: node.id,
+        targetId,
+        sourcePort: outPort,
+        targetPort,
+        label: '',
+        routing,
+        animated
+      });
+
+      if (edge1) edge1.render();
+      if (edge2) edge2.render();
+      this.updateConnectedEdges(node.id);
+
+      this.emit('edge:split', { edgeId, nodeId, edge1, edge2 });
+      return true;
+    }, preCapturedState);
+  }
+
   findActivityNear(centerX, centerY, threshold = 40, excludeId = null) {
     let bestHost = null;
     let bestDist = Infinity;
@@ -1559,11 +1714,6 @@ export class BpmnCanvas {
     // Add nodes
     data.nodes.forEach(n => this.addNode(n));
 
-    // Add edges
-    if (Array.isArray(data.edges)) {
-      data.edges.forEach(e => this.addEdge(e));
-    }
-
     // Restore subprocess children visibility and state
     this.nodes.forEach(n => {
       if (n.type === 'subprocess') {
@@ -1578,6 +1728,14 @@ export class BpmnCanvas {
         n.createPorts();
       }
     });
+
+    // Add edges
+    if (Array.isArray(data.edges)) {
+      data.edges.forEach(e => this.addEdge(e));
+    }
+
+    // Refresh all edge paths and endpoints
+    this.edges.forEach(edge => edge.render());
 
     if (data.autoFit !== false) {
       this.fitView();
@@ -1619,7 +1777,7 @@ export class BpmnCanvas {
    * Executes a batch of operations atomically as a single undo step.
    * If nested, the outermost batch retains the baseline state.
    */
-  batchOperation(fn) {
+  batchOperation(fn, customPreBatchState = null) {
     if (this.isPerformingHistoryAction) {
       return fn();
     }
@@ -1629,8 +1787,12 @@ export class BpmnCanvas {
       return fn();
     }
 
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
+
     this.isBatching = true;
-    const preBatchState = this.snapshotState();
+    const preBatchState = customPreBatchState || this.snapshotState();
 
     try {
       return fn();
@@ -1656,6 +1818,9 @@ export class BpmnCanvas {
   }
 
   undo() {
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
     if (this.undoStack.length === 0) return false;
 
     const currentState = this.snapshotState();
@@ -1668,6 +1833,9 @@ export class BpmnCanvas {
   }
 
   redo() {
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
     if (this.redoStack.length === 0) return false;
 
     const currentState = this.snapshotState();
