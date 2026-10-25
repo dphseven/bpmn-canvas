@@ -1,0 +1,26 @@
+{
+  "name": "bpmn-canvas",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dphseven/bpmn-canvas.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dphseven/bpmn-canvas/issues"
+  },
+  "homepage": "https://github.com/dphseven/bpmn-canvas#readme",
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vitest": "^5.0.5"
+  }
+}

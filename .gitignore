@@ -1,3 +1,5 @@
 .agents
 .vite
 todos.md
+node_modules
+dist
