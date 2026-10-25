@@ -22,6 +22,12 @@ export class BpmnNode {
   }
 
   getDefaultLabel(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.defaultLabel !== undefined) {
+        return def.defaultLabel;
+      }
+    }
     switch (type) {
       case 'start-event': return 'Start';
       case 'start-timer-event': return 'Scheduled';
@@ -56,6 +62,12 @@ export class BpmnNode {
   }
 
   getDefaultWidth(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.width) {
+        return def.width;
+      }
+    }
     if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
@@ -66,6 +78,12 @@ export class BpmnNode {
   }
 
   getDefaultHeight(type) {
+    if (this.canvas?.registry) {
+      const def = this.canvas.registry.get(type);
+      if (def && def.height) {
+        return def.height;
+      }
+    }
     if (type.startsWith('boundary-')) return 36;
     if (type.includes('event')) return 52;
     if (type.includes('gateway')) return 56;
@@ -290,6 +308,16 @@ export class BpmnNode {
       // Activity / Task / Subprocess
       let icon = '✋';
       let badge = 'Manual Task';
+
+      const customDef = this.canvas?.registry?.get(this.type);
+      if (customDef) {
+        if (customDef.icon || customDef.iconSvg || customDef.symbolHtml) {
+          icon = customDef.iconSvg || customDef.symbolHtml || customDef.icon;
+        }
+        if (customDef.badge || customDef.label) {
+          badge = customDef.badge || customDef.label;
+        }
+      }
 
       if (this.type === 'user-task') {
         icon = '👤';

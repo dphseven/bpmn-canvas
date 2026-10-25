@@ -1106,6 +1106,17 @@ export class BpmnCanvas {
     this.emit('edge:reconnect', { edge, updates });
   }
 
+  /**
+   * Registers a custom node type definition with the canvas registry
+   *
+   * @param {string} typeKey - Unique identifier (e.g., 'slack-notification')
+   * @param {Object} definition - Node definition metadata
+   */
+  registerNodeType(typeKey, definition) {
+    this.registry.register(typeKey, definition);
+    this.emit('registry:registerNodeType', { typeKey, definition });
+  }
+
   addNode(config) {
     this.pushHistory();
     const node = new BpmnNode(config, this);
@@ -1912,6 +1923,20 @@ export class BpmnCanvas {
     });
 
     return { nodes, edges };
+  }
+
+  /**
+   * Alias for exportData() providing standard JSON export naming
+   */
+  exportToJson() {
+    return this.exportData();
+  }
+
+  /**
+   * Alias for loadData(data) providing standard JSON import naming
+   */
+  importFromJson(data) {
+    return this.loadData(data);
   }
 
   loadData(data) {

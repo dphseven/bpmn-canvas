@@ -16,6 +16,27 @@ export class Palette {
     this.container.classList.add('palette-panel');
     this.render();
     this.bindCanvasDropEvents();
+
+    if (this.canvas && typeof this.canvas.on === 'function') {
+      this.canvas.on('registry:registerNodeType', () => {
+        this.render();
+      });
+    }
+  }
+
+  /**
+   * Registers a new item or updates an existing item definition in the palette/registry
+   *
+   * @param {string} category - Category ID (e.g. 'activities', 'integrations')
+   * @param {Object} itemDef - Node type definition (must have .type, .label, etc.)
+   */
+  registerItem(category, itemDef) {
+    if (!itemDef || !itemDef.type) {
+      throw new Error('Palette.registerItem: itemDef must include a type identifier');
+    }
+    const def = Object.assign({}, itemDef, { category: category || itemDef.category || 'activities' });
+    this.registry.register(itemDef.type, def);
+    this.render();
   }
 
   /**
