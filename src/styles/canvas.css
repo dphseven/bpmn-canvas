@@ -108,6 +108,11 @@
   pointer-events: none;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-connection-draft,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-connection-draft {
+  animation: none;
+}
+
 /* Edge Label Styling */
 .bpmn-edge-label-group {
   pointer-events: all;

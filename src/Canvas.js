@@ -16,6 +16,7 @@ export class BpmnCanvas {
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
       snapToGrid: true,
+      pulsing: true, // Visual feedback pulsing animations (selected node halo, draft connector flow)
       themeClass: null, // e.g., 'theme-light', 'theme-custom', or null
       capabilities: {
         readOnly: false,             // Master killswitch: disables all mutations
@@ -161,6 +162,7 @@ export class BpmnCanvas {
 
   initDOM() {
     this.container.classList.add('bpmn-canvas-viewport');
+    this.container.setAttribute('data-bpmn-pulsing', this.options.pulsing !== false ? 'true' : 'false');
     if (this.options.themeClass) {
       this.container.classList.add(this.options.themeClass);
     }
@@ -774,6 +776,26 @@ export class BpmnCanvas {
       this.container.classList.add(this.options.themeClass);
     }
     this.emit('theme:change', { themeClass: this.options.themeClass });
+  }
+
+  /**
+   * Enable or disable visual pulsing animations (selected node halo, draft line flow)
+   * @param {boolean} enabled
+   */
+  setPulsing(enabled) {
+    this.options.pulsing = Boolean(enabled);
+    if (this.container) {
+      this.container.setAttribute('data-bpmn-pulsing', this.options.pulsing ? 'true' : 'false');
+    }
+    this.emit('pulsing:change', { pulsing: this.options.pulsing });
+  }
+
+  /**
+   * Check whether visual pulsing animations are currently enabled
+   * @returns {boolean}
+   */
+  isPulsing() {
+    return this.options.pulsing !== false;
   }
 
   /**
