@@ -471,7 +471,7 @@ export class BpmnCanvas {
         this.attachedBoundaryOffsets.clear();
         this.containedChildOffsets.clear();
 
-        // If a single boundary event was dragged, check if it docks to an activity or detaches
+        // If a single boundary or event node was dragged
         if (releasedNode.type.startsWith('boundary-') && this.selectedNodes.size === 1) {
           const centerX = releasedNode.x + releasedNode.width / 2;
           const centerY = releasedNode.y + releasedNode.height / 2;
@@ -488,7 +488,28 @@ export class BpmnCanvas {
               this.emit('node:update', releasedNode);
             }
           }
-        } else if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
+        } else if (this.selectedNodes.size === 1) {
+          // Check if an existing node on canvas is a boundary-compatible event type
+          const t = releasedNode.type;
+          let boundaryType = null;
+          if (t.includes('timer')) boundaryType = 'boundary-timer-event';
+          else if (t.includes('message')) boundaryType = 'boundary-message-event';
+          else if (t.includes('signal')) boundaryType = 'boundary-signal-event';
+          else if (t.includes('error')) boundaryType = 'boundary-error-event';
+
+          if (boundaryType) {
+            const centerX = releasedNode.x + releasedNode.width / 2;
+            const centerY = releasedNode.y + releasedNode.height / 2;
+            const nearbyActivity = this.findActivityNear(centerX, centerY, 50, releasedNode.id);
+
+            if (nearbyActivity) {
+              releasedNode.setType(boundaryType);
+              this.attachBoundaryEvent(releasedNode, nearbyActivity, centerX, centerY);
+            }
+          }
+        }
+        
+        if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
           // If a non-subprocess node was dragged, check if dropped inside an expanded subprocess
           const centerX = releasedNode.x + releasedNode.width / 2;
           const centerY = releasedNode.y + releasedNode.height / 2;

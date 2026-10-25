@@ -14,134 +14,119 @@ export class Palette {
       <div>
         <div class="palette-heading">Events</div>
         <div class="palette-category">
-          <div class="palette-item" draggable="true" data-type="start-event">
+          <!-- Start Event (with Flyout Subtypes) -->
+          <div class="palette-item palette-has-sub" draggable="true" data-type="start-event">
             <div class="palette-item-icon" style="border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">Start Event</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="start-timer-event">
-            <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <polyline points="10,5 10,10 13.5,10" />
-              </svg>
+            <span class="palette-expand-arrow">▶</span>
+            <div class="palette-sub-menu">
+              <div class="palette-sub-heading">Start Triggers</div>
+              <div class="palette-sub-item" draggable="true" data-type="start-timer-event">
+                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <polyline points="10,5 10,10 13.5,10" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Timer Start</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="start-message-event">
+                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="11" height="8" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                    <polyline points="2,2 10,8.5 18,2" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Message Start</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="start-signal-event">
+                <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="10,2 18,17 2,17" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Signal Start</span>
+              </div>
             </div>
-            <span class="palette-item-label">Timer Start</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="start-message-event">
-            <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="12" height="9" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                <polyline points="2,2 10,8.5 18,2" />
-              </svg>
+
+          <!-- Intermediate Event (with Flyout Subtypes) -->
+          <div class="palette-item palette-has-sub" draggable="true" data-type="intermediate-event">
+            <div class="palette-item-icon" style="border: 2px double #f59e0b; outline: 1.5px solid #f59e0b; outline-offset: -4px; border-radius: 50%; width: 22px; height: 22px;"></div>
+            <span class="palette-item-label">Intermediate Event</span>
+            <span class="palette-expand-arrow">▶</span>
+            <div class="palette-sub-menu">
+              <div class="palette-sub-heading">Catch / Throw</div>
+              <div class="palette-sub-item" draggable="true" data-type="intermediate-timer-event">
+                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <polyline points="10,5 10,10 13.5,10" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Timer</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="intermediate-message-event">
+                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="13" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
+                    <polyline points="2,2 10,8.5 18,2" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Message</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="intermediate-signal-event">
+                <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="10,2 18,17 2,17" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Signal</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="boundary-error-event">
+                <div class="palette-item-icon" style="color: #f43f5e; border: 1.5px solid #f43f5e; outline: 1px solid #f43f5e; outline-offset: -3px; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Error Catch</span>
+              </div>
             </div>
-            <span class="palette-item-label">Message Start</span>
           </div>
-          <div class="palette-item" draggable="true" data-type="start-signal-event">
-            <div class="palette-item-icon" style="color: #10b981; border: 2px solid #10b981; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="10,2 18,17 2,17" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Signal Start</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="end-event">
+
+          <!-- End Event (with Flyout Subtypes) -->
+          <div class="palette-item palette-has-sub" draggable="true" data-type="end-event">
             <div class="palette-item-icon" style="border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;"></div>
             <span class="palette-item-label">End Event</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="end-error-event">
-            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
+            <span class="palette-expand-arrow">▶</span>
+            <div class="palette-sub-menu">
+              <div class="palette-sub-heading">End Results</div>
+              <div class="palette-sub-item" draggable="true" data-type="end-error-event">
+                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Error End</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="end-terminate-event">
+                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor">
+                    <circle cx="10" cy="10" r="7" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Terminate End</span>
+              </div>
+              <div class="palette-sub-item" draggable="true" data-type="end-message-event">
+                <div class="palette-item-icon" style="color: #f43f5e; border: 3px solid #f43f5e; border-radius: 50%; width: 20px; height: 20px;">
+                  <svg width="11" height="8" viewBox="0 0 20 15" fill="currentColor">
+                    <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
+                    <polygon points="2,2 10,8.5 18,2" />
+                  </svg>
+                </div>
+                <span class="palette-item-label">Message End</span>
+              </div>
             </div>
-            <span class="palette-item-label">Error End</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="end-terminate-event">
-            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor">
-                <circle cx="10" cy="10" r="7" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Terminate End</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="end-message-event">
-            <div class="palette-item-icon" style="color: #f43f5e; border: 4px solid #f43f5e; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="12" height="9" viewBox="0 0 20 15" fill="currentColor">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
-                <polygon points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Message End</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-event">
-            <div class="palette-item-icon" style="border: 2px double #f59e0b; outline: 1.5px solid #f59e0b; outline-offset: -4px; border-radius: 50%; width: 22px; height: 22px;"></div>
-            <span class="palette-item-label">Intermediate (None)</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-timer-event">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <polyline points="10,5 10,10 13.5,10" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Timer Event</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-message-event" data-event-def="message">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
-              <svg width="14" height="11" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                <polyline points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Message Event</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="intermediate-signal-event" data-event-def="signal">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px double #f59e0b; border-radius: 50%;">
-              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="10,2 18,17 2,17" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Signal Event</span>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="palette-heading">Boundary Events</div>
-        <div class="palette-category">
-          <div class="palette-item" draggable="true" data-type="boundary-timer-event">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <polyline points="10,5 10,10 13.5,10" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Boundary Timer</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="boundary-error-event">
-            <div class="palette-item-icon" style="color: #f43f5e; border: 1.5px solid #f43f5e; outline: 1px solid #f43f5e; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Boundary Error</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="boundary-message-event">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="11" height="8" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                <polyline points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Boundary Message</span>
-          </div>
-          <div class="palette-item" draggable="true" data-type="boundary-signal-event">
-            <div class="palette-item-icon" style="color: #f59e0b; border: 1.5px solid #f59e0b; outline: 1px solid #f59e0b; outline-offset: -3px; border-radius: 50%; width: 22px; height: 22px;">
-              <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="10,2 18,17 2,17" />
-              </svg>
-            </div>
-            <span class="palette-item-label">Boundary Signal</span>
           </div>
         </div>
       </div>
@@ -218,13 +203,14 @@ export class Palette {
   }
 
   bindEvents() {
-    const items = this.container.querySelectorAll('.palette-item');
+    const items = this.container.querySelectorAll('.palette-item, .palette-sub-item');
     items.forEach(item => {
       item.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
         const rect = item.getBoundingClientRect();
         const icon = item.querySelector('.palette-item-icon');
 
-        // Center of the icon relative to the palette-item
+        // Center of the icon relative to the palette item
         let grabOffsetX = 24;
         let grabOffsetY = rect.height / 2;
 
@@ -294,24 +280,37 @@ export class Palette {
         finalCenterY = Math.round(finalCenterY / this.canvas.options.gridSize) * this.canvas.options.gridSize;
       }
       
-      // If dropping a boundary event, check if dropped on or near an activity
-      if (nodeType.startsWith('boundary-')) {
-        const nearbyActivity = this.canvas.findActivityNear(coords.x, coords.y, 60);
-        if (nearbyActivity) {
-          const docking = this.canvas.calculateBoundaryDocking(nearbyActivity, coords.x, coords.y, dummyWidth, dummyHeight);
-          const node = this.canvas.addNode({
-            type: nodeType,
-            x: docking.x,
-            y: docking.y,
-            data: {
-              hostNodeId: nearbyActivity.id,
-              dockEdge: docking.dockEdge,
-              interrupting: true
-            }
-          });
-          this.canvas.selectNode(node);
-          return;
-        }
+      // Helper: Map an event type to a boundary event type if valid in BPMN 2.0
+      const getBoundaryTypeFor = (type) => {
+        if (type.startsWith('boundary-')) return type;
+        if (type.includes('timer')) return 'boundary-timer-event';
+        if (type.includes('message')) return 'boundary-message-event';
+        if (type.includes('signal')) return 'boundary-signal-event';
+        if (type.includes('error')) return 'boundary-error-event';
+        return null; // Not a boundary-compatible event type (e.g. generic start, generic end, terminate)
+      };
+
+      // Check if dropped near or on an activity with a boundary-compatible event
+      const nearbyActivity = this.canvas.findActivityNear(coords.x, coords.y, 50);
+      const boundaryType = nearbyActivity ? getBoundaryTypeFor(nodeType) : null;
+
+      if (nearbyActivity && boundaryType) {
+        const boundaryDim = 36;
+        const docking = this.canvas.calculateBoundaryDocking(nearbyActivity, coords.x, coords.y, boundaryDim, boundaryDim);
+        const node = this.canvas.addNode({
+          type: boundaryType,
+          x: docking.x,
+          y: docking.y,
+          data: {
+            hostNodeId: nearbyActivity.id,
+            dockEdge: docking.dockEdge,
+            relativeOffsetX: docking.relativeOffsetX,
+            relativeOffsetY: docking.relativeOffsetY,
+            interrupting: true
+          }
+        });
+        this.canvas.selectNode(node);
+        return;
       }
 
       // Check if dropped inside an expanded subprocess
