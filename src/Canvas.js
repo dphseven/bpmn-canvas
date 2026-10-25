@@ -16,8 +16,35 @@ export class BpmnCanvas {
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
       snapToGrid: true,
-      themeClass: null // e.g., 'theme-light', 'theme-custom', or null
-    }, options);
+      themeClass: null, // e.g., 'theme-light', 'theme-custom', or null
+      capabilities: {
+        readOnly: false,             // Master killswitch: disables all mutations
+        allowPan: true,              // Viewport pan
+        allowZoom: true,             // Viewport zoom
+        allowDrag: true,             // Node position dragging
+        allowConnect: true,          // Drawing new edges
+        allowReconnect: true,        // Reconnecting existing edge endpoints
+        allowDelete: true,           // Deleting nodes/edges (keyboard & API)
+        allowLabelEdit: true,        // Double-click inline text editing
+        allowMarqueeSelect: true,    // Box-selection tool
+        allowSubprocessResize: true, // Manual resizing of expanded subprocesses
+        allowKeyboardShortcuts: true // Undo/redo/delete shortcuts
+      }
+    }, options, {
+      capabilities: Object.assign({
+        readOnly: false,
+        allowPan: true,
+        allowZoom: true,
+        allowDrag: true,
+        allowConnect: true,
+        allowReconnect: true,
+        allowDelete: true,
+        allowLabelEdit: true,
+        allowMarqueeSelect: true,
+        allowSubprocessResize: true,
+        allowKeyboardShortcuts: true
+      }, options.capabilities || {})
+    });
 
     // Transform State
     this.zoom = 1;
@@ -728,6 +755,45 @@ export class BpmnCanvas {
       this.container.classList.add(this.options.themeClass);
     }
     this.emit('theme:change', { themeClass: this.options.themeClass });
+  }
+
+  /**
+   * Get current canvas capabilities configuration
+   * @returns {Object} copy of current capabilities
+   */
+  getCapabilities() {
+    return Object.assign({}, this.options.capabilities);
+  }
+
+  /**
+   * Update canvas capabilities at runtime
+   * @param {Object} partialCapabilities - partial capabilities object to merge
+   */
+  setCapabilities(partialCapabilities = {}) {
+    this.options.capabilities = Object.assign({}, this.options.capabilities, partialCapabilities);
+    this.emit('capabilities:change', { capabilities: this.getCapabilities() });
+  }
+
+  /**
+   * Check if a specific capability is allowed, taking readOnly master switch into account
+   * @param {string} capabilityName - e.g. 'allowDrag', 'allowConnect', 'allowDelete', etc.
+   * @returns {boolean}
+   */
+  hasCapability(capabilityName) {
+    const caps = this.options.capabilities;
+    if (!caps) return true;
+
+    // Viewport capabilities are not blocked by readOnly
+    if (capabilityName === 'allowPan' || capabilityName === 'allowZoom') {
+      return Boolean(caps[capabilityName]);
+    }
+
+    // readOnly is master killswitch for mutating interactions
+    if (caps.readOnly) {
+      return false;
+    }
+
+    return capabilityName in caps ? Boolean(caps[capabilityName]) : true;
   }
 
   clientToCanvas(clientX, clientY) {
