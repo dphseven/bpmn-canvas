@@ -28,8 +28,14 @@
         <button class="btn" id="btn-simulate" title="Simulate Token Flow" style="border-color: var(--border-focus)">
           <span>▶</span> <span id="sim-label">Pause Flow</span>
         </button>
+        <button class="btn" id="btn-grid-toggle" title="Toggle Grid Visibility" style="border-color: var(--border-focus)">
+          <span>▦</span> Grid: <span id="grid-status">On</span>
+        </button>
         <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
           <span>🧲</span> Grid Snap: <span id="snap-status">On</span>
+        </button>
+        <button class="btn" id="btn-pulse-toggle" title="Toggle Pulsing Visual Feedback" style="border-color: var(--border-focus)">
+          <span>✨</span> Pulse: <span id="pulse-status">On</span>
         </button>
         <button class="btn" id="btn-export-json">
           <span>📥</span> Export JSON
@@ -387,13 +393,37 @@
       simBtn.style.borderColor = 'var(--border-color)';
     });
 
-    // 6. Grid Snap Toggle
+    // 6a. Grid Visibility Toggle
+    const gridBtn = document.getElementById('btn-grid-toggle');
+    const gridStatus = document.getElementById('grid-status');
+    gridBtn.addEventListener('click', () => {
+      canvas.setGrid(!canvas.isGridVisible());
+    });
+    canvas.on('grid:change', ({ grid }) => {
+      gridStatus.textContent = grid ? 'On' : 'Off';
+      gridBtn.style.borderColor = grid ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6b. Grid Snap Toggle
     const snapBtn = document.getElementById('btn-snap-toggle');
     const snapStatus = document.getElementById('snap-status');
     snapBtn.addEventListener('click', () => {
-      canvas.options.snapToGrid = !canvas.options.snapToGrid;
-      snapStatus.textContent = canvas.options.snapToGrid ? 'On' : 'Off';
-      snapBtn.style.borderColor = canvas.options.snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
+      canvas.setSnapToGrid(!canvas.isSnapToGrid());
+    });
+    canvas.on('snapToGrid:change', ({ snapToGrid }) => {
+      snapStatus.textContent = snapToGrid ? 'On' : 'Off';
+      snapBtn.style.borderColor = snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6b. Pulsing Visual Feedback Toggle
+    const pulseBtn = document.getElementById('btn-pulse-toggle');
+    const pulseStatus = document.getElementById('pulse-status');
+    pulseBtn.addEventListener('click', () => {
+      canvas.setPulsing(!canvas.isPulsing());
+    });
+    canvas.on('pulsing:change', ({ pulsing }) => {
+      pulseStatus.textContent = pulsing ? 'On' : 'Off';
+      pulseBtn.style.borderColor = pulsing ? 'var(--border-focus)' : 'var(--border-color)';
     });
 
     // 7. Theme Toggle (Dark / Light)

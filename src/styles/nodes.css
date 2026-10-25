@@ -34,6 +34,12 @@
   animation: pulseHalo 2s infinite ease-in-out;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-node.selected::after,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node.selected::after {
+  animation: none;
+  opacity: 0.8;
+}
+
 @keyframes pulseHalo {
   0%, 100% { opacity: 0.8; }
   50% { opacity: 0.4; }

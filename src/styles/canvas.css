@@ -13,6 +13,10 @@
   cursor: default;
 }
 
+.bpmn-canvas-viewport[data-bpmn-grid="false"] {
+  background-image: none !important;
+}
+
 .bpmn-canvas-viewport.space-pressed {
   cursor: grab;
 }
@@ -81,6 +85,11 @@
   animation: flowAnimation 1s linear infinite;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-edge.animated .bpmn-edge-path,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-edge.animated .bpmn-edge-path {
+  animation: none;
+}
+
 @keyframes flowAnimation {
   from {
     stroke-dashoffset: 24;
@@ -106,6 +115,11 @@
   stroke-dasharray: 5, 5;
   animation: flowAnimation 0.8s linear infinite;
   pointer-events: none;
+}
+
+[data-bpmn-pulsing="false"] .bpmn-connection-draft,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-connection-draft {
+  animation: none;
 }
 
 /* Edge Label Styling */
@@ -217,6 +231,11 @@
   animation: tokenPulse 2s ease-in-out infinite alternate;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-sim-token-glow,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-sim-token-glow {
+  animation: none;
+}
+
 .bpmn-sim-token-core {
   fill: #e0f2fe;
   stroke: #38bdf8;
@@ -241,12 +260,28 @@
   z-index: 28 !important;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-node.sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node.sim-active {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
 /* Event Nodes (Circle) Active Pulse - Glowing outline without shifting port positions */
 .bpmn-node[class*="bpmn-node-start-"].sim-active,
 .bpmn-node[class*="bpmn-node-end-"].sim-active,
 .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
   box-shadow: 0 0 0 3px var(--border-focus), 0 0 22px rgba(56, 189, 248, 0.8) !important;
   filter: brightness(1.2);
+}
+
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 /* For Gateways: Highlight the rotated diamond element directly without resizing */
