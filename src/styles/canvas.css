@@ -256,12 +256,28 @@
   z-index: 28 !important;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-node.sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node.sim-active {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
 /* Event Nodes (Circle) Active Pulse - Glowing outline without shifting port positions */
 .bpmn-node[class*="bpmn-node-start-"].sim-active,
 .bpmn-node[class*="bpmn-node-end-"].sim-active,
 .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
   box-shadow: 0 0 0 3px var(--border-focus), 0 0 22px rgba(56, 189, 248, 0.8) !important;
   filter: brightness(1.2);
+}
+
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 /* For Gateways: Highlight the rotated diamond element directly without resizing */

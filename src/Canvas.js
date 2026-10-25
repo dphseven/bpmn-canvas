@@ -2267,6 +2267,7 @@ export class BpmnCanvas {
     let edgeIndex = 0;
 
     const highlightNode = (nodeId, duration = 300) => {
+      if (!this.isPulsing()) return;
       const node = this.getNode(nodeId);
       if (node && node.domElement) {
         node.domElement.classList.add('sim-active');
