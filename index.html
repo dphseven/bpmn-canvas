@@ -53,7 +53,10 @@
         <button class="btn" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>
           <span>↪</span> Redo
         </button>
-        <button class="btn btn-primary" id="btn-fit-view">
+        <button class="btn btn-primary" id="btn-config-drawer-toggle" title="Open Client Configuration & Capabilities Showcase">
+          <span>⚙️</span> Client Config
+        </button>
+        <button class="btn" id="btn-fit-view">
           <span>🎯</span> Fit View
         </button>
       </div>
@@ -76,6 +79,164 @@
 
       <!-- Live Properties Inspector -->
       <aside id="inspector-container"></aside>
+
+      <!-- Client Configuration Drawer / Showcase Panel -->
+      <aside id="config-drawer" class="config-drawer">
+        <div class="config-drawer-header">
+          <div class="config-drawer-title-group">
+            <span class="config-badge">Dev Showcase</span>
+            <h3 class="config-drawer-title">Client Configuration</h3>
+          </div>
+          <button class="config-drawer-close" id="btn-config-drawer-close" title="Close Drawer">&times;</button>
+        </div>
+
+        <div class="config-drawer-body">
+          <!-- Preset Profiles -->
+          <div class="config-section">
+            <label class="config-section-title">Quick Role Presets</label>
+            <div class="config-btn-group">
+              <button class="config-action-btn" id="btn-preset-admin" title="Full authoring mode with all capabilities enabled">Full Author (Admin)</button>
+              <button class="config-action-btn" id="btn-preset-reviewer" title="View & pan only: disables mutation, connection, deletion, drag">Read-Only Reviewer</button>
+              <button class="config-action-btn" id="btn-preset-clean" title="Disables delete, label edit and reconnect">Locked Structure</button>
+            </div>
+          </div>
+
+          <!-- Capabilities Switches -->
+          <div class="config-section">
+            <label class="config-section-title">Interaction Capabilities</label>
+            <div class="config-switches-grid">
+              <label class="config-switch">
+                <input type="checkbox" id="cap-readonly" />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label"><strong>readOnly</strong> (Killswitch)</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowdrag" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowDrag</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowconnect" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowConnect</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowreconnect" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowReconnect</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowdelete" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowDelete</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowlabeledit" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowLabelEdit</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowmarqueeselect" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowMarqueeSelect</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowsubparseresize" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowSubprocessResize</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowshortcuts" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowKeyboardShortcuts</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowpan" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowPan</span>
+              </label>
+
+              <label class="config-switch">
+                <input type="checkbox" id="cap-allowzoom" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">allowZoom</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- UI & Feedback Toggles -->
+          <div class="config-section">
+            <label class="config-section-title">Visual Styling & Chrome</label>
+            <div class="config-switches-grid">
+              <label class="config-switch">
+                <input type="checkbox" id="ui-switch-grid" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">Canvas Grid Pattern</span>
+              </label>
+              <label class="config-switch">
+                <input type="checkbox" id="ui-switch-snap" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">Snap to Grid</span>
+              </label>
+              <label class="config-switch">
+                <input type="checkbox" id="ui-switch-pulse" checked />
+                <span class="config-switch-slider"></span>
+                <span class="config-switch-label">Pulsing Halos & Flows</span>
+              </label>
+            </div>
+            <div class="config-field" style="margin-top: 10px;">
+              <label class="config-field-label">Active Theme</label>
+              <select class="inspector-select" id="config-theme-select">
+                <option value="dark">Standard Dark</option>
+                <option value="light">High-Contrast Light</option>
+                <option value="ocean">Custom: Cyber Ocean</option>
+                <option value="unstyled">Unstyled (Clean Canvas)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Palette Filter Presets -->
+          <div class="config-section">
+            <label class="config-section-title">Palette Filtering Presets</label>
+            <div class="config-field">
+              <select class="inspector-select" id="config-filter-preset">
+                <option value="full">Full BPMN 2.0 (All Categories)</option>
+                <option value="simple">Simple Flowchart (No Subprocesses or Artifacts)</option>
+                <option value="events-only">Events & Gateways Only</option>
+                <option value="tasks-only">Activities & Tasks Only</option>
+              </select>
+            </div>
+            <div class="config-info-note" id="config-filter-summary">
+              Showing all standard BPMN 2.0 categories and elements.
+            </div>
+          </div>
+
+          <!-- Extensible Custom Node Registration -->
+          <div class="config-section">
+            <label class="config-section-title">Extensible Node Registry</label>
+            <p class="config-help-text">
+              Dynamically inject domain-specific task types with custom SVG glyphs, default labels, and schema attributes.
+            </p>
+            <div class="config-btn-group" style="margin-top: 8px;">
+              <button class="config-action-btn highlight-btn" id="btn-register-slack">
+                <span>💬</span> Register Slack Notification Task
+              </button>
+              <button class="config-action-btn highlight-btn" id="btn-register-db">
+                <span>🗄️</span> Register Database Query Task
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
 
       <!-- Floating Viewport Navigation Toolbar -->
       <div class="floating-controls">
@@ -356,19 +517,36 @@
 
     // 4. Viewport Controls & Indicators
     const zoomLevelEl = document.getElementById('ctrl-zoom-level');
+    const zoomInBtn = document.getElementById('ctrl-zoom-in');
+    const zoomOutBtn = document.getElementById('ctrl-zoom-out');
+    const resetViewBtn = document.getElementById('ctrl-reset-view');
+
     canvas.on('viewport:change', ({ zoom }) => {
       zoomLevelEl.textContent = `${Math.round(zoom * 100)}%`;
     });
 
-    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
+    function updateViewportControlState() {
+      const canZoom = canvas.hasCapability('allowZoom');
+      const canPan = canvas.hasCapability('allowPan');
+      zoomInBtn.disabled = !canZoom;
+      zoomOutBtn.disabled = !canZoom;
+      resetViewBtn.disabled = !canZoom && !canPan;
+    }
+
+    canvas.on('capabilities:change', () => {
+      updateViewportControlState();
+    });
+    updateViewportControlState();
+
+    zoomInBtn.addEventListener('click', () => {
       canvas.setZoom(canvas.zoom * 1.2);
     });
 
-    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
+    zoomOutBtn.addEventListener('click', () => {
       canvas.setZoom(canvas.zoom / 1.2);
     });
 
-    document.getElementById('ctrl-reset-view').addEventListener('click', () => {
+    resetViewBtn.addEventListener('click', () => {
       canvas.resetViewport();
     });
 
@@ -589,6 +767,244 @@
     canvas.on('history:change', ({ canUndo, canRedo }) => {
       undoBtn.disabled = !canUndo;
       redoBtn.disabled = !canRedo;
+    });
+
+    // 10. Client Configuration Showcase Panel Interactions
+    const configDrawer = document.getElementById('config-drawer');
+    const configToggleBtn = document.getElementById('btn-config-drawer-toggle');
+    const configCloseBtn = document.getElementById('btn-config-drawer-close');
+
+    // Toggle drawer open/close
+    configToggleBtn.addEventListener('click', () => {
+      configDrawer.classList.toggle('hidden');
+    });
+
+    configCloseBtn.addEventListener('click', () => {
+      configDrawer.classList.add('hidden');
+    });
+
+    // Capabilities Checkboxes mapping
+    const capSwitches = {
+      readOnly: document.getElementById('cap-readonly'),
+      allowDrag: document.getElementById('cap-allowdrag'),
+      allowConnect: document.getElementById('cap-allowconnect'),
+      allowReconnect: document.getElementById('cap-allowreconnect'),
+      allowDelete: document.getElementById('cap-allowdelete'),
+      allowLabelEdit: document.getElementById('cap-allowlabeledit'),
+      allowMarqueeSelect: document.getElementById('cap-allowmarqueeselect'),
+      allowSubprocessResize: document.getElementById('cap-allowsubparseresize'),
+      allowKeyboardShortcuts: document.getElementById('cap-allowshortcuts'),
+      allowPan: document.getElementById('cap-allowpan'),
+      allowZoom: document.getElementById('cap-allowzoom')
+    };
+
+    function syncCapabilityCheckboxes() {
+      const caps = canvas.getCapabilities();
+      for (const [key, checkbox] of Object.entries(capSwitches)) {
+        if (checkbox && caps[key] !== undefined) {
+          checkbox.checked = !!caps[key];
+        }
+      }
+    }
+
+    // Attach listener to each capability switch
+    for (const [key, checkbox] of Object.entries(capSwitches)) {
+      if (checkbox) {
+        checkbox.addEventListener('change', () => {
+          canvas.setCapabilities({ [key]: checkbox.checked });
+          showToast(`Capability "${key}" set to ${checkbox.checked}`);
+        });
+      }
+    }
+
+    // Listen to canvas capabilities changes to keep UI synchronized
+    canvas.on('capabilities:change', ({ capabilities }) => {
+      syncCapabilityCheckboxes();
+    });
+
+    // Preset Profiles
+    document.getElementById('btn-preset-admin').addEventListener('click', () => {
+      canvas.setCapabilities({
+        readOnly: false,
+        allowPan: true,
+        allowZoom: true,
+        allowDrag: true,
+        allowConnect: true,
+        allowReconnect: true,
+        allowDelete: true,
+        allowLabelEdit: true,
+        allowMarqueeSelect: true,
+        allowSubprocessResize: true,
+        allowKeyboardShortcuts: true
+      });
+      showToast('Switched to Full Author (Admin) preset');
+    });
+
+    document.getElementById('btn-preset-reviewer').addEventListener('click', () => {
+      canvas.setCapabilities({
+        readOnly: true,
+        allowPan: true,
+        allowZoom: true,
+        allowDrag: false,
+        allowConnect: false,
+        allowReconnect: false,
+        allowDelete: false,
+        allowLabelEdit: false,
+        allowMarqueeSelect: true,
+        allowSubprocessResize: false,
+        allowKeyboardShortcuts: false
+      });
+      showToast('Switched to Read-Only Reviewer preset');
+    });
+
+    document.getElementById('btn-preset-clean').addEventListener('click', () => {
+      canvas.setCapabilities({
+        readOnly: false,
+        allowPan: true,
+        allowZoom: true,
+        allowDrag: true,
+        allowConnect: true,
+        allowReconnect: false,
+        allowDelete: false,
+        allowLabelEdit: false,
+        allowMarqueeSelect: true,
+        allowSubprocessResize: true,
+        allowKeyboardShortcuts: false
+      });
+      showToast('Switched to Locked Structure preset (no delete/reconnect/edit)');
+    });
+
+    // UI Switches within drawer
+    const uiSwitchGrid = document.getElementById('ui-switch-grid');
+    const uiSwitchSnap = document.getElementById('ui-switch-snap');
+    const uiSwitchPulse = document.getElementById('ui-switch-pulse');
+
+    uiSwitchGrid.addEventListener('change', () => {
+      canvas.setGrid(uiSwitchGrid.checked);
+    });
+    canvas.on('grid:change', ({ grid }) => {
+      uiSwitchGrid.checked = grid;
+    });
+
+    uiSwitchSnap.addEventListener('change', () => {
+      canvas.setSnapToGrid(uiSwitchSnap.checked);
+    });
+    canvas.on('snapToGrid:change', ({ snapToGrid }) => {
+      uiSwitchSnap.checked = snapToGrid;
+    });
+
+    uiSwitchPulse.addEventListener('change', () => {
+      canvas.setPulsing(uiSwitchPulse.checked);
+    });
+    canvas.on('pulsing:change', ({ pulsing }) => {
+      uiSwitchPulse.checked = pulsing;
+    });
+
+    // Active Theme Selector
+    const themeSelect = document.getElementById('config-theme-select');
+    themeSelect.addEventListener('change', (e) => {
+      const selected = e.target.value;
+      // Clear theme classes on body
+      document.body.classList.remove('theme-light', 'theme-ocean');
+      
+      if (selected === 'light') {
+        document.body.classList.add('theme-light');
+        canvas.setTheme('theme-light');
+        themeLabel.textContent = 'Light';
+      } else if (selected === 'ocean') {
+        document.body.classList.add('theme-ocean');
+        canvas.setTheme('theme-ocean');
+        themeLabel.textContent = 'Ocean';
+      } else if (selected === 'unstyled') {
+        canvas.setTheme(null);
+        themeLabel.textContent = 'Unstyled';
+      } else {
+        canvas.setTheme(null);
+        themeLabel.textContent = 'Dark';
+      }
+      showToast(`Applied theme: ${selected}`);
+    });
+
+    // Palette Filter Presets
+    const filterPresetSelect = document.getElementById('config-filter-preset');
+    const filterSummary = document.getElementById('config-filter-summary');
+
+    filterPresetSelect.addEventListener('change', (e) => {
+      const mode = e.target.value;
+      if (mode === 'simple') {
+        palette.setFilter({
+          excludeCategories: ['subprocesses', 'artifacts'],
+          excludeTypes: ['subprocess', 'text-annotation', 'data-object']
+        });
+        filterSummary.textContent = 'Simple flowchart mode: Subprocesses and Data Artifacts excluded.';
+      } else if (mode === 'events-only') {
+        palette.setFilter({
+          includeCategories: ['events', 'gateways']
+        });
+        filterSummary.textContent = 'Restricted: Only Events and Gateway branch elements available.';
+      } else if (mode === 'tasks-only') {
+        palette.setFilter({
+          includeCategories: ['activities']
+        });
+        filterSummary.textContent = 'Restricted: Activities and Work Tasks only.';
+      } else {
+        palette.setFilter(null);
+        filterSummary.textContent = 'Showing all standard BPMN 2.0 categories and elements.';
+      }
+      showToast(`Palette filter set to: ${mode}`);
+    });
+
+    // Extensible Node Registration Buttons
+    let slackRegistered = false;
+    document.getElementById('btn-register-slack').addEventListener('click', () => {
+      if (slackRegistered) {
+        showToast('Slack Notification task is already registered', 'error');
+        return;
+      }
+      
+      canvas.registerNodeType('slack-notification-task', {
+        type: 'slack-notification-task',
+        category: 'activities',
+        label: 'Slack Notification',
+        badge: 'Slack Alert',
+        iconSvg: '💬',
+        symbolHtml: '💬',
+        defaultWidth: 160,
+        defaultHeight: 84,
+        data: {
+          channel: '#general',
+          message: 'Hello team!',
+          notifyOnFailure: true
+        }
+      });
+      slackRegistered = true;
+      showToast('Registered custom "Slack Notification" task in Palette!');
+    });
+
+    let dbRegistered = false;
+    document.getElementById('btn-register-db').addEventListener('click', () => {
+      if (dbRegistered) {
+        showToast('Database Query task is already registered', 'error');
+        return;
+      }
+
+      canvas.registerNodeType('db-query-task', {
+        type: 'db-query-task',
+        category: 'activities',
+        label: 'Database Query',
+        badge: 'DB Query',
+        iconSvg: '🗄️',
+        symbolHtml: '🗄️',
+        defaultWidth: 160,
+        defaultHeight: 84,
+        data: {
+          connection: 'prod-postgres-pool',
+          query: 'SELECT * FROM users;',
+          timeoutMs: 5000
+        }
+      });
+      dbRegistered = true;
+      showToast('Registered custom "Database Query" task in Palette!');
     });
 
     // Start simulation automatically on initial load

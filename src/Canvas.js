@@ -5,9 +5,35 @@ import { NodeTypeRegistry } from './NodeTypeRegistry.js';
 
 /**
  * Core Canvas Engine for BPMN Canvas
- * Manages viewport zoom/pan, coordinate mapping, shapes, connectors, and history
+ * Manages viewport zoom/pan, coordinate mapping, shapes, connectors, capabilities, and history.
  */
 export class BpmnCanvas {
+  /**
+   * @param {HTMLElement} containerElement - Root DOM element to mount the canvas
+   * @param {Object} [options={}] - Configuration options for the canvas
+   * @param {number} [options.zoomMin=0.2] - Minimum allowable viewport zoom factor
+   * @param {number} [options.zoomMax=3.0] - Maximum allowable viewport zoom factor
+   * @param {number} [options.zoomSpeed=0.0015] - Wheel zoom sensitivity
+   * @param {'bezier'|'orthogonal'} [options.defaultRouting='bezier'] - Default connector line routing algorithm
+   * @param {number} [options.gridSize=24] - Background grid step size in pixels
+   * @param {boolean} [options.grid=true] - Whether background dot grid pattern is visible
+   * @param {boolean} [options.snapToGrid=true] - Whether node positioning snaps to the grid
+   * @param {boolean} [options.pulsing=true] - Whether visual feedback pulsing halos and draft flow animations are active
+   * @param {string|null} [options.themeClass=null] - CSS theme class applied to container (e.g. 'theme-light', 'theme-ocean')
+   * @param {NodeTypeRegistry} [options.registry] - Optional shared or custom NodeTypeRegistry instance
+   * @param {Object} [options.capabilities={}] - Granular permissions and interaction toggles
+   * @param {boolean} [options.capabilities.readOnly=false] - Master killswitch disabling all mutations and authoring
+   * @param {boolean} [options.capabilities.allowPan=true] - Whether viewport panning is allowed
+   * @param {boolean} [options.capabilities.allowZoom=true] - Whether viewport zooming is allowed
+   * @param {boolean} [options.capabilities.allowDrag=true] - Whether node dragging and moving is allowed
+   * @param {boolean} [options.capabilities.allowConnect=true] - Whether creating new connector edges is allowed
+   * @param {boolean} [options.capabilities.allowReconnect=true] - Whether reconnecting existing edge endpoints is allowed
+   * @param {boolean} [options.capabilities.allowDelete=true] - Whether deleting nodes and edges is allowed
+   * @param {boolean} [options.capabilities.allowLabelEdit=true] - Whether inline double-click text editing is allowed
+   * @param {boolean} [options.capabilities.allowMarqueeSelect=true] - Whether box/marquee multi-selection is allowed
+   * @param {boolean} [options.capabilities.allowSubprocessResize=true] - Whether resizing expanded subprocesses is allowed
+   * @param {boolean} [options.capabilities.allowKeyboardShortcuts=true] - Whether undo/redo/delete shortcuts are processed
+   */
   constructor(containerElement, options = {}) {
     this.container = containerElement;
     this.options = Object.assign({
@@ -870,12 +896,16 @@ export class BpmnCanvas {
     const allowConnect = !readOnly && caps.allowConnect !== false;
     const allowReconnect = !readOnly && caps.allowReconnect !== false;
     const allowLabelEdit = !readOnly && caps.allowLabelEdit !== false;
+    const allowZoom = caps.allowZoom !== false;
+    const allowPan = caps.allowPan !== false;
 
     this.container.classList.toggle('readonly', readOnly);
     this.container.classList.toggle('no-drag', !allowDrag);
     this.container.classList.toggle('no-connect', !allowConnect);
     this.container.classList.toggle('no-reconnect', !allowReconnect);
     this.container.classList.toggle('no-label-edit', !allowLabelEdit);
+    this.container.classList.toggle('no-zoom', !allowZoom);
+    this.container.classList.toggle('no-pan', !allowPan);
   }
 
   /**
@@ -1847,15 +1877,21 @@ export class BpmnCanvas {
   }
 
   setZoom(zoomFactor) {
+    if (!this.hasCapability('allowZoom')) return;
     this.zoom = Math.min(Math.max(zoomFactor, this.options.zoomMin), this.options.zoomMax);
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
   }
 
   resetViewport() {
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
+    if (!this.hasCapability('allowZoom') && !this.hasCapability('allowPan')) return;
+    if (this.hasCapability('allowZoom')) {
+      this.zoom = 1;
+    }
+    if (this.hasCapability('allowPan')) {
+      this.panX = 0;
+      this.panY = 0;
+    }
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
   }
