@@ -46,12 +46,20 @@ export class BpmnCanvas {
     this.selectStart = { x: 0, y: 0 };
     this.isSpacePressed = false;
 
+    // Undo / Redo History Stacks
+    this.undoStack = [];
+    this.redoStack = [];
+    this.maxHistory = 50;
+    this.isPerformingHistoryAction = false;
+    this.isBatching = false;
+    this.batchInitialState = null;
+    this.dragInitialState = null;
+
     // Event Bus Callbacks
     this.listeners = new Map();
 
-    this.on('edge:animatedChange', () => {
+    const handleStructuralChange = () => {
       if (this.simulationActive) {
-        // Stop current animation cycle and seamlessly restart with updated path
         if (this.simAnimationId) {
           cancelAnimationFrame(this.simAnimationId);
           this.simAnimationId = null;
@@ -60,9 +68,60 @@ export class BpmnCanvas {
           clearTimeout(this.simTimeoutId);
           this.simTimeoutId = null;
         }
-        this.runSimulationCycle();
+        const path = this.findSimulationPath();
+        if (!path || path.length === 0) {
+          this.stopSimulation();
+        } else {
+          this.runSimulationCycle();
+        }
+      }
+    };
+
+    this.on('edge:animatedChange', handleStructuralChange);
+    this.on('node:remove', handleStructuralChange);
+    this.on('edge:remove', handleStructuralChange);
+    this.on('data:load', () => {
+      if (this.simulationActive) {
+        handleStructuralChange();
       }
     });
+
+    // Capture debounced history snapshots for label and property edits
+    let editDebounceTimer = null;
+    let editPreState = null;
+
+    this.clearEditDebounce = () => {
+      if (editDebounceTimer) {
+        clearTimeout(editDebounceTimer);
+        editDebounceTimer = null;
+      }
+      editPreState = null;
+    };
+
+    const handleEditChange = () => {
+      if (this.isPerformingHistoryAction || this.isBatching) return;
+      if (!editPreState) {
+        // Capture snapshot before this sequence of keystrokes/edits
+        editPreState = this.undoStack[this.undoStack.length - 1] || this.snapshotState();
+      }
+      if (editDebounceTimer) clearTimeout(editDebounceTimer);
+      editDebounceTimer = setTimeout(() => {
+        if (this.isPerformingHistoryAction || this.isBatching) {
+          this.clearEditDebounce();
+          return;
+        }
+        if (editPreState && editPreState !== this.snapshotState()) {
+          this.pushHistory(editPreState);
+        }
+        editPreState = null;
+        editDebounceTimer = null;
+      }, 500);
+    };
+
+    this.on('node:labelChange', handleEditChange);
+    this.on('edge:labelChange', handleEditChange);
+    this.on('node:update', handleEditChange);
+    this.on('edge:update', handleEditChange);
 
     this.initDOM();
     this.bindEvents();
@@ -412,7 +471,7 @@ export class BpmnCanvas {
         this.attachedBoundaryOffsets.clear();
         this.containedChildOffsets.clear();
 
-        // If a single boundary event was dragged, check if it docks to an activity or detaches
+        // If a single boundary or event node was dragged
         if (releasedNode.type.startsWith('boundary-') && this.selectedNodes.size === 1) {
           const centerX = releasedNode.x + releasedNode.width / 2;
           const centerY = releasedNode.y + releasedNode.height / 2;
@@ -429,7 +488,28 @@ export class BpmnCanvas {
               this.emit('node:update', releasedNode);
             }
           }
-        } else if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
+        } else if (this.selectedNodes.size === 1) {
+          // Check if an existing node on canvas is a boundary-compatible event type
+          const t = releasedNode.type;
+          let boundaryType = null;
+          if (t.includes('timer')) boundaryType = 'boundary-timer-event';
+          else if (t.includes('message')) boundaryType = 'boundary-message-event';
+          else if (t.includes('signal')) boundaryType = 'boundary-signal-event';
+          else if (t.includes('error')) boundaryType = 'boundary-error-event';
+
+          if (boundaryType) {
+            const centerX = releasedNode.x + releasedNode.width / 2;
+            const centerY = releasedNode.y + releasedNode.height / 2;
+            const nearbyActivity = this.findActivityNear(centerX, centerY, 50, releasedNode.id);
+
+            if (nearbyActivity) {
+              releasedNode.setType(boundaryType);
+              this.attachBoundaryEvent(releasedNode, nearbyActivity, centerX, centerY);
+            }
+          }
+        }
+        
+        if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
           // If a non-subprocess node was dragged, check if dropped inside an expanded subprocess
           const centerX = releasedNode.x + releasedNode.width / 2;
           const centerY = releasedNode.y + releasedNode.height / 2;
@@ -452,11 +532,29 @@ export class BpmnCanvas {
               this.emit('node:update', releasedNode);
             }
           }
+
+          // Check if single released node is dropped onto an existing sequence flow edge
+          if (this.selectedNodes.size === 1 && this.canSplitEdgeWithNode(releasedNode)) {
+            const centerX = releasedNode.x + releasedNode.width / 2;
+            const centerY = releasedNode.y + releasedNode.height / 2;
+            const nearbyEdge = this.findEdgeNear(centerX, centerY, 35, releasedNode.id);
+            if (nearbyEdge) {
+              const baselineDragState = this.dragInitialState;
+              this.splitEdgeWithNode(nearbyEdge.id, releasedNode.id, baselineDragState);
+              // splitEdgeWithNode pushed history with baselineDragState
+              this.dragInitialState = null;
+            }
+          }
         }
+
+        if (this.dragInitialState && this.dragInitialState !== this.snapshotState()) {
+          this.pushHistory(this.dragInitialState);
+        }
+        this.dragInitialState = null;
       }
 
       if (this.resizingSubprocess) {
-        const { node, startWidth, downstreamNodeStartPositions } = this.resizingSubprocess;
+        const { node, startWidth, downstreamNodeStartPositions, preResizeState } = this.resizingSubprocess;
         const totalDeltaW = node.width - startWidth;
 
         if (totalDeltaW !== 0 && downstreamNodeStartPositions) {
@@ -469,6 +567,10 @@ export class BpmnCanvas {
 
         this.resizingSubprocess = null;
         this.emit('node:update', node);
+
+        if (preResizeState && preResizeState !== this.snapshotState()) {
+          this.pushHistory(preResizeState);
+        }
       }
 
       const findTargetPort = (clientX, clientY, excludeNodeId) => {
@@ -576,7 +678,9 @@ export class BpmnCanvas {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (this.selectedNodes.size > 0) {
           const ids = Array.from(this.selectedNodes).map(n => n.id);
-          ids.forEach(id => this.removeNode(id));
+          this.batchOperation(() => {
+            ids.forEach(id => this.removeNode(id));
+          });
           this.clearSelection();
         } else if (this.selectedEdge) {
           this.removeEdge(this.selectedEdge.id);
@@ -584,6 +688,16 @@ export class BpmnCanvas {
         }
       } else if (e.key === 'Escape') {
         this.clearSelection();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        this.redo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
         this.selectAll();
@@ -606,6 +720,7 @@ export class BpmnCanvas {
   }
 
   startDraggingNode(leaderNode, e) {
+    this.dragInitialState = this.snapshotState();
     const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
     this.draggedNode = leaderNode;
     this.dragStartPos = {
@@ -680,7 +795,8 @@ export class BpmnCanvas {
       startHeight: node.height,
       mouseStartX: mouseCanvas.x,
       mouseStartY: mouseCanvas.y,
-      downstreamNodeStartPositions
+      downstreamNodeStartPositions,
+      preResizeState: this.snapshotState()
     };
     this.selectNode(node);
   }
@@ -792,11 +908,13 @@ export class BpmnCanvas {
         return;
       }
     }
+    this.pushHistory();
     edge.updateConnection(updates);
     this.emit('edge:reconnect', { edge, updates });
   }
 
   addNode(config) {
+    this.pushHistory();
     const node = new BpmnNode(config, this);
     this.nodes.set(node.id, node);
     this.surface.appendChild(node.domElement);
@@ -808,7 +926,8 @@ export class BpmnCanvas {
     const node = this.nodes.get(id);
     if (!node) return;
 
-    // Cascade remove any child nodes contained inside this subprocess
+    return this.batchOperation(() => {
+      // Cascade remove any child nodes contained inside this subprocess
     const containedChildNodes = [];
     this.nodes.forEach(n => {
       if (n.data && n.data.parentId === id) {
@@ -844,6 +963,7 @@ export class BpmnCanvas {
     node.destroy();
     this.nodes.delete(id);
     this.emit('node:remove', id);
+    });
   }
 
   findSubprocessAt(x, y, excludeId = null) {
@@ -883,6 +1003,8 @@ export class BpmnCanvas {
   setSubprocessExpanded(subprocessId, expanded) {
     const subprocessNode = this.getNode(subprocessId);
     if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+
+    this.pushHistory();
 
     subprocessNode.data = Object.assign(subprocessNode.data || {}, {
       expanded: !!expanded
@@ -1129,6 +1251,136 @@ export class BpmnCanvas {
     };
   }
 
+  /**
+   * Finds the closest edge within maxDistance of given canvas coordinates (x, y).
+   * Optionally excludes edges connected to excludeNodeId.
+   */
+  findEdgeNear(x, y, maxDistance = 30, excludeNodeId = null) {
+    let bestEdge = null;
+    let minDistance = Infinity;
+
+    this.edges.forEach(edge => {
+      if (excludeNodeId && (edge.sourceId === excludeNodeId || edge.targetId === excludeNodeId)) {
+        return;
+      }
+
+      const pathEl = edge.pathElement;
+      if (!pathEl || !pathEl.getTotalLength) return;
+
+      const totalLen = pathEl.getTotalLength();
+      if (totalLen <= 0) return;
+
+      // Sample along path points to find closest distance to (x, y)
+      const samples = Math.max(15, Math.min(50, Math.floor(totalLen / 10)));
+      for (let i = 0; i <= samples; i++) {
+        const pt = pathEl.getPointAtLength((i / samples) * totalLen);
+        const dist = Math.hypot(pt.x - x, pt.y - y);
+        if (dist < minDistance && dist <= maxDistance) {
+          minDistance = dist;
+          bestEdge = edge;
+        }
+      }
+    });
+
+    return bestEdge;
+  }
+
+  /**
+   * Determines if a node can be inserted into an existing sequence flow edge.
+   * Boundary events, text annotations, data objects, pure start events, and pure end events cannot split edges into through-flows.
+   */
+  canSplitEdgeWithNode(node) {
+    if (!node || !node.type) return false;
+    const t = node.type;
+    if (t.startsWith('boundary-')) return false;
+    if (t === 'text-annotation' || t === 'data-object') return false;
+    if (t.startsWith('start-')) return false;
+    if (t.startsWith('end-')) return false;
+    return true;
+  }
+
+  /**
+   * Drops/inserts a node as an intermediate step into an existing edge:
+   * - Preserves the original edge's label on the incoming edge into the inserted shape.
+   * - Creates an outgoing edge from the inserted shape to original target.
+   * - Preserves routing style and animation settings.
+   * - Removes the original edge.
+   * - Wrapped in batchOperation so undo/redo is completely atomic.
+   */
+  splitEdgeWithNode(edgeId, nodeId, preCapturedState = null) {
+    const edge = this.edges.get(edgeId);
+    const node = this.getNode(nodeId);
+    if (!edge || !node) return false;
+    if (!this.canSplitEdgeWithNode(node)) return false;
+
+    // Do not split an edge that already connects to this node
+    if (edge.sourceId === nodeId || edge.targetId === nodeId) return false;
+
+    return this.batchOperation(() => {
+      const sourceId = edge.sourceId;
+      const targetId = edge.targetId;
+      const sourcePort = edge.sourcePort || 'right';
+      const targetPort = edge.targetPort || 'left';
+      const originalLabel = edge.label || '';
+      const routing = edge.routing || this.options.defaultRouting;
+      const animated = Boolean(edge.animated);
+
+      // Determine appropriate ports for the inserted node based on relative positions
+      const srcNode = this.getNode(sourceId);
+      const tgtNode = this.getNode(targetId);
+
+      let inPort = 'left';
+      let outPort = 'right';
+
+      if (srcNode && tgtNode) {
+        const dx = tgtNode.x - srcNode.x;
+        const dy = tgtNode.y - srcNode.y;
+        // If flow is predominantly vertical (e.g. top to bottom or bottom to top)
+        if (Math.abs(dy) > Math.abs(dx) * 1.5) {
+          if (dy > 0) {
+            inPort = 'top';
+            outPort = 'bottom';
+          } else {
+            inPort = 'bottom';
+            outPort = 'top';
+          }
+        }
+      }
+
+      // Remove the original edge
+      this.removeEdge(edge.id);
+
+      // Edge 1: Original source -> newly inserted node (inherits label, routing, animation)
+      const edge1 = this.addEdge({
+        sourceId,
+        targetId: node.id,
+        sourcePort,
+        targetPort: inPort,
+        label: originalLabel,
+        routing,
+        animated
+      });
+
+      // Edge 2: Newly inserted node -> original target (unlabeled, inherits routing, animation)
+      const edge2 = this.addEdge({
+        sourceId: node.id,
+        targetId,
+        sourcePort: outPort,
+        targetPort,
+        label: '',
+        routing,
+        animated
+      });
+
+      if (edge1) edge1.render();
+      if (edge2) edge2.render();
+      this.updateConnectedEdges(node.id);
+
+      this.emit('edge:split', { edgeId, nodeId, edge1, edge2 });
+      return true;
+    }, preCapturedState);
+  }
+
   findActivityNear(centerX, centerY, threshold = 40, excludeId = null) {
     let bestHost = null;
     let bestDist = Infinity;
@@ -1235,6 +1487,7 @@ export class BpmnCanvas {
       return null;
     }
 
+    this.pushHistory();
     const edge = new BpmnEdge(config, this);
     this.edges.set(edge.id, edge);
     this.edgesContainer.appendChild(edge.groupElement);
@@ -1243,6 +1496,7 @@ export class BpmnCanvas {
   }
 
   removeEdge(id) {
+    this.pushHistory();
     const edge = this.edges.get(id);
     if (!edge) return;
 
@@ -1481,11 +1735,6 @@ export class BpmnCanvas {
     // Add nodes
     data.nodes.forEach(n => this.addNode(n));
 
-    // Add edges
-    if (Array.isArray(data.edges)) {
-      data.edges.forEach(e => this.addEdge(e));
-    }
-
     // Restore subprocess children visibility and state
     this.nodes.forEach(n => {
       if (n.type === 'subprocess') {
@@ -1501,10 +1750,130 @@ export class BpmnCanvas {
       }
     });
 
+    // Add edges
+    if (Array.isArray(data.edges)) {
+      data.edges.forEach(e => this.addEdge(e));
+    }
+
+    // Refresh all edge paths and endpoints
+    this.edges.forEach(edge => edge.render());
+
     if (data.autoFit !== false) {
       this.fitView();
     }
+    if (data.clearHistory !== false && !this.isPerformingHistoryAction) {
+      this.undoStack = [];
+      this.redoStack = [];
+      this.emit('history:change', { canUndo: false, canRedo: false });
+    }
     this.emit('data:load', data);
+  }
+
+  /* -------------------------------------------------------------
+   * History & Undo / Redo Engine
+   * ----------------------------------------------------------- */
+  snapshotState() {
+    return JSON.stringify(this.exportData());
+  }
+
+  pushHistory(preCapturedState = null) {
+    if (this.isPerformingHistoryAction || this.isBatching) return;
+
+    const stateToPush = preCapturedState || this.snapshotState();
+
+    // Avoid pushing duplicate states
+    if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === stateToPush) {
+      return;
+    }
+
+    this.undoStack.push(stateToPush);
+    if (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+  }
+
+  /**
+   * Executes a batch of operations atomically as a single undo step.
+   * If nested, the outermost batch retains the baseline state.
+   */
+  batchOperation(fn, customPreBatchState = null) {
+    if (this.isPerformingHistoryAction) {
+      return fn();
+    }
+
+    if (this.isBatching) {
+      // Already inside a batch; execute directly
+      return fn();
+    }
+
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
+
+    this.isBatching = true;
+    const preBatchState = customPreBatchState || this.snapshotState();
+
+    try {
+      return fn();
+    } finally {
+      this.isBatching = false;
+      const postBatchState = this.snapshotState();
+      if (preBatchState !== postBatchState) {
+        this.pushHistory(preBatchState);
+      }
+    }
+  }
+
+  applyState(stateJson) {
+    if (!stateJson) return;
+    this.isPerformingHistoryAction = true;
+    try {
+      const data = JSON.parse(stateJson);
+      data.autoFit = false;
+      this.loadData(data);
+    } finally {
+      this.isPerformingHistoryAction = false;
+    }
+  }
+
+  undo() {
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
+    if (this.undoStack.length === 0) return false;
+
+    const currentState = this.snapshotState();
+    const previousState = this.undoStack.pop();
+    this.redoStack.push(currentState);
+
+    this.applyState(previousState);
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+    return true;
+  }
+
+  redo() {
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
+    if (this.redoStack.length === 0) return false;
+
+    const currentState = this.snapshotState();
+    const nextState = this.redoStack.pop();
+    this.undoStack.push(currentState);
+
+    this.applyState(nextState);
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+    return true;
+  }
+
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo() {
+    return this.redoStack.length > 0;
   }
 
   /* -------------------------------------------------------------
@@ -1755,8 +2124,20 @@ export class BpmnCanvas {
       }
 
       const edge = pathEdges[edgeIndex];
+      if (!edge || !this.edges.has(edge.id) || !edge.pathElement || !edge.pathElement.parentNode) {
+        // Edge was deleted or removed while animation was in progress
+        const remainingPath = this.findSimulationPath();
+        if (!remainingPath || remainingPath.length === 0) {
+          this.stopSimulation();
+          return;
+        }
+        edgeIndex = 0;
+        animateEdgeStep();
+        return;
+      }
+
       const pathEl = edge.pathElement;
-      if (!pathEl || !pathEl.getTotalLength) {
+      if (!pathEl.getTotalLength) {
         edgeIndex++;
         animateEdgeStep();
         return;

@@ -144,15 +144,20 @@
   border: 1.5px solid var(--border-focus);
   box-shadow: var(--shadow-glow), 0 4px 12px rgba(0, 0, 0, 0.4);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 4px 8px;
+  font-family: inherit;
   font-size: 11px;
+  line-height: 14px;
   font-weight: 500;
   color: var(--text-main);
   outline: none;
   z-index: 60;
-  min-width: 60px;
+  min-width: 64px;
   text-align: center;
   box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
 }
 
 /* Top SVG Layer for Interactive Handles */
@@ -229,23 +234,22 @@
   }
 }
 
-/* Active node pulse when visited by token */
+/* Active node pulse when visited by token (ports stay completely stationary for easy connection dropping) */
 .bpmn-node.sim-active {
-  box-shadow: 0 0 0 2px var(--border-focus), 0 0 16px rgba(56, 189, 248, 0.55) !important;
-  transform: scale(1.025);
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.65) !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
   z-index: 28 !important;
 }
 
-/* Event Nodes (Circle) Active Pulse */
+/* Event Nodes (Circle) Active Pulse - Glowing outline without shifting port positions */
 .bpmn-node[class*="bpmn-node-start-"].sim-active,
 .bpmn-node[class*="bpmn-node-end-"].sim-active,
 .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
-  transform: scale(1.12) !important;
-  box-shadow: 0 0 0 3px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.75) !important;
+  box-shadow: 0 0 0 3px var(--border-focus), 0 0 22px rgba(56, 189, 248, 0.8) !important;
+  filter: brightness(1.2);
 }
 
-/* For Gateways: Highlight the rotated diamond element directly instead of the outer square container */
+/* For Gateways: Highlight the rotated diamond element directly without resizing */
 .bpmn-node.bpmn-node-gateway.sim-active,
 .bpmn-node.bpmn-node-gateway-exclusive.sim-active,
 .bpmn-node.bpmn-node-gateway-parallel.sim-active {
@@ -254,9 +258,9 @@
 }
 
 .bpmn-node.sim-active .bpmn-gateway-diamond {
-  box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 16px rgba(56, 189, 248, 0.75) !important;
-  transform: rotate(45deg) scale(1.08) !important;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.8) !important;
+  transform: rotate(45deg) !important;
+  transition: box-shadow 0.2s ease;
 }
 
 /* For Expanded Subprocesses: Glow the container border */

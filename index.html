@@ -41,6 +41,12 @@
         <button class="btn" id="btn-demo-flow">
           <span>✨</span> Demo Flow
         </button>
+        <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" disabled>
+          <span>↩</span> Undo
+        </button>
+        <button class="btn" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>
+          <span>↪</span> Redo
+        </button>
         <button class="btn btn-primary" id="btn-fit-view">
           <span>🎯</span> Fit View
         </button>
@@ -368,9 +374,17 @@
     const simBtn = document.getElementById('btn-simulate');
     const simLabel = document.getElementById('sim-label');
     simBtn.addEventListener('click', () => {
-      const isRunning = canvas.toggleSimulation();
-      simLabel.textContent = isRunning ? 'Pause Flow' : 'Play Flow';
-      simBtn.style.borderColor = isRunning ? 'var(--border-focus)' : 'var(--border-color)';
+      canvas.toggleSimulation();
+    });
+
+    canvas.on('simulation:start', () => {
+      simLabel.textContent = 'Pause Flow';
+      simBtn.style.borderColor = 'var(--border-focus)';
+    });
+
+    canvas.on('simulation:stop', () => {
+      simLabel.textContent = 'Play Flow';
+      simBtn.style.borderColor = 'var(--border-color)';
     });
 
     // 6. Grid Snap Toggle
@@ -528,6 +542,23 @@
       simLabel.textContent = 'Pause Flow';
       simBtn.style.borderColor = 'var(--border-focus)';
       showToast('Loaded demo workflow');
+    });
+
+    // 9. Undo & Redo Controls
+    const undoBtn = document.getElementById('btn-undo');
+    const redoBtn = document.getElementById('btn-redo');
+
+    undoBtn.addEventListener('click', () => {
+      canvas.undo();
+    });
+
+    redoBtn.addEventListener('click', () => {
+      canvas.redo();
+    });
+
+    canvas.on('history:change', ({ canUndo, canRedo }) => {
+      undoBtn.disabled = !canUndo;
+      redoBtn.disabled = !canRedo;
     });
 
     // Start simulation automatically on initial load

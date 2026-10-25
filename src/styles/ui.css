@@ -144,6 +144,13 @@ body, html {
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
 }
 
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+}
+
 .btn-icon {
   padding: 8px;
   border-radius: 8px;
@@ -201,6 +208,7 @@ body, html {
   border-radius: 10px;
   cursor: grab;
   transition: var(--transition-smooth);
+  position: relative;
 }
 
 .palette-item:hover {
@@ -221,12 +229,106 @@ body, html {
   justify-content: center;
   border-radius: 6px;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .palette-item-label {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-main);
+  flex-grow: 1;
+}
+
+.palette-expand-arrow {
+  font-size: 10px;
+  color: var(--text-subtle);
+  transition: transform 0.2s ease;
+  margin-left: auto;
+}
+
+/* Palette Flyout Submenu for Specialized Types */
+.palette-has-sub {
+  position: relative;
+}
+
+.palette-has-sub:hover .palette-expand-arrow {
+  color: var(--accent-color, #38bdf8);
+  transform: translateX(2px);
+}
+
+.palette-sub-menu {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: -4px;
+  width: 195px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 15px rgba(56, 189, 248, 0.1);
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 50;
+  animation: flyoutFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Invisible bridge so mouse hover doesn't drop when transitioning across the 8px gap */
+.palette-sub-menu::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -12px;
+  width: 16px;
+  height: 100%;
+}
+
+.palette-has-sub:hover > .palette-sub-menu {
+  display: flex;
+}
+
+.palette-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: grab;
+  transition: var(--transition-smooth);
+}
+
+.palette-sub-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-focus);
+  transform: translateX(3px);
+}
+
+.palette-sub-item:active {
+  cursor: grabbing;
+}
+
+.palette-sub-heading {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-subtle);
+  padding: 4px 6px 2px 6px;
+}
+
+@keyframes flyoutFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* Floating Inspector Panel */

@@ -137,26 +137,38 @@ export class BpmnEdge {
     const p2 = targetNode.getPortPosition(this.targetPort);
     const mid = Router.getMidpoint(p1, p2);
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'bpmn-edge-inline-editor';
-    input.value = this.label || '';
-    input.placeholder = 'Label...';
-    input.style.left = `${mid.x}px`;
-    input.style.top = `${mid.y}px`;
+    const textarea = document.createElement('textarea');
+    textarea.className = 'bpmn-edge-inline-editor';
+    textarea.value = this.label || '';
+    textarea.placeholder = 'Label...';
+    textarea.rows = Math.max(1, (this.label || '').split('\n').length);
+    textarea.style.left = `${mid.x}px`;
+    textarea.style.top = `${mid.y}px`;
+
+    const autoResize = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(26, textarea.scrollHeight)}px`;
+    };
 
     const commitChange = () => {
-      const newLabel = input.value.trim();
+      const newLabel = textarea.value.trim();
       this.setLabel(newLabel);
       this.canvas.emit('edge:labelChange', { edge: this, label: newLabel });
       this.closeLabelEditor();
     };
 
-    input.addEventListener('pointerdown', (e) => e.stopPropagation());
-    input.addEventListener('dblclick', (e) => e.stopPropagation());
+    textarea.addEventListener('pointerdown', (e) => e.stopPropagation());
+    textarea.addEventListener('dblclick', (e) => e.stopPropagation());
+    textarea.addEventListener('input', autoResize);
 
-    input.addEventListener('keydown', (e) => {
+    textarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        if (e.shiftKey) {
+          // Allow Shift+Enter to insert a newline
+          setTimeout(autoResize, 0);
+          return;
+        }
+        // Plain Enter commits changes
         e.preventDefault();
         commitChange();
       } else if (e.key === 'Escape') {
@@ -165,14 +177,15 @@ export class BpmnEdge {
       }
     });
 
-    input.addEventListener('blur', () => {
+    textarea.addEventListener('blur', () => {
       commitChange();
     });
 
-    this.canvas.surface.appendChild(input);
-    this.inlineEditor = input;
-    input.focus();
-    input.select();
+    this.canvas.surface.appendChild(textarea);
+    this.inlineEditor = textarea;
+    autoResize();
+    textarea.focus();
+    textarea.select();
   }
 
   closeLabelEditor() {
@@ -247,11 +260,27 @@ export class BpmnEdge {
     const svgNS = 'http://www.w3.org/2000/svg';
     this.labelGroup.innerHTML = '';
 
+    const lines = String(this.label).split('\n');
+    const lineHeight = 14;
+    const totalTextHeight = lines.length * lineHeight;
+    const startY = pos.y - (totalTextHeight / 2) + (lineHeight / 2);
+
     const text = document.createElementNS(svgNS, 'text');
     text.classList.add('bpmn-edge-label-text');
     text.setAttribute('x', pos.x);
     text.setAttribute('y', pos.y);
-    text.textContent = this.label;
+
+    let maxLineLength = 0;
+    lines.forEach((lineText, idx) => {
+      const trimmed = lineText || ' ';
+      maxLineLength = Math.max(maxLineLength, trimmed.length);
+
+      const tspan = document.createElementNS(svgNS, 'tspan');
+      tspan.setAttribute('x', pos.x);
+      tspan.setAttribute('y', startY + (idx * lineHeight));
+      tspan.textContent = trimmed;
+      text.appendChild(tspan);
+    });
 
     const bg = document.createElementNS(svgNS, 'rect');
     bg.classList.add('bpmn-edge-label-bg');
@@ -259,9 +288,9 @@ export class BpmnEdge {
     this.labelGroup.appendChild(bg);
     this.labelGroup.appendChild(text);
 
-    // Approximate size
-    const width = Math.max(this.label.length * 7 + 14, 40);
-    const height = 20;
+    // Compute bounding dimensions
+    const width = Math.max(maxLineLength * 7 + 16, 40);
+    const height = Math.max(totalTextHeight + 8, 20);
     bg.setAttribute('x', pos.x - width / 2);
     bg.setAttribute('y', pos.y - height / 2);
     bg.setAttribute('width', width);
