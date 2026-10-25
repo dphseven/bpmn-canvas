@@ -4,6 +4,7 @@
 
 export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
+    this.canvas = canvas;
     this.id = id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     this.type = type || 'task'; // 'start-event', 'end-event', 'task', 'user-task', 'service-task', 'gateway-exclusive', 'gateway-parallel', 'boundary-timer-event', 'boundary-error-event'
     this.label = label !== undefined ? label : this.getDefaultLabel(this.type);
@@ -14,7 +15,6 @@ export class BpmnNode {
     this.data = Object.assign({
       interrupting: true
     }, data);
-    this.canvas = canvas;
     this.selected = false;
 
     this.domElement = null;
@@ -95,7 +95,12 @@ export class BpmnNode {
 
   initDOM() {
     this.domElement = document.createElement('div');
-    this.domElement.className = `bpmn-node bpmn-node-${this.type}`;
+    const def = this.canvas?.registry?.get(this.type);
+    const category = def?.category;
+    const isCustom = !this.type.startsWith('boundary-') && !this.type.includes('event') && !this.type.includes('gateway') && this.type !== 'subprocess' && this.type !== 'text-annotation' && this.type !== 'data-object';
+    const isActivity = category === 'activities' || isCustom;
+
+    this.domElement.className = `bpmn-node bpmn-node-${this.type}${isActivity ? ' bpmn-node-activity' : ''}`;
     this.domElement.id = this.id;
     this.domElement.style.width = `${this.width}px`;
     this.domElement.style.minHeight = `${this.height}px`;
@@ -603,7 +608,12 @@ export class BpmnNode {
 
     this.domElement.style.width = `${this.width}px`;
     this.domElement.style.minHeight = `${this.height}px`;
-    this.domElement.className = `bpmn-node bpmn-node-${this.type}`;
+    const def = this.canvas?.registry?.get(this.type);
+    const category = def?.category;
+    const isCustom = !this.type.startsWith('boundary-') && !this.type.includes('event') && !this.type.includes('gateway') && this.type !== 'subprocess' && this.type !== 'text-annotation' && this.type !== 'data-object';
+    const isActivity = category === 'activities' || isCustom;
+
+    this.domElement.className = `bpmn-node bpmn-node-${this.type}${isActivity ? ' bpmn-node-activity' : ''}`;
     if (this.selected) this.domElement.classList.add('selected');
     
     this.updatePosition();
