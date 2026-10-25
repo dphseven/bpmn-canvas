@@ -870,12 +870,16 @@ export class BpmnCanvas {
     const allowConnect = !readOnly && caps.allowConnect !== false;
     const allowReconnect = !readOnly && caps.allowReconnect !== false;
     const allowLabelEdit = !readOnly && caps.allowLabelEdit !== false;
+    const allowZoom = caps.allowZoom !== false;
+    const allowPan = caps.allowPan !== false;
 
     this.container.classList.toggle('readonly', readOnly);
     this.container.classList.toggle('no-drag', !allowDrag);
     this.container.classList.toggle('no-connect', !allowConnect);
     this.container.classList.toggle('no-reconnect', !allowReconnect);
     this.container.classList.toggle('no-label-edit', !allowLabelEdit);
+    this.container.classList.toggle('no-zoom', !allowZoom);
+    this.container.classList.toggle('no-pan', !allowPan);
   }
 
   /**
@@ -1847,15 +1851,21 @@ export class BpmnCanvas {
   }
 
   setZoom(zoomFactor) {
+    if (!this.hasCapability('allowZoom')) return;
     this.zoom = Math.min(Math.max(zoomFactor, this.options.zoomMin), this.options.zoomMax);
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
   }
 
   resetViewport() {
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
+    if (!this.hasCapability('allowZoom') && !this.hasCapability('allowPan')) return;
+    if (this.hasCapability('allowZoom')) {
+      this.zoom = 1;
+    }
+    if (this.hasCapability('allowPan')) {
+      this.panX = 0;
+      this.panY = 0;
+    }
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
   }

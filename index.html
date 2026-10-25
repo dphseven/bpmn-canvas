@@ -517,19 +517,36 @@
 
     // 4. Viewport Controls & Indicators
     const zoomLevelEl = document.getElementById('ctrl-zoom-level');
+    const zoomInBtn = document.getElementById('ctrl-zoom-in');
+    const zoomOutBtn = document.getElementById('ctrl-zoom-out');
+    const resetViewBtn = document.getElementById('ctrl-reset-view');
+
     canvas.on('viewport:change', ({ zoom }) => {
       zoomLevelEl.textContent = `${Math.round(zoom * 100)}%`;
     });
 
-    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
+    function updateViewportControlState() {
+      const canZoom = canvas.hasCapability('allowZoom');
+      const canPan = canvas.hasCapability('allowPan');
+      zoomInBtn.disabled = !canZoom;
+      zoomOutBtn.disabled = !canZoom;
+      resetViewBtn.disabled = !canZoom && !canPan;
+    }
+
+    canvas.on('capabilities:change', () => {
+      updateViewportControlState();
+    });
+    updateViewportControlState();
+
+    zoomInBtn.addEventListener('click', () => {
       canvas.setZoom(canvas.zoom * 1.2);
     });
 
-    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
+    zoomOutBtn.addEventListener('click', () => {
       canvas.setZoom(canvas.zoom / 1.2);
     });
 
-    document.getElementById('ctrl-reset-view').addEventListener('click', () => {
+    resetViewBtn.addEventListener('click', () => {
       canvas.resetViewport();
     });
 

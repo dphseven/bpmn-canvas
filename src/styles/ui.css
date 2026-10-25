@@ -602,6 +602,12 @@ body, html {
   color: var(--text-main);
 }
 
+.control-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .control-divider {
   width: 1px;
   height: 18px;
