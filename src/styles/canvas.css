@@ -270,3 +270,25 @@
   transform: none !important;
   z-index: 6 !important;
 }
+
+/* -------------------------------------------------------------
+ * Capabilities & Permission Modifier Classes
+ * ----------------------------------------------------------- */
+.bpmn-canvas-viewport.readonly,
+.bpmn-canvas-viewport.no-drag .bpmn-node {
+  cursor: default !important;
+}
+
+.bpmn-canvas-viewport.readonly .bpmn-subprocess-resize-handle {
+  display: none !important;
+}
+
+.bpmn-canvas-viewport.readonly .bpmn-port,
+.bpmn-canvas-viewport.no-connect .bpmn-port {
+  display: none !important;
+}
+
+.bpmn-canvas-viewport.readonly .bpmn-handles-layer,
+.bpmn-canvas-viewport.no-reconnect .bpmn-handles-layer {
+  display: none !important;
+}
