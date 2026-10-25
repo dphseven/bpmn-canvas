@@ -15,6 +15,7 @@ export class BpmnCanvas {
       zoomSpeed: 0.0015,
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
+      grid: true, // Grid dot pattern visibility
       snapToGrid: true,
       pulsing: true, // Visual feedback pulsing animations (selected node halo, draft connector flow)
       themeClass: null, // e.g., 'theme-light', 'theme-custom', or null
@@ -163,6 +164,7 @@ export class BpmnCanvas {
   initDOM() {
     this.container.classList.add('bpmn-canvas-viewport');
     this.container.setAttribute('data-bpmn-pulsing', this.options.pulsing !== false ? 'true' : 'false');
+    this.container.setAttribute('data-bpmn-grid', this.options.grid !== false ? 'true' : 'false');
     if (this.options.themeClass) {
       this.container.classList.add(this.options.themeClass);
     }
@@ -796,6 +798,43 @@ export class BpmnCanvas {
    */
   isPulsing() {
     return this.options.pulsing !== false;
+  }
+
+  /**
+   * Toggle or set the visibility of the viewport background dot grid pattern
+   * @param {boolean} visible
+   */
+  setGrid(visible) {
+    this.options.grid = Boolean(visible);
+    if (this.container) {
+      this.container.setAttribute('data-bpmn-grid', this.options.grid ? 'true' : 'false');
+    }
+    this.emit('grid:change', { grid: this.options.grid });
+  }
+
+  /**
+   * Check whether grid dot pattern is currently visible
+   * @returns {boolean}
+   */
+  isGridVisible() {
+    return this.options.grid !== false;
+  }
+
+  /**
+   * Toggle or set snap-to-grid alignment logic
+   * @param {boolean} enabled
+   */
+  setSnapToGrid(enabled) {
+    this.options.snapToGrid = Boolean(enabled);
+    this.emit('snapToGrid:change', { snapToGrid: this.options.snapToGrid });
+  }
+
+  /**
+   * Check whether snap-to-grid is currently enabled
+   * @returns {boolean}
+   */
+  isSnapToGrid() {
+    return this.options.snapToGrid !== false;
   }
 
   /**

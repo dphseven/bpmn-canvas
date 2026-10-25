@@ -13,6 +13,10 @@
   cursor: default;
 }
 
+.bpmn-canvas-viewport[data-bpmn-grid="false"] {
+  background-image: none !important;
+}
+
 .bpmn-canvas-viewport.space-pressed {
   cursor: grab;
 }
