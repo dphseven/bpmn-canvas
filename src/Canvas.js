@@ -15,7 +15,8 @@ export class BpmnCanvas {
       zoomSpeed: 0.0015,
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
-      snapToGrid: true
+      snapToGrid: true,
+      themeClass: null // e.g., 'theme-light', 'theme-custom', or null
     }, options);
 
     // Transform State
@@ -133,6 +134,9 @@ export class BpmnCanvas {
 
   initDOM() {
     this.container.classList.add('bpmn-canvas-viewport');
+    if (this.options.themeClass) {
+      this.container.classList.add(this.options.themeClass);
+    }
 
     // Surface layer receiving pan and zoom matrix transforms
     this.surface = document.createElement('div');
@@ -709,6 +713,21 @@ export class BpmnCanvas {
     this.surface.style.transform = `translate3d(${this.panX}px, ${this.panY}px, 0) scale(${this.zoom})`;
     this.container.style.backgroundPosition = `${this.panX}px ${this.panY}px`;
     this.container.style.backgroundSize = `${this.options.gridSize * this.zoom}px ${this.options.gridSize * this.zoom}px`;
+  }
+
+  /**
+   * Set or switch theme class on the canvas container
+   * @param {string|null} newThemeClass - e.g. 'theme-light', 'theme-custom', or null to reset
+   */
+  setTheme(newThemeClass) {
+    if (this.options.themeClass) {
+      this.container.classList.remove(this.options.themeClass);
+    }
+    this.options.themeClass = newThemeClass || null;
+    if (this.options.themeClass) {
+      this.container.classList.add(this.options.themeClass);
+    }
+    this.emit('theme:change', { themeClass: this.options.themeClass });
   }
 
   clientToCanvas(clientX, clientY) {
