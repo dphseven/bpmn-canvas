@@ -126,11 +126,12 @@ export class NodeTypeRegistry {
       iconSvg: `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>`
     });
 
-    // Additional boundary events for completeness
+    // Additional boundary events for completeness (docked on activities, not standalone in palette)
     this.register('boundary-timer-event', {
       category: 'events',
       label: 'Timeout Boundary',
       defaultLabel: 'Timeout',
+      inPalette: false,
       width: 36,
       height: 36
     });
@@ -139,6 +140,7 @@ export class NodeTypeRegistry {
       category: 'events',
       label: 'Message Boundary',
       defaultLabel: 'Message Boundary',
+      inPalette: false,
       width: 36,
       height: 36
     });
@@ -147,6 +149,7 @@ export class NodeTypeRegistry {
       category: 'events',
       label: 'Signal Boundary',
       defaultLabel: 'Signal Boundary',
+      inPalette: false,
       width: 36,
       height: 36
     });
@@ -453,9 +456,9 @@ export class NodeTypeRegistry {
         return;
       }
 
-      // Find top-level items for this category (items without parentType)
+      // Find top-level items for this category (items without parentType and not marked inPalette: false)
       const topLevelItems = Array.from(this.types.values()).filter(t => {
-        return t.category === cat.id && !t.parentType;
+        return t.category === cat.id && !t.parentType && t.inPalette !== false;
       });
 
       const allowedItems = [];
