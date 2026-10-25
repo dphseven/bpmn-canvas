@@ -31,6 +31,9 @@
         <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
           <span>🧲</span> Grid Snap: <span id="snap-status">On</span>
         </button>
+        <button class="btn" id="btn-pulse-toggle" title="Toggle Pulsing Visual Feedback" style="border-color: var(--border-focus)">
+          <span>✨</span> Pulse: <span id="pulse-status">On</span>
+        </button>
         <button class="btn" id="btn-export-json">
           <span>📥</span> Export JSON
         </button>
@@ -394,6 +397,17 @@
       canvas.options.snapToGrid = !canvas.options.snapToGrid;
       snapStatus.textContent = canvas.options.snapToGrid ? 'On' : 'Off';
       snapBtn.style.borderColor = canvas.options.snapToGrid ? 'var(--border-focus)' : 'var(--border-color)';
+    });
+
+    // 6b. Pulsing Visual Feedback Toggle
+    const pulseBtn = document.getElementById('btn-pulse-toggle');
+    const pulseStatus = document.getElementById('pulse-status');
+    pulseBtn.addEventListener('click', () => {
+      canvas.setPulsing(!canvas.isPulsing());
+    });
+    canvas.on('pulsing:change', ({ pulsing }) => {
+      pulseStatus.textContent = pulsing ? 'On' : 'Off';
+      pulseBtn.style.borderColor = pulsing ? 'var(--border-focus)' : 'var(--border-color)';
     });
 
     // 7. Theme Toggle (Dark / Light)
