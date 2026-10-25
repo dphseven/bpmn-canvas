@@ -240,7 +240,9 @@ export class Inspector {
     const deleteBtn = this.container.querySelector('#btn-delete-multi');
     deleteBtn.addEventListener('click', () => {
       const ids = nodes.map(n => n.id);
-      ids.forEach(id => this.canvas.removeNode(id));
+      this.canvas.batchOperation(() => {
+        ids.forEach(id => this.canvas.removeNode(id));
+      });
       this.canvas.clearSelection();
     });
   }

@@ -46,12 +46,20 @@ export class BpmnCanvas {
     this.selectStart = { x: 0, y: 0 };
     this.isSpacePressed = false;
 
+    // Undo / Redo History Stacks
+    this.undoStack = [];
+    this.redoStack = [];
+    this.maxHistory = 50;
+    this.isPerformingHistoryAction = false;
+    this.isBatching = false;
+    this.batchInitialState = null;
+    this.dragInitialState = null;
+
     // Event Bus Callbacks
     this.listeners = new Map();
 
-    this.on('edge:animatedChange', () => {
+    const handleStructuralChange = () => {
       if (this.simulationActive) {
-        // Stop current animation cycle and seamlessly restart with updated path
         if (this.simAnimationId) {
           cancelAnimationFrame(this.simAnimationId);
           this.simAnimationId = null;
@@ -60,9 +68,48 @@ export class BpmnCanvas {
           clearTimeout(this.simTimeoutId);
           this.simTimeoutId = null;
         }
-        this.runSimulationCycle();
+        const path = this.findSimulationPath();
+        if (!path || path.length === 0) {
+          this.stopSimulation();
+        } else {
+          this.runSimulationCycle();
+        }
+      }
+    };
+
+    this.on('edge:animatedChange', handleStructuralChange);
+    this.on('node:remove', handleStructuralChange);
+    this.on('edge:remove', handleStructuralChange);
+    this.on('data:load', () => {
+      if (this.simulationActive) {
+        handleStructuralChange();
       }
     });
+
+    // Capture debounced history snapshots for label and property edits
+    let editDebounceTimer = null;
+    let editPreState = null;
+
+    const handleEditChange = () => {
+      if (this.isPerformingHistoryAction) return;
+      if (!editPreState) {
+        // Capture snapshot before this sequence of keystrokes/edits
+        editPreState = this.undoStack[this.undoStack.length - 1] || this.snapshotState();
+      }
+      if (editDebounceTimer) clearTimeout(editDebounceTimer);
+      editDebounceTimer = setTimeout(() => {
+        if (editPreState && editPreState !== this.snapshotState()) {
+          this.pushHistory(editPreState);
+        }
+        editPreState = null;
+        editDebounceTimer = null;
+      }, 500);
+    };
+
+    this.on('node:labelChange', handleEditChange);
+    this.on('edge:labelChange', handleEditChange);
+    this.on('node:update', handleEditChange);
+    this.on('edge:update', handleEditChange);
 
     this.initDOM();
     this.bindEvents();
@@ -453,10 +500,15 @@ export class BpmnCanvas {
             }
           }
         }
+
+        if (this.dragInitialState && this.dragInitialState !== this.snapshotState()) {
+          this.pushHistory(this.dragInitialState);
+        }
+        this.dragInitialState = null;
       }
 
       if (this.resizingSubprocess) {
-        const { node, startWidth, downstreamNodeStartPositions } = this.resizingSubprocess;
+        const { node, startWidth, downstreamNodeStartPositions, preResizeState } = this.resizingSubprocess;
         const totalDeltaW = node.width - startWidth;
 
         if (totalDeltaW !== 0 && downstreamNodeStartPositions) {
@@ -469,6 +521,10 @@ export class BpmnCanvas {
 
         this.resizingSubprocess = null;
         this.emit('node:update', node);
+
+        if (preResizeState && preResizeState !== this.snapshotState()) {
+          this.pushHistory(preResizeState);
+        }
       }
 
       const findTargetPort = (clientX, clientY, excludeNodeId) => {
@@ -576,7 +632,9 @@ export class BpmnCanvas {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (this.selectedNodes.size > 0) {
           const ids = Array.from(this.selectedNodes).map(n => n.id);
-          ids.forEach(id => this.removeNode(id));
+          this.batchOperation(() => {
+            ids.forEach(id => this.removeNode(id));
+          });
           this.clearSelection();
         } else if (this.selectedEdge) {
           this.removeEdge(this.selectedEdge.id);
@@ -584,6 +642,16 @@ export class BpmnCanvas {
         }
       } else if (e.key === 'Escape') {
         this.clearSelection();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        this.redo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
         this.selectAll();
@@ -606,6 +674,7 @@ export class BpmnCanvas {
   }
 
   startDraggingNode(leaderNode, e) {
+    this.dragInitialState = this.snapshotState();
     const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
     this.draggedNode = leaderNode;
     this.dragStartPos = {
@@ -680,7 +749,8 @@ export class BpmnCanvas {
       startHeight: node.height,
       mouseStartX: mouseCanvas.x,
       mouseStartY: mouseCanvas.y,
-      downstreamNodeStartPositions
+      downstreamNodeStartPositions,
+      preResizeState: this.snapshotState()
     };
     this.selectNode(node);
   }
@@ -792,11 +862,13 @@ export class BpmnCanvas {
         return;
       }
     }
+    this.pushHistory();
     edge.updateConnection(updates);
     this.emit('edge:reconnect', { edge, updates });
   }
 
   addNode(config) {
+    this.pushHistory();
     const node = new BpmnNode(config, this);
     this.nodes.set(node.id, node);
     this.surface.appendChild(node.domElement);
@@ -808,7 +880,8 @@ export class BpmnCanvas {
     const node = this.nodes.get(id);
     if (!node) return;
 
-    // Cascade remove any child nodes contained inside this subprocess
+    return this.batchOperation(() => {
+      // Cascade remove any child nodes contained inside this subprocess
     const containedChildNodes = [];
     this.nodes.forEach(n => {
       if (n.data && n.data.parentId === id) {
@@ -844,6 +917,7 @@ export class BpmnCanvas {
     node.destroy();
     this.nodes.delete(id);
     this.emit('node:remove', id);
+    });
   }
 
   findSubprocessAt(x, y, excludeId = null) {
@@ -883,6 +957,8 @@ export class BpmnCanvas {
   setSubprocessExpanded(subprocessId, expanded) {
     const subprocessNode = this.getNode(subprocessId);
     if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+
+    this.pushHistory();
 
     subprocessNode.data = Object.assign(subprocessNode.data || {}, {
       expanded: !!expanded
@@ -1235,6 +1311,7 @@ export class BpmnCanvas {
       return null;
     }
 
+    this.pushHistory();
     const edge = new BpmnEdge(config, this);
     this.edges.set(edge.id, edge);
     this.edgesContainer.appendChild(edge.groupElement);
@@ -1243,6 +1320,7 @@ export class BpmnCanvas {
   }
 
   removeEdge(id) {
+    this.pushHistory();
     const edge = this.edges.get(id);
     if (!edge) return;
 
@@ -1504,7 +1582,109 @@ export class BpmnCanvas {
     if (data.autoFit !== false) {
       this.fitView();
     }
+    if (data.clearHistory !== false && !this.isPerformingHistoryAction) {
+      this.undoStack = [];
+      this.redoStack = [];
+      this.emit('history:change', { canUndo: false, canRedo: false });
+    }
     this.emit('data:load', data);
+  }
+
+  /* -------------------------------------------------------------
+   * History & Undo / Redo Engine
+   * ----------------------------------------------------------- */
+  snapshotState() {
+    return JSON.stringify(this.exportData());
+  }
+
+  pushHistory(preCapturedState = null) {
+    if (this.isPerformingHistoryAction || this.isBatching) return;
+
+    const stateToPush = preCapturedState || this.snapshotState();
+
+    // Avoid pushing duplicate states
+    if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === stateToPush) {
+      return;
+    }
+
+    this.undoStack.push(stateToPush);
+    if (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+  }
+
+  /**
+   * Executes a batch of operations atomically as a single undo step.
+   * If nested, the outermost batch retains the baseline state.
+   */
+  batchOperation(fn) {
+    if (this.isPerformingHistoryAction) {
+      return fn();
+    }
+
+    if (this.isBatching) {
+      // Already inside a batch; execute directly
+      return fn();
+    }
+
+    this.isBatching = true;
+    const preBatchState = this.snapshotState();
+
+    try {
+      return fn();
+    } finally {
+      this.isBatching = false;
+      const postBatchState = this.snapshotState();
+      if (preBatchState !== postBatchState) {
+        this.pushHistory(preBatchState);
+      }
+    }
+  }
+
+  applyState(stateJson) {
+    if (!stateJson) return;
+    this.isPerformingHistoryAction = true;
+    try {
+      const data = JSON.parse(stateJson);
+      data.autoFit = false;
+      this.loadData(data);
+    } finally {
+      this.isPerformingHistoryAction = false;
+    }
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return false;
+
+    const currentState = this.snapshotState();
+    const previousState = this.undoStack.pop();
+    this.redoStack.push(currentState);
+
+    this.applyState(previousState);
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+    return true;
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return false;
+
+    const currentState = this.snapshotState();
+    const nextState = this.redoStack.pop();
+    this.undoStack.push(currentState);
+
+    this.applyState(nextState);
+    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+    return true;
+  }
+
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo() {
+    return this.redoStack.length > 0;
   }
 
   /* -------------------------------------------------------------
@@ -1755,8 +1935,20 @@ export class BpmnCanvas {
       }
 
       const edge = pathEdges[edgeIndex];
+      if (!edge || !this.edges.has(edge.id) || !edge.pathElement || !edge.pathElement.parentNode) {
+        // Edge was deleted or removed while animation was in progress
+        const remainingPath = this.findSimulationPath();
+        if (!remainingPath || remainingPath.length === 0) {
+          this.stopSimulation();
+          return;
+        }
+        edgeIndex = 0;
+        animateEdgeStep();
+        return;
+      }
+
       const pathEl = edge.pathElement;
-      if (!pathEl || !pathEl.getTotalLength) {
+      if (!pathEl.getTotalLength) {
         edgeIndex++;
         animateEdgeStep();
         return;

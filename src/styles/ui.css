@@ -144,6 +144,13 @@ body, html {
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
 }
 
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+}
+
 .btn-icon {
   padding: 8px;
   border-radius: 8px;
