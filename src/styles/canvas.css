@@ -81,6 +81,11 @@
   animation: flowAnimation 1s linear infinite;
 }
 
+[data-bpmn-pulsing="false"] .bpmn-edge.animated .bpmn-edge-path,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-edge.animated .bpmn-edge-path {
+  animation: none;
+}
+
 @keyframes flowAnimation {
   from {
     stroke-dashoffset: 24;
@@ -220,6 +225,11 @@
   fill: #38bdf8;
   opacity: 0.18;
   animation: tokenPulse 2s ease-in-out infinite alternate;
+}
+
+[data-bpmn-pulsing="false"] .bpmn-sim-token-glow,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-sim-token-glow {
+  animation: none;
 }
 
 .bpmn-sim-token-core {
