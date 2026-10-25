@@ -481,6 +481,7 @@ export class BpmnNode {
 
     this.domElement.addEventListener('dblclick', (e) => {
       if (e.target.classList.contains('bpmn-port')) return;
+      if (this.canvas && !this.canvas.hasCapability('allowLabelEdit')) return;
       const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
                       this.domElement.querySelector('.bpmn-event-floating-label') ||
                       this.domElement.querySelector('.bpmn-gateway-floating-label') ||

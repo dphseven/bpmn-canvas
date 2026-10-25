@@ -16,8 +16,35 @@ export class BpmnCanvas {
       defaultRouting: 'bezier', // 'bezier' or 'orthogonal'
       gridSize: 24,
       snapToGrid: true,
-      themeClass: null // e.g., 'theme-light', 'theme-custom', or null
-    }, options);
+      themeClass: null, // e.g., 'theme-light', 'theme-custom', or null
+      capabilities: {
+        readOnly: false,             // Master killswitch: disables all mutations
+        allowPan: true,              // Viewport pan
+        allowZoom: true,             // Viewport zoom
+        allowDrag: true,             // Node position dragging
+        allowConnect: true,          // Drawing new edges
+        allowReconnect: true,        // Reconnecting existing edge endpoints
+        allowDelete: true,           // Deleting nodes/edges (keyboard & API)
+        allowLabelEdit: true,        // Double-click inline text editing
+        allowMarqueeSelect: true,    // Box-selection tool
+        allowSubprocessResize: true, // Manual resizing of expanded subprocesses
+        allowKeyboardShortcuts: true // Undo/redo/delete shortcuts
+      }
+    }, options, {
+      capabilities: Object.assign({
+        readOnly: false,
+        allowPan: true,
+        allowZoom: true,
+        allowDrag: true,
+        allowConnect: true,
+        allowReconnect: true,
+        allowDelete: true,
+        allowLabelEdit: true,
+        allowMarqueeSelect: true,
+        allowSubprocessResize: true,
+        allowKeyboardShortcuts: true
+      }, options.capabilities || {})
+    });
 
     // Transform State
     this.zoom = 1;
@@ -178,6 +205,7 @@ export class BpmnCanvas {
     this.marqueeEl.className = 'bpmn-marquee-selection';
     this.container.appendChild(this.marqueeEl);
 
+    this.updateCapabilityClasses();
     this.applyTransform();
   }
 
@@ -185,6 +213,8 @@ export class BpmnCanvas {
     // Wheel zoom & trackpad swipe pan
     this.container.addEventListener('wheel', (e) => {
       e.preventDefault();
+      if (!this.hasCapability('allowZoom')) return;
+
       const rect = this.container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -218,6 +248,7 @@ export class BpmnCanvas {
 
     // Spacebar Hand/Pan Tool Toggle
     window.addEventListener('keydown', (e) => {
+      if (!this.hasCapability('allowPan')) return;
       if (e.code === 'Space' && !this.isSpacePressed) {
         if (e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
         this.isSpacePressed = true;
@@ -246,11 +277,21 @@ export class BpmnCanvas {
       const isPanAction = (e.button === 2) || (e.button === 1) || (e.button === 0 && (this.isSpacePressed || e.altKey));
 
       if (isPanAction) {
+        if (!this.hasCapability('allowPan')) return;
         // Pan canvas
         this.isPanning = true;
         this.panStart = { x: e.clientX - this.panX, y: e.clientY - this.panY };
         this.container.classList.add('panning');
       } else if (e.button === 0) {
+        if (!this.hasCapability('allowMarqueeSelect')) {
+          // If marquee selection is disallowed, clear selection if not clicking with modifiers
+          const isCumulative = e.shiftKey || e.ctrlKey || e.metaKey;
+          if (!isCumulative) {
+            this.clearSelection();
+          }
+          return;
+        }
+
         // Left click drag: Rubberband / Marquee Box Selection
         this.isSelecting = true;
         this.selectStart = { clientX: e.clientX, clientY: e.clientY };
@@ -679,7 +720,10 @@ export class BpmnCanvas {
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
 
+      if (!this.hasCapability('allowKeyboardShortcuts')) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!this.hasCapability('allowDelete')) return;
         if (this.selectedNodes.size > 0) {
           const ids = Array.from(this.selectedNodes).map(n => n.id);
           this.batchOperation(() => {
@@ -693,6 +737,7 @@ export class BpmnCanvas {
       } else if (e.key === 'Escape') {
         this.clearSelection();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        if (!this.hasCapability('allowKeyboardShortcuts')) return;
         e.preventDefault();
         if (e.shiftKey) {
           this.redo();
@@ -700,6 +745,7 @@ export class BpmnCanvas {
           this.undo();
         }
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        if (!this.hasCapability('allowKeyboardShortcuts')) return;
         e.preventDefault();
         this.redo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
@@ -730,6 +776,65 @@ export class BpmnCanvas {
     this.emit('theme:change', { themeClass: this.options.themeClass });
   }
 
+  /**
+   * Get current canvas capabilities configuration
+   * @returns {Object} copy of current capabilities
+   */
+  getCapabilities() {
+    return Object.assign({}, this.options.capabilities);
+  }
+
+  /**
+   * Update canvas capabilities at runtime
+   * @param {Object} partialCapabilities - partial capabilities object to merge
+   */
+  setCapabilities(partialCapabilities = {}) {
+    this.options.capabilities = Object.assign({}, this.options.capabilities, partialCapabilities);
+    this.updateCapabilityClasses();
+    this.emit('capabilities:change', { capabilities: this.getCapabilities() });
+  }
+
+  /**
+   * Synchronize DOM classes and attributes with active capabilities
+   */
+  updateCapabilityClasses() {
+    if (!this.container) return;
+    const caps = this.options.capabilities || {};
+    const readOnly = Boolean(caps.readOnly);
+    const allowDrag = !readOnly && caps.allowDrag !== false;
+    const allowConnect = !readOnly && caps.allowConnect !== false;
+    const allowReconnect = !readOnly && caps.allowReconnect !== false;
+    const allowLabelEdit = !readOnly && caps.allowLabelEdit !== false;
+
+    this.container.classList.toggle('readonly', readOnly);
+    this.container.classList.toggle('no-drag', !allowDrag);
+    this.container.classList.toggle('no-connect', !allowConnect);
+    this.container.classList.toggle('no-reconnect', !allowReconnect);
+    this.container.classList.toggle('no-label-edit', !allowLabelEdit);
+  }
+
+  /**
+   * Check if a specific capability is allowed, taking readOnly master switch into account
+   * @param {string} capabilityName - e.g. 'allowDrag', 'allowConnect', 'allowDelete', etc.
+   * @returns {boolean}
+   */
+  hasCapability(capabilityName) {
+    const caps = this.options.capabilities;
+    if (!caps) return true;
+
+    // Viewport capabilities are not blocked by readOnly
+    if (capabilityName === 'allowPan' || capabilityName === 'allowZoom') {
+      return Boolean(caps[capabilityName]);
+    }
+
+    // readOnly is master killswitch for mutating interactions
+    if (caps.readOnly) {
+      return false;
+    }
+
+    return capabilityName in caps ? Boolean(caps[capabilityName]) : true;
+  }
+
   clientToCanvas(clientX, clientY) {
     const rect = this.container.getBoundingClientRect();
     return {
@@ -739,6 +844,7 @@ export class BpmnCanvas {
   }
 
   startDraggingNode(leaderNode, e) {
+    if (!this.hasCapability('allowDrag')) return;
     this.dragInitialState = this.snapshotState();
     const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
     this.draggedNode = leaderNode;
@@ -796,6 +902,7 @@ export class BpmnCanvas {
   }
 
   startResizingSubprocess(node, e) {
+    if (!this.hasCapability('allowSubprocessResize')) return;
     const mouseCanvas = this.clientToCanvas(e.clientX, e.clientY);
     const downstreamNodeStartPositions = new Map();
     const rightEdge = node.x + node.width;
@@ -908,11 +1015,13 @@ export class BpmnCanvas {
   }
 
   startConnecting(node, port, e) {
+    if (!this.hasCapability('allowConnect')) return;
     this.connectingFrom = { node, port };
     this.surface.classList.add('connecting');
   }
 
   startReconnecting(edge, endpoint, e) {
+    if (!this.hasCapability('allowReconnect')) return;
     this.reconnectingEdge = { edge, endpoint };
     this.surface.classList.add('connecting');
   }
@@ -942,6 +1051,7 @@ export class BpmnCanvas {
   }
 
   removeNode(id) {
+    if (!this.hasCapability('allowDelete')) return;
     const node = this.nodes.get(id);
     if (!node) return;
 
@@ -1515,6 +1625,7 @@ export class BpmnCanvas {
   }
 
   removeEdge(id) {
+    if (!this.hasCapability('allowDelete')) return;
     this.pushHistory();
     const edge = this.edges.get(id);
     if (!edge) return;
@@ -1639,6 +1750,24 @@ export class BpmnCanvas {
 
     this.surface.classList.remove('edge-selected');
     this.emit('selection:change', { type: 'none' });
+  }
+
+  /**
+   * Delete currently selected nodes and edges if allowDelete capability permits
+   */
+  deleteSelection() {
+    if (!this.hasCapability('allowDelete')) return;
+
+    if (this.selectedNodes.size > 0) {
+      const ids = Array.from(this.selectedNodes).map(n => n.id);
+      this.batchOperation(() => {
+        ids.forEach(id => this.removeNode(id));
+      });
+      this.clearSelection();
+    } else if (this.selectedEdge) {
+      this.removeEdge(this.selectedEdge.id);
+      this.clearSelection();
+    }
   }
 
   setZoom(zoomFactor) {

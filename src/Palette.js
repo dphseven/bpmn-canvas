@@ -238,11 +238,18 @@ export class Palette {
 
     const canvasContainer = this.canvas.container;
     canvasContainer.addEventListener('dragover', (e) => {
+      if (this.canvas.options?.capabilities?.readOnly) {
+        e.dataTransfer.dropEffect = 'none';
+        return;
+      }
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     });
 
     canvasContainer.addEventListener('drop', (e) => {
+      if (this.canvas.options?.capabilities?.readOnly) {
+        return;
+      }
       e.preventDefault();
       const rawData = e.dataTransfer.getData('text/plain');
       if (!rawData) return;
