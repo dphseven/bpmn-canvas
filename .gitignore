@@ -2,4 +2,5 @@
 .vite
 todos.md
 node_modules
-dist
+dist
+coverage
