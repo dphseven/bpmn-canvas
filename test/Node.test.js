@@ -123,9 +123,110 @@ describe('BpmnNode', () => {
     expect(signal.domElement.querySelector('.bpmn-event-signal-icon')).toBeTruthy();
   });
 
+  it('handles clicking subprocess expand/collapse marker', () => {
+    const sub = canvas.addNode({ type: 'subprocess', x: 50, y: 50, data: { expanded: false } });
+    const toggleMarker = sub.domElement.querySelector('.bpmn-subprocess-marker');
+    expect(toggleMarker).toBeTruthy();
+
+    const clickEvent = new MouseEvent('pointerdown', { bubbles: true });
+    toggleMarker.dispatchEvent(clickEvent);
+    expect(sub.data.expanded).toBe(true);
+  });
+
+  it('handles clicking subprocess resize handle', () => {
+    const sub = canvas.addNode({ type: 'subprocess', x: 50, y: 50, data: { expanded: true } });
+    const resizeHandle = sub.domElement.querySelector('.bpmn-subprocess-resize-handle');
+    expect(resizeHandle).toBeTruthy();
+
+    const pointerEvent = new PointerEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 100 });
+    resizeHandle.dispatchEvent(pointerEvent);
+    expect(canvas.resizingSubprocess).toBeTruthy();
+  });
+
+  it('enters inline label editing on double click', () => {
+    const task = canvas.addNode({ type: 'task', label: 'Editable Task' });
+    const labelEl = task.domElement.querySelector('.bpmn-activity-label');
+    expect(labelEl).toBeTruthy();
+
+    task.domElement.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(labelEl.getAttribute('contenteditable')).toBe('true');
+  });
+
+  it('renders various end event types with custom inner icons', () => {
+    const errorEnd = new BpmnNode({ type: 'end-error-event', label: 'Throw Error' }, canvas);
+    expect(errorEnd.domElement.querySelector('.bpmn-end-error-icon')).toBeTruthy();
+
+    const termEnd = new BpmnNode({ type: 'end-terminate-event', label: 'Terminate Flow' }, canvas);
+    expect(termEnd.domElement.querySelector('.bpmn-end-terminate-icon')).toBeTruthy();
+
+    const msgEnd = new BpmnNode({ type: 'end-message-event', label: 'Send Reply' }, canvas);
+    expect(msgEnd.domElement.querySelector('.bpmn-end-message-icon')).toBeTruthy();
+  });
+
+  it('updates type and preserves center point via setType', () => {
+    const node = canvas.addNode({ type: 'task', x: 100, y: 100 });
+    const origCenterX = node.x + node.width / 2;
+    const origCenterY = node.y + node.height / 2;
+
+    node.setType('start-event');
+    expect(node.type).toBe('start-event');
+    expect(node.x + node.width / 2).toBeCloseTo(origCenterX);
+    expect(node.y + node.height / 2).toBeCloseTo(origCenterY);
+  });
+
+  it('toggles boundary event interrupting mode via setInterrupting', () => {
+    const boundary = canvas.addNode({ type: 'boundary-timer-event', x: 100, y: 100, data: { interrupting: true } });
+    expect(boundary.domElement.classList.contains('non-interrupting')).toBe(false);
+
+    boundary.setInterrupting(false);
+    expect(boundary.data.interrupting).toBe(false);
+    expect(boundary.domElement.classList.contains('non-interrupting')).toBe(true);
+
+    boundary.setInterrupting(true);
+    expect(boundary.data.interrupting).toBe(true);
+    expect(boundary.domElement.classList.contains('non-interrupting')).toBe(false);
+  });
+
+  it('renders start events with specialized inner icons', () => {
+    const timerStart = new BpmnNode({ type: 'start-timer-event', label: 'Every Monday' }, canvas);
+    expect(timerStart.domElement.querySelector('.bpmn-start-timer-icon')).toBeTruthy();
+
+    const msgStart = new BpmnNode({ type: 'start-message-event', label: 'Message Inbound' }, canvas);
+    expect(msgStart.domElement.querySelector('.bpmn-start-message-icon')).toBeTruthy();
+
+    const signalStart = new BpmnNode({ type: 'start-signal-event', label: 'Broadcast' }, canvas);
+    expect(signalStart.domElement.querySelector('.bpmn-start-signal-icon')).toBeTruthy();
+  });
+
+  it('renders boundary events with custom inner icons', () => {
+    const errorB = new BpmnNode({ type: 'boundary-error-event', label: 'Catch Error' }, canvas);
+    expect(errorB.domElement.querySelector('.bpmn-boundary-error-icon')).toBeTruthy();
+
+    const msgB = new BpmnNode({ type: 'boundary-message-event', label: 'Timeout Notice' }, canvas);
+    expect(msgB.domElement.querySelector('.bpmn-boundary-message-icon')).toBeTruthy();
+
+    const sigB = new BpmnNode({ type: 'boundary-signal-event', label: 'Alert' }, canvas);
+    expect(sigB.domElement.querySelector('.bpmn-boundary-signal-icon')).toBeTruthy();
+  });
+
+  it('renders task types with specific icons and badges', () => {
+    const userTask = new BpmnNode({ type: 'user-task', label: 'Approve Request' }, canvas);
+    expect(userTask.domElement.querySelector('.bpmn-activity-header span:nth-child(2)').textContent).toBe('User Task');
+
+    const serviceTask = new BpmnNode({ type: 'service-task', label: 'Fetch Records' }, canvas);
+    expect(serviceTask.domElement.querySelector('.bpmn-activity-header span:nth-child(2)').textContent).toBe('Service Task');
+
+    const ruleTask = new BpmnNode({ type: 'business-rule-task', label: 'Check Discount' }, canvas);
+    expect(ruleTask.domElement.querySelector('.bpmn-activity-header span:nth-child(2)').textContent).toBe('Rule Task');
+
+    const scriptTask = new BpmnNode({ type: 'script-task', label: 'Execute Python' }, canvas);
+    expect(scriptTask.domElement.querySelector('.bpmn-activity-header span:nth-child(2)').textContent).toBe('Script Task');
+  });
+
   it('destroys correctly', () => {
     const node = new BpmnNode({ type: 'task' }, canvas);
     node.destroy();
     expect(node.domElement.parentNode).toBeNull();
   });
-});
+});
+

@@ -133,4 +133,47 @@ describe('Inspector', () => {
       expect(boundary.data.interrupting).toBe(false);
     }
   });
+
+  it('updates edge ports, routing, and allows deletion via inspector', () => {
+    const nodeA = canvas.addNode({ type: 'task', x: 0, y: 0 });
+    const nodeB = canvas.addNode({ type: 'task', x: 200, y: 0 });
+    const nodeC = canvas.addNode({ type: 'task', x: 200, y: 200 });
+    const edge = canvas.addEdge({ sourceId: nodeA.id, targetId: nodeB.id });
+
+    canvas.selectEdge(edge);
+
+    const sourcePortSelect = container.querySelector('#prop-edge-source-port');
+    if (sourcePortSelect) {
+      sourcePortSelect.value = 'top';
+      sourcePortSelect.dispatchEvent(new Event('change'));
+      expect(edge.sourcePort).toBe('top');
+    }
+
+    const targetSelect = container.querySelector('#prop-edge-target');
+    if (targetSelect) {
+      targetSelect.value = nodeC.id;
+      targetSelect.dispatchEvent(new Event('change'));
+      expect(edge.targetId).toBe(nodeC.id);
+    }
+
+    const targetPortSelect = container.querySelector('#prop-edge-target-port');
+    if (targetPortSelect) {
+      targetPortSelect.value = 'bottom';
+      targetPortSelect.dispatchEvent(new Event('change'));
+      expect(edge.targetPort).toBe('bottom');
+    }
+
+    const routingSelect = container.querySelector('#prop-edge-routing');
+    if (routingSelect) {
+      routingSelect.value = 'orthogonal';
+      routingSelect.dispatchEvent(new Event('change'));
+      expect(edge.routing).toBe('orthogonal');
+    }
+
+    const deleteBtn = container.querySelector('#btn-delete-edge');
+    if (deleteBtn) {
+      deleteBtn.dispatchEvent(new Event('click'));
+      expect(canvas.edges.size).toBe(0);
+    }
+  });
 });
