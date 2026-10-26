@@ -95,5 +95,5 @@ unsub();
 - Contributor guidelines / CLA requirements
 
 ### License & Acknowledgements
-- License declaration (Apache 2.0 notice and link to LICENSE)
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
 - Credits, inspirations, or foundational libraries acknowledged
