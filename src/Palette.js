@@ -1,3 +1,18 @@
+/**
+ * Copyright 2026 Don Hussey
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import { NodeTypeRegistry } from './NodeTypeRegistry.js';
 
 /**
@@ -20,6 +35,7 @@ export class Palette {
     this.registry = this.options.registry || (canvas && canvas.registry) || new NodeTypeRegistry();
     this.filter = this.options.filter || null;
 
+    this.listeners = new Map();
     this.container.classList.add('palette-panel');
     this.render();
     this.bindCanvasDropEvents();
@@ -28,6 +44,49 @@ export class Palette {
       this.canvas.on('registry:registerNodeType', () => {
         this.render();
       });
+    }
+  }
+
+  on(event, handler) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push(handler);
+    return () => this.off(event, handler);
+  }
+
+  off(event, handler) {
+    if (!this.listeners.has(event)) return;
+    if (!handler) {
+      this.listeners.delete(event);
+      return;
+    }
+    const handlers = this.listeners.get(event);
+    const index = handlers.indexOf(handler);
+    if (index !== -1) {
+      handlers.splice(index, 1);
+    }
+    if (handlers.length === 0) {
+      this.listeners.delete(event);
+    }
+  }
+
+  once(event, handler) {
+    const wrapped = (data) => {
+      this.off(event, wrapped);
+      handler(data);
+    };
+    return this.on(event, wrapped);
+  }
+
+  emit(event, data) {
+    if (this.listeners.has(event)) {
+      const handlers = [...this.listeners.get(event)];
+      handlers.forEach(handler => handler(data));
+    }
+    // Also propagate through connected canvas if available
+    if (this.canvas && typeof this.canvas.emit === 'function') {
+      this.canvas.emit(event, data);
     }
   }
 
@@ -44,6 +103,7 @@ export class Palette {
     const def = Object.assign({}, itemDef, { category: category || itemDef.category || 'activities' });
     this.registry.register(itemDef.type, def);
     this.render();
+    this.emit('palette:itemRegister', { category, itemDef: def });
   }
 
   /**
@@ -60,6 +120,7 @@ export class Palette {
   setFilter(filterConfig) {
     this.filter = filterConfig || null;
     this.render();
+    this.emit('palette:filterChange', { filter: this.filter });
   }
 
   /**
@@ -178,6 +239,14 @@ export class Palette {
 
         e.dataTransfer.setData('text/plain', payload);
         e.dataTransfer.effectAllowed = 'copy';
+
+        this.emit('palette:dragstart', {
+          type: item.dataset.type,
+          element: item,
+          grabOffsetX,
+          grabOffsetY,
+          event: e
+        });
       });
     });
   }
@@ -257,6 +326,14 @@ export class Palette {
           }
         });
         this.canvas.selectNode(node);
+        this.emit('palette:drop', {
+          type: boundaryType,
+          node,
+          position: { x: docking.x, y: docking.y },
+          isBoundary: true,
+          hostNodeId: nearbyActivity.id,
+          event: e
+        });
         return;
       }
 
@@ -305,6 +382,15 @@ export class Palette {
 
       if (node) {
         this.canvas.selectNode(node);
+        this.emit('palette:drop', {
+          type: nodeType,
+          node,
+          position: { x: node.x, y: node.y },
+          isBoundary: false,
+          splitEdgeId: nearbyEdge ? nearbyEdge.id : null,
+          parentId: nodeData.parentId || null,
+          event: e
+        });
       }
     });
   }
