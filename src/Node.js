@@ -382,8 +382,7 @@ export class BpmnNode {
                     this.domElement.querySelector('.bpmn-gateway-floating-label') ||
                     this.domElement.querySelector('.bpmn-annotation-text') ||
                     this.domElement.querySelector('.bpmn-data-object-floating-label');
-    if (labelEl) {
-      labelEl.setAttribute('spellcheck', 'false');
+      let initialLabelOnEdit = this.label;
 
       labelEl.addEventListener('input', (e) => {
         this.label = e.target.innerText;
@@ -408,12 +407,29 @@ export class BpmnNode {
         }
       });
 
-      labelEl.addEventListener('blur', () => {
+      const commitLabelChange = () => {
         labelEl.removeAttribute('contenteditable');
+        const currentText = labelEl.innerText;
+        this.label = currentText;
+        if (initialLabelOnEdit !== currentText) {
+          this.canvas.emit('node:labelChange', { node: this, label: this.label });
+          this.canvas.emit('node:update', this);
+          initialLabelOnEdit = currentText;
+        }
+      };
+
+      labelEl.addEventListener('focus', () => {
+        initialLabelOnEdit = labelEl.innerText;
+      });
+
+      labelEl.addEventListener('blur', () => {
+        commitLabelChange();
       });
 
       labelEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+          labelEl.innerText = initialLabelOnEdit;
+          this.label = initialLabelOnEdit;
           labelEl.removeAttribute('contenteditable');
           labelEl.blur();
           return;
@@ -427,7 +443,7 @@ export class BpmnNode {
           }
           if (!e.shiftKey) {
             e.preventDefault();
-            labelEl.removeAttribute('contenteditable');
+            commitLabelChange();
             labelEl.blur();
           }
         }
@@ -570,6 +586,7 @@ export class BpmnNode {
   }
 
   setLabel(label) {
+    const oldLabel = this.label;
     this.label = label;
     const labelEl = this.domElement.querySelector('.bpmn-activity-label') ||
                     this.domElement.querySelector('.bpmn-event-floating-label') ||
@@ -590,6 +607,10 @@ export class BpmnNode {
         }
       }
       this.canvas.updateConnectedEdges(this.id);
+    }
+    if (oldLabel !== label && this.canvas) {
+      this.canvas.emit('node:labelChange', { node: this, label: this.label });
+      this.canvas.emit('node:update', this);
     }
   }
 

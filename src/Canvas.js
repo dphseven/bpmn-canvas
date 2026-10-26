@@ -1840,11 +1840,13 @@ export class BpmnCanvas {
         node.setSelected(true);
       }
     } else {
-      if (!this.selectedNodes.has(node)) {
-        this.clearSelection(false);
-        this.selectedNodes.add(node);
-        node.setSelected(true);
+      if (this.selectedNodes.has(node) && this.selectedNodes.size === 1) {
+        // Already the only selected node; nothing to change or re-emit
+        return;
       }
+      this.clearSelection(false);
+      this.selectedNodes.add(node);
+      node.setSelected(true);
     }
 
     this.emitSelectionChange();
