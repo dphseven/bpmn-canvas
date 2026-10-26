@@ -35,26 +35,26 @@ Brief 1–2 line guidance or links to starter templates for modern front-end sta
   - Subscriptions: `const unsub = canvas.on(event, handler)`, `canvas.once(event, handler)`, and `canvas.off(event, handler)`.
   - Also supported on `Palette` (`palette.on(event, handler)`), with automatic propagation to connected `canvas`.
   - **Event Catalog**:
-    | Event Name | Description | Payload |
-    | :--- | :--- | :--- |
-    | `node:add` | Fired when a node is added | `BpmnNode` |
-    | `node:remove` | Fired when a node is removed | `nodeId` |
-    | `node:update` | Fired when node properties, label, or position change | `BpmnNode` |
-    | `node:labelChange` | Fired when node label text is committed | `{ node, label }` |
-    | `edge:add` | Fired when an edge is added | `BpmnEdge` |
-    | `edge:remove` | Fired when an edge is removed | `edgeId` |
-    | `edge:update` | Fired when edge properties or routing change | `BpmnEdge` |
-    | `edge:reconnect` | Fired when an edge is reconnected to new endpoints | `{ edge, updates }` |
-    | `edge:split` | Fired when an edge is split by a dropped node | `{ edgeId, nodeId, edge1, edge2 }` |
-    | `selection:change` | Fired when selection changes | `{ type: 'node'\|'edge'\|'multi'\|'none', item?, items? }` |
-    | `palette:dragstart`| Fired when user starts dragging an item from the palette | `{ type, element, grabOffsetX, grabOffsetY, event }` |
-    | `palette:drop` | Fired when an item from the palette is dropped on canvas | `{ type, node, position, isBoundary, splitEdgeId?, parentId?, hostNodeId?, event }` |
-    | `palette:filterChange` | Fired when palette filters are modified | `{ filter }` |
-    | `palette:itemRegister` | Fired when a custom item is registered on palette | `{ category, itemDef }` |
-    | `history:change` | Fired on undo/redo availability change | `{ canUndo, canRedo }` |
-    | `viewport:change`| Fired on zoom or pan adjustments | `{ zoom, panX, panY }` |
-    | `batch:complete` | Fired when a batch operation completes | `{ preBatchState, postBatchState }` |
-    | `simulation:start` / `stop` | Fired when token simulation toggles | `void` |
+    | Event Name                  | Description                                              | Payload                                                                             |
+    | :-------------------------- | :------------------------------------------------------- | :---------------------------------------------------------------------------------- |
+    | `node:add`                  | Fired when a node is added                               | `BpmnNode`                                                                          |
+    | `node:remove`               | Fired when a node is removed                             | `nodeId`                                                                            |
+    | `node:update`               | Fired when node properties, label, or position change    | `BpmnNode`                                                                          |
+    | `node:labelChange`          | Fired when node label text is committed                  | `{ node, label }`                                                                   |
+    | `edge:add`                  | Fired when an edge is added                              | `BpmnEdge`                                                                          |
+    | `edge:remove`               | Fired when an edge is removed                            | `edgeId`                                                                            |
+    | `edge:update`               | Fired when edge properties or routing change             | `BpmnEdge`                                                                          |
+    | `edge:reconnect`            | Fired when an edge is reconnected to new endpoints       | `{ edge, updates }`                                                                 |
+    | `edge:split`                | Fired when an edge is split by a dropped node            | `{ edgeId, nodeId, edge1, edge2 }`                                                  |
+    | `selection:change`          | Fired when selection changes                             | `{ type: 'node'\|'edge'\|'multi'\|'none', item?, items? }`                          |
+    | `palette:dragstart`         | Fired when user starts dragging an item from the palette | `{ type, element, grabOffsetX, grabOffsetY, event }`                                |
+    | `palette:drop`              | Fired when an item from the palette is dropped on canvas | `{ type, node, position, isBoundary, splitEdgeId?, parentId?, hostNodeId?, event }` |
+    | `palette:filterChange`      | Fired when palette filters are modified                  | `{ filter }`                                                                        |
+    | `palette:itemRegister`      | Fired when a custom item is registered on palette        | `{ category, itemDef }`                                                             |
+    | `history:change`            | Fired on undo/redo availability change                   | `{ canUndo, canRedo }`                                                              |
+    | `viewport:change`           | Fired on zoom or pan adjustments                         | `{ zoom, panX, panY }`                                                              |
+    | `batch:complete`            | Fired when a batch operation completes                   | `{ preBatchState, postBatchState }`                                                 |
+    | `simulation:start` / `stop` | Fired when token simulation toggles                      | `void`                                                                              |
 - Extension guide preview (registering a custom element or custom renderer)
 
 ### API Reference (Programmatic Command API)
@@ -94,6 +94,11 @@ unsub();
 - Testing and linting commands
 - Contributor guidelines / CLA requirements
 
-### License & Acknowledgements
+### License
 This project is licensed under the [Apache License, Version 2.0](LICENSE).
-- Credits, inspirations, or foundational libraries acknowledged
+
+### Acknowledgements
+- **[OMG (Object Management Group)](https://www.omg.org/bpmn/)**: For the BPMN 2.0 (Business Process Model and Notation) standard and visual specification that guides the shapes, semantics, and connection rules in this library
+- **[bpmn.io / bpmn-js (Camunda)](https://bpmn.io/)**: For pioneering modern, open-source web-based BPMN modeling and setting the benchmark for browser diagramming ergonomics
+- **Modern Canvas & Node Graph Pioneers**: Architectural patterns and interaction models inspired by modern visual node graphs such as [React Flow / xyflow](https://reactflow.dev/) and [LiteGraph](https://github.com/jagenjo/litegraph.js)
+- **Google Fonts**: For the clean UI typography powered by [Inter](https://fonts.google.com/specimen/Inter)
