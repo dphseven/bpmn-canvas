@@ -1157,48 +1157,78 @@ export class BpmnCanvas {
   }
 
   removeNode(id) {
-    if (!this.hasCapability('allowDelete')) return;
+    if (!this.hasCapability('allowDelete')) return false;
     const node = this.nodes.get(id);
-    if (!node) return;
+    if (!node) return false;
 
-    return this.batchOperation(() => {
+    this.batchOperation(() => {
       // Cascade remove any child nodes contained inside this subprocess
-    const containedChildNodes = [];
-    this.nodes.forEach(n => {
-      if (n.data && n.data.parentId === id) {
-        containedChildNodes.push(n.id);
-      }
-    });
-    containedChildNodes.forEach(cId => this.removeNode(cId));
+      const containedChildNodes = [];
+      this.nodes.forEach(n => {
+        if (n.data && n.data.parentId === id) {
+          containedChildNodes.push(n.id);
+        }
+      });
+      containedChildNodes.forEach(cId => this.removeNode(cId));
 
-    // Cascade remove any boundary events attached to this node
-    const attachedBoundaryEvents = [];
-    this.nodes.forEach(n => {
-      if (n.data && n.data.hostNodeId === id) {
-        attachedBoundaryEvents.push(n.id);
-      }
-    });
-    attachedBoundaryEvents.forEach(bId => this.removeNode(bId));
+      // Cascade remove any boundary events attached to this node
+      const attachedBoundaryEvents = [];
+      this.nodes.forEach(n => {
+        if (n.data && n.data.hostNodeId === id) {
+          attachedBoundaryEvents.push(n.id);
+        }
+      });
+      attachedBoundaryEvents.forEach(bId => this.removeNode(bId));
 
-    // Remove connected edges
-    const edgesToRemove = [];
-    this.edges.forEach(edge => {
-      if (edge.sourceId === id || edge.targetId === id) {
-        edgesToRemove.push(edge.id);
-      }
-    });
-    edgesToRemove.forEach(eId => this.removeEdge(eId));
+      // Remove connected edges
+      const edgesToRemove = [];
+      this.edges.forEach(edge => {
+        if (edge.sourceId === id || edge.targetId === id) {
+          edgesToRemove.push(edge.id);
+        }
+      });
+      edgesToRemove.forEach(eId => this.removeEdge(eId));
 
-    if (this.selectedNodes.has(node)) {
-      this.selectedNodes.delete(node);
-      node.setSelected(false);
-      this.emitSelectionChange();
+      if (this.selectedNodes.has(node)) {
+        this.selectedNodes.delete(node);
+        node.setSelected(false);
+        this.emitSelectionChange();
+      }
+
+      node.destroy();
+      this.nodes.delete(id);
+      this.emit('node:remove', id);
+    });
+    return true;
+  }
+
+  updateNode(id, updates = {}) {
+    const node = this.nodes.get(id);
+    if (!node) return null;
+
+    this.pushHistory();
+
+    if (updates.label !== undefined && updates.label !== node.label) {
+      node.setLabel(updates.label);
+    }
+    if (updates.type !== undefined && updates.type !== node.type) {
+      node.setType(updates.type);
+    }
+    if (updates.x !== undefined || updates.y !== undefined) {
+      if (updates.x !== undefined) node.x = updates.x;
+      if (updates.y !== undefined) node.y = updates.y;
+      node.updatePosition();
+      this.updateConnectedEdges(node.id);
+    }
+    if (updates.data && typeof updates.data === 'object') {
+      node.data = { ...node.data, ...updates.data };
+      if (updates.data.interrupting !== undefined) {
+        node.setInterrupting(updates.data.interrupting);
+      }
     }
 
-    node.destroy();
-    this.nodes.delete(id);
-    this.emit('node:remove', id);
-    });
+    this.emit('node:update', node);
+    return node;
   }
 
   findSubprocessAt(x, y, excludeId = null) {
@@ -1714,6 +1744,14 @@ export class BpmnCanvas {
     return Array.from(this.nodes.values());
   }
 
+  getEdge(id) {
+    return this.edges.get(id);
+  }
+
+  getEdges() {
+    return Array.from(this.edges.values());
+  }
+
   addEdge(config) {
     // Validate BPMN 2.0 connection rule: Boundary events cannot have incoming sequence flows
     const targetNode = this.getNode(config.targetId);
@@ -1731,10 +1769,11 @@ export class BpmnCanvas {
   }
 
   removeEdge(id) {
-    if (!this.hasCapability('allowDelete')) return;
-    this.pushHistory();
+    if (!this.hasCapability('allowDelete')) return false;
     const edge = this.edges.get(id);
-    if (!edge) return;
+    if (!edge) return false;
+
+    this.pushHistory();
 
     if (this.selectedEdge === edge) {
       this.selectedEdge = null;
@@ -1744,6 +1783,35 @@ export class BpmnCanvas {
     edge.destroy();
     this.edges.delete(id);
     this.emit('edge:remove', id);
+    return true;
+  }
+
+  updateEdge(id, updates = {}) {
+    const edge = this.edges.get(id);
+    if (!edge) return null;
+
+    this.pushHistory();
+
+    if (updates.label !== undefined && updates.label !== edge.label) {
+      edge.setLabel(updates.label);
+    }
+    if (updates.animated !== undefined) {
+      edge.setAnimated(updates.animated);
+    }
+    if (updates.data && typeof updates.data === 'object') {
+      edge.data = { ...edge.data, ...updates.data };
+    }
+    if (updates.sourceId !== undefined || updates.targetId !== undefined || updates.sourceHandle !== undefined || updates.targetHandle !== undefined) {
+      if (updates.sourceId !== undefined) edge.sourceId = updates.sourceId;
+      if (updates.targetId !== undefined) edge.targetId = updates.targetId;
+      if (updates.sourceHandle !== undefined) edge.sourceHandle = updates.sourceHandle;
+      if (updates.targetHandle !== undefined) edge.targetHandle = updates.targetHandle;
+      edge.render();
+      this.emit('edge:reconnect', { edge, updates });
+    }
+
+    this.emit('edge:update', edge);
+    return edge;
   }
 
   updateConnectedEdges(nodeId) {
@@ -1772,18 +1840,20 @@ export class BpmnCanvas {
         node.setSelected(true);
       }
     } else {
-      if (!this.selectedNodes.has(node)) {
-        this.clearSelection();
-        this.selectedNodes.add(node);
-        node.setSelected(true);
+      if (this.selectedNodes.has(node) && this.selectedNodes.size === 1) {
+        // Already the only selected node; nothing to change or re-emit
+        return;
       }
+      this.clearSelection(false);
+      this.selectedNodes.add(node);
+      node.setSelected(true);
     }
 
     this.emitSelectionChange();
   }
 
   selectAll() {
-    this.clearSelection();
+    this.clearSelection(false);
     this.nodes.forEach(node => {
       // Do not select child nodes that are currently hidden inside a collapsed subprocess
       if (node.domElement && node.domElement.style.display === 'none') return;
@@ -1795,6 +1865,7 @@ export class BpmnCanvas {
 
   updateMarqueeSelection(box, isCumulative = false) {
     const baseSet = (isCumulative && this.initialSelectedOnMarquee) ? this.initialSelectedOnMarquee : new Set();
+    const prevSelected = new Set(this.selectedNodes);
 
     this.nodes.forEach(node => {
       // Do not select child nodes that are currently hidden inside a collapsed subprocess
@@ -1822,11 +1893,24 @@ export class BpmnCanvas {
       }
     });
 
-    this.emitSelectionChange();
+    // Check if the selection set actually changed
+    let changed = this.selectedNodes.size !== prevSelected.size;
+    if (!changed) {
+      for (const node of this.selectedNodes) {
+        if (!prevSelected.has(node)) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    if (changed) {
+      this.emitSelectionChange();
+    }
   }
 
   selectEdge(edge) {
-    this.clearSelection();
+    this.clearSelection(false);
     this.selectedEdge = edge;
     edge.setSelected(true);
     this.surface.classList.add('edge-selected');
@@ -1845,7 +1929,8 @@ export class BpmnCanvas {
     }
   }
 
-  clearSelection() {
+  clearSelection(emit = true) {
+    const hadSelection = this.selectedNodes.size > 0 || this.selectedEdge !== null;
     this.selectedNodes.forEach(node => node.setSelected(false));
     this.selectedNodes.clear();
 
@@ -1855,7 +1940,9 @@ export class BpmnCanvas {
     }
 
     this.surface.classList.remove('edge-selected');
-    this.emit('selection:change', { type: 'none' });
+    if (emit && hadSelection) {
+      this.emit('selection:change', { type: 'none' });
+    }
   }
 
   /**
@@ -2090,14 +2177,23 @@ export class BpmnCanvas {
     const preBatchState = customPreBatchState || this.snapshotState();
 
     try {
-      return fn();
+      const result = fn();
+      return result;
     } finally {
       this.isBatching = false;
       const postBatchState = this.snapshotState();
       if (preBatchState !== postBatchState) {
         this.pushHistory(preBatchState);
       }
+      this.emit('batch:complete', { preBatchState, postBatchState });
     }
+  }
+
+  /**
+   * Alias for batchOperation
+   */
+  batch(fn, customPreBatchState = null) {
+    return this.batchOperation(fn, customPreBatchState);
   }
 
   applyState(stateJson) {
@@ -2500,11 +2596,38 @@ export class BpmnCanvas {
       this.listeners.set(event, []);
     }
     this.listeners.get(event).push(handler);
+    return () => this.off(event, handler);
+  }
+
+  off(event, handler) {
+    if (!this.listeners.has(event)) return;
+    if (!handler) {
+      this.listeners.delete(event);
+      return;
+    }
+    const handlers = this.listeners.get(event);
+    const index = handlers.indexOf(handler);
+    if (index !== -1) {
+      handlers.splice(index, 1);
+    }
+    if (handlers.length === 0) {
+      this.listeners.delete(event);
+    }
+  }
+
+  once(event, handler) {
+    const wrapped = (data) => {
+      this.off(event, wrapped);
+      handler(data);
+    };
+    return this.on(event, wrapped);
   }
 
   emit(event, data) {
     if (this.listeners.has(event)) {
-      this.listeners.get(event).forEach(handler => handler(data));
+      // Clone array to prevent issues if listeners modify the list during execution
+      const handlers = [...this.listeners.get(event)];
+      handlers.forEach(handler => handler(data));
     }
   }
 }
