@@ -1863,6 +1863,7 @@ export class BpmnCanvas {
 
   updateMarqueeSelection(box, isCumulative = false) {
     const baseSet = (isCumulative && this.initialSelectedOnMarquee) ? this.initialSelectedOnMarquee : new Set();
+    const prevSelected = new Set(this.selectedNodes);
 
     this.nodes.forEach(node => {
       // Do not select child nodes that are currently hidden inside a collapsed subprocess
@@ -1890,7 +1891,20 @@ export class BpmnCanvas {
       }
     });
 
-    this.emitSelectionChange();
+    // Check if the selection set actually changed
+    let changed = this.selectedNodes.size !== prevSelected.size;
+    if (!changed) {
+      for (const node of this.selectedNodes) {
+        if (!prevSelected.has(node)) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    if (changed) {
+      this.emitSelectionChange();
+    }
   }
 
   selectEdge(edge) {
