@@ -68,6 +68,41 @@ describe('BpmnEdge', () => {
     expect(edge.groupElement.classList.contains('animated')).toBe(true);
   });
 
+  it('renders orthogonal routing path', () => {
+    const edge = new BpmnEdge({ sourceId: sourceNode.id, targetId: targetNode.id, routing: 'orthogonal' }, canvas);
+    edge.render();
+    const d = edge.pathElement.getAttribute('d');
+    expect(d).toContain('M');
+    expect(d).toContain('L');
+  });
+
+  it('renders endpoint reconnection handles on selection', () => {
+    const edge = new BpmnEdge({ sourceId: sourceNode.id, targetId: targetNode.id }, canvas);
+    edge.render();
+    if (edge.handlesGroup) {
+      expect(edge.handlesGroup.style.display).toBe('none');
+
+      edge.setSelected(true);
+      expect(edge.handlesGroup.style.display).toBe('block');
+
+      edge.setSelected(false);
+      expect(edge.handlesGroup.style.display).toBe('none');
+    }
+  });
+
+
+  it('opens and closes inline label editor', () => {
+    const edge = new BpmnEdge({ sourceId: sourceNode.id, targetId: targetNode.id, label: 'Initial' }, canvas);
+    edge.render();
+    edge.openLabelEditor();
+    const editor = container.querySelector('.bpmn-edge-inline-editor');
+    expect(editor).toBeTruthy();
+    expect(editor.value).toBe('Initial');
+
+    edge.closeLabelEditor();
+    expect(container.querySelector('.bpmn-edge-inline-editor')).toBeNull();
+  });
+
   it('destroys correctly', () => {
     const edge = new BpmnEdge({ sourceId: sourceNode.id, targetId: targetNode.id }, canvas);
     edge.destroy();
@@ -80,4 +115,4 @@ describe('BpmnEdge', () => {
     edge.updateConnection({ sourceId: newNode.id });
     expect(edge.sourceId).toBe(newNode.id);
   });
-});
+});
