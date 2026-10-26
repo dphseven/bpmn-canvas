@@ -381,7 +381,7 @@ export class BpmnNode {
                     this.domElement.querySelector('.bpmn-event-floating-label') ||
                     this.domElement.querySelector('.bpmn-gateway-floating-label') ||
                     this.domElement.querySelector('.bpmn-annotation-text') ||
-                    this.domElement.querySelector('.bpmn-data-object-floating-label');
+    if (labelEl) {
       let initialLabelOnEdit = this.label;
 
       labelEl.addEventListener('input', (e) => {
