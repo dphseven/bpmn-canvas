@@ -1841,7 +1841,7 @@ export class BpmnCanvas {
       }
     } else {
       if (!this.selectedNodes.has(node)) {
-        this.clearSelection();
+        this.clearSelection(false);
         this.selectedNodes.add(node);
         node.setSelected(true);
       }
@@ -1851,7 +1851,7 @@ export class BpmnCanvas {
   }
 
   selectAll() {
-    this.clearSelection();
+    this.clearSelection(false);
     this.nodes.forEach(node => {
       // Do not select child nodes that are currently hidden inside a collapsed subprocess
       if (node.domElement && node.domElement.style.display === 'none') return;
@@ -1894,7 +1894,7 @@ export class BpmnCanvas {
   }
 
   selectEdge(edge) {
-    this.clearSelection();
+    this.clearSelection(false);
     this.selectedEdge = edge;
     edge.setSelected(true);
     this.surface.classList.add('edge-selected');
@@ -1913,7 +1913,8 @@ export class BpmnCanvas {
     }
   }
 
-  clearSelection() {
+  clearSelection(emit = true) {
+    const hadSelection = this.selectedNodes.size > 0 || this.selectedEdge !== null;
     this.selectedNodes.forEach(node => node.setSelected(false));
     this.selectedNodes.clear();
 
@@ -1923,7 +1924,9 @@ export class BpmnCanvas {
     }
 
     this.surface.classList.remove('edge-selected');
-    this.emit('selection:change', { type: 'none' });
+    if (emit && hadSelection) {
+      this.emit('selection:change', { type: 'none' });
+    }
   }
 
   /**
