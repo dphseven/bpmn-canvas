@@ -17,6 +17,9 @@ import { BpmnNode } from './Node.js';
 import { BpmnEdge } from './Edge.js';
 import { Router } from './router.js';
 import { NodeTypeRegistry } from './NodeTypeRegistry.js';
+import { HistoryManager } from './HistoryManager.js';
+import { SelectionManager } from './SelectionManager.js';
+import { calculateBoundaryDocking } from './geometry.js';
 
 /**
  * Core Canvas Engine for BPMN Canvas
@@ -103,8 +106,8 @@ export class BpmnCanvas {
     // Selection & Data Stores
     this.nodes = new Map();
     this.edges = new Map();
-    this.selectedNodes = new Set();
-    this.selectedEdge = null;
+    this._selectedNodes = new Set();
+    this._selectedEdge = null;
 
     // Drag / Connection / Selection State
     this.draggedNode = null;
@@ -121,12 +124,20 @@ export class BpmnCanvas {
     this.selectStart = { x: 0, y: 0 };
     this.isSpacePressed = false;
 
-    // Undo / Redo History Stacks
-    this.undoStack = [];
-    this.redoStack = [];
-    this.maxHistory = 50;
-    this.isPerformingHistoryAction = false;
-    this.isBatching = false;
+    // Undo / Redo History Engine
+    this.historyManager = new HistoryManager({
+      maxHistory: 50,
+      snapshotFn: () => this.snapshotState(),
+      applyStateFn: (json) => {
+        const data = JSON.parse(json);
+        data.autoFit = false;
+        this.loadData(data);
+      },
+      emitFn: (event, payload) => this.emit(event, payload),
+      clearEditDebounceFn: () => {
+        if (this.clearEditDebounce) this.clearEditDebounce();
+      }
+    });
     this.batchInitialState = null;
     this.dragInitialState = null;
 
@@ -202,6 +213,56 @@ export class BpmnCanvas {
     this.bindEvents();
   }
 
+  get undoStack() {
+    return this.historyManager.undoStack;
+  }
+  set undoStack(stack) {
+    this.historyManager.undoStack = stack;
+  }
+
+  get redoStack() {
+    return this.historyManager.redoStack;
+  }
+  set redoStack(stack) {
+    this.historyManager.redoStack = stack;
+  }
+
+  get isBatching() {
+    return this.historyManager.isBatching;
+  }
+  set isBatching(val) {
+    this.historyManager.isBatching = val;
+  }
+
+  get isPerformingHistoryAction() {
+    return this.historyManager.isPerformingHistoryAction;
+  }
+  set isPerformingHistoryAction(val) {
+    this.historyManager.isPerformingHistoryAction = val;
+  }
+
+  get selectedNodes() {
+    return this.selectionManager ? this.selectionManager.selectedNodes : this._selectedNodes;
+  }
+  set selectedNodes(val) {
+    if (this.selectionManager) {
+      this.selectionManager.selectedNodes = val;
+    } else {
+      this._selectedNodes = val;
+    }
+  }
+
+  get selectedEdge() {
+    return this.selectionManager ? this.selectionManager.selectedEdge : this._selectedEdge;
+  }
+  set selectedEdge(val) {
+    if (this.selectionManager) {
+      this.selectionManager.selectedEdge = val;
+    } else {
+      this._selectedEdge = val;
+    }
+  }
+
   get selectedNode() {
     return this.selectedNodes.size === 1 ? Array.from(this.selectedNodes)[0] : null;
   }
@@ -256,6 +317,12 @@ export class BpmnCanvas {
 
     this.updateCapabilityClasses();
     this.applyTransform();
+
+    this.selectionManager = new SelectionManager({
+      nodes: this.nodes,
+      surface: this.surface,
+      emitFn: (event, payload) => this.emit(event, payload)
+    });
   }
 
   bindEvents() {
@@ -1471,65 +1538,9 @@ export class BpmnCanvas {
   }
 
   calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth = 36, boundaryHeight = 36) {
-    const hostW = hostNode.domElement ? (hostNode.domElement.offsetWidth || hostNode.width) : hostNode.width;
-    const hostH = hostNode.domElement ? (hostNode.domElement.offsetHeight || hostNode.height) : hostNode.height;
-    const left = hostNode.x;
-    const top = hostNode.y;
-    const right = hostNode.x + hostW;
-    const bottom = hostNode.y + hostH;
-
-    // Measure distance from (centerX, centerY) to each of the 4 border segments
-    // Bottom border segment: [left, right] at y = bottom
-    const clampedBottomX = Math.max(left, Math.min(right, centerX));
-    const distBottom = Math.hypot(centerX - clampedBottomX, centerY - bottom);
-
-    // Right border segment: [top, bottom] at x = right
-    const clampedRightY = Math.max(top, Math.min(bottom, centerY));
-    const distRight = Math.hypot(centerX - right, centerY - clampedRightY);
-
-    // Top border segment: [left, right] at y = top
-    const clampedTopX = Math.max(left, Math.min(right, centerX));
-    const distTop = Math.hypot(centerX - clampedTopX, centerY - top);
-
-    // Left border segment: [top, bottom] at x = left
-    const clampedLeftY = Math.max(top, Math.min(bottom, centerY));
-    const distLeft = Math.hypot(centerX - left, centerY - clampedLeftY);
-
-    const minDist = Math.min(distBottom, distRight, distTop, distLeft);
-
-    let dockedX = centerX;
-    let dockedY = centerY;
-    let dockEdge = 'bottom';
-    const halfW = boundaryWidth / 2;
-    const halfH = boundaryHeight / 2;
-
-    if (minDist === distBottom) {
-      dockEdge = 'bottom';
-      dockedY = bottom - halfH; // Center lies directly on bottom border line
-      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
-    } else if (minDist === distRight) {
-      dockEdge = 'right';
-      dockedX = right - halfW; // Center lies directly on right border line
-      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
-    } else if (minDist === distTop) {
-      dockEdge = 'top';
-      dockedY = top - halfH;
-      dockedX = Math.max(left + halfW, Math.min(right - halfW, centerX)) - halfW;
-    } else {
-      dockEdge = 'left';
-      dockedX = left - halfW;
-      dockedY = Math.max(top + halfH, Math.min(bottom - halfH, centerY)) - halfH;
-    }
-
-    return {
-      x: Math.round(dockedX),
-      y: Math.round(dockedY),
-      dockEdge,
-      hostNodeId: hostNode.id,
-      relativeOffsetX: Math.round(dockedX - left),
-      relativeOffsetY: Math.round(dockedY - top)
-    };
+    return calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth, boundaryHeight);
   }
+
 
   /**
    * Finds the closest edge within maxDistance of given canvas coordinates (x, y).
@@ -1838,127 +1849,29 @@ export class BpmnCanvas {
   }
 
   selectNode(node, modifiers = {}) {
-    const isMultiKey = typeof modifiers === 'object' ? (modifiers.shiftKey || modifiers.ctrlKey) : !!modifiers;
-
-    if (this.selectedEdge) {
-      this.selectedEdge.setSelected(false);
-      this.selectedEdge = null;
-      this.surface.classList.remove('edge-selected');
-    }
-
-    if (isMultiKey) {
-      if (this.selectedNodes.has(node)) {
-        this.selectedNodes.delete(node);
-        node.setSelected(false);
-      } else {
-        this.selectedNodes.add(node);
-        node.setSelected(true);
-      }
-    } else {
-      if (this.selectedNodes.has(node) && this.selectedNodes.size === 1) {
-        // Already the only selected node; nothing to change or re-emit
-        return;
-      }
-      this.clearSelection(false);
-      this.selectedNodes.add(node);
-      node.setSelected(true);
-    }
-
-    this.emitSelectionChange();
+    return this.selectionManager.selectNode(node, modifiers);
   }
 
   selectAll() {
-    this.clearSelection(false);
-    this.nodes.forEach(node => {
-      // Do not select child nodes that are currently hidden inside a collapsed subprocess
-      if (node.domElement && node.domElement.style.display === 'none') return;
-      this.selectedNodes.add(node);
-      node.setSelected(true);
-    });
-    this.emitSelectionChange();
+    return this.selectionManager.selectAll();
   }
 
   updateMarqueeSelection(box, isCumulative = false) {
-    const baseSet = (isCumulative && this.initialSelectedOnMarquee) ? this.initialSelectedOnMarquee : new Set();
-    const prevSelected = new Set(this.selectedNodes);
-
-    this.nodes.forEach(node => {
-      // Do not select child nodes that are currently hidden inside a collapsed subprocess
-      if (node.domElement && node.domElement.style.display === 'none') return;
-
-      const nodeMinX = node.x;
-      const nodeMinY = node.y;
-      const nodeMaxX = node.x + node.width;
-      const nodeMaxY = node.y + node.height;
-
-      // Check intersection between marquee box and node bounding rect
-      const intersects = (
-        box.minX < nodeMaxX &&
-        box.maxX > nodeMinX &&
-        box.minY < nodeMaxY &&
-        box.maxY > nodeMinY
-      );
-
-      if (intersects || baseSet.has(node)) {
-        this.selectedNodes.add(node);
-        node.setSelected(true);
-      } else {
-        this.selectedNodes.delete(node);
-        node.setSelected(false);
-      }
-    });
-
-    // Check if the selection set actually changed
-    let changed = this.selectedNodes.size !== prevSelected.size;
-    if (!changed) {
-      for (const node of this.selectedNodes) {
-        if (!prevSelected.has(node)) {
-          changed = true;
-          break;
-        }
-      }
-    }
-
-    if (changed) {
-      this.emitSelectionChange();
-    }
+    return this.selectionManager.updateMarqueeSelection(box, isCumulative);
   }
 
   selectEdge(edge) {
-    this.clearSelection(false);
-    this.selectedEdge = edge;
-    edge.setSelected(true);
-    this.surface.classList.add('edge-selected');
-    this.emit('selection:change', { type: 'edge', item: edge });
+    return this.selectionManager.selectEdge(edge);
   }
 
   emitSelectionChange() {
-    if (this.selectedNodes.size === 1) {
-      this.emit('selection:change', { type: 'node', item: Array.from(this.selectedNodes)[0] });
-    } else if (this.selectedNodes.size > 1) {
-      this.emit('selection:change', { type: 'multi', items: Array.from(this.selectedNodes) });
-    } else if (this.selectedEdge) {
-      this.emit('selection:change', { type: 'edge', item: this.selectedEdge });
-    } else {
-      this.emit('selection:change', { type: 'none' });
-    }
+    return this.selectionManager.emitSelectionChange();
   }
 
   clearSelection(emit = true) {
-    const hadSelection = this.selectedNodes.size > 0 || this.selectedEdge !== null;
-    this.selectedNodes.forEach(node => node.setSelected(false));
-    this.selectedNodes.clear();
-
-    if (this.selectedEdge) {
-      this.selectedEdge.setSelected(false);
-      this.selectedEdge = null;
-    }
-
-    this.surface.classList.remove('edge-selected');
-    if (emit && hadSelection) {
-      this.emit('selection:change', { type: 'none' });
-    }
+    return this.selectionManager.clearSelection(emit);
   }
+
 
   /**
    * Delete currently selected nodes and edges if allowDelete capability permits
@@ -2153,21 +2066,7 @@ export class BpmnCanvas {
   }
 
   pushHistory(preCapturedState = null) {
-    if (this.isPerformingHistoryAction || this.isBatching) return;
-
-    const stateToPush = preCapturedState || this.snapshotState();
-
-    // Avoid pushing duplicate states
-    if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === stateToPush) {
-      return;
-    }
-
-    this.undoStack.push(stateToPush);
-    if (this.undoStack.length > this.maxHistory) {
-      this.undoStack.shift();
-    }
-    this.redoStack = [];
-    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
+    this.historyManager.pushHistory(preCapturedState);
   }
 
   /**
@@ -2175,33 +2074,7 @@ export class BpmnCanvas {
    * If nested, the outermost batch retains the baseline state.
    */
   batchOperation(fn, customPreBatchState = null) {
-    if (this.isPerformingHistoryAction) {
-      return fn();
-    }
-
-    if (this.isBatching) {
-      // Already inside a batch; execute directly
-      return fn();
-    }
-
-    if (this.clearEditDebounce) {
-      this.clearEditDebounce();
-    }
-
-    this.isBatching = true;
-    const preBatchState = customPreBatchState || this.snapshotState();
-
-    try {
-      const result = fn();
-      return result;
-    } finally {
-      this.isBatching = false;
-      const postBatchState = this.snapshotState();
-      if (preBatchState !== postBatchState) {
-        this.pushHistory(preBatchState);
-      }
-      this.emit('batch:complete', { preBatchState, postBatchState });
-    }
+    return this.historyManager.batch(fn, customPreBatchState);
   }
 
   /**
@@ -2212,54 +2085,25 @@ export class BpmnCanvas {
   }
 
   applyState(stateJson) {
-    if (!stateJson) return;
-    this.isPerformingHistoryAction = true;
-    try {
-      const data = JSON.parse(stateJson);
-      data.autoFit = false;
-      this.loadData(data);
-    } finally {
-      this.isPerformingHistoryAction = false;
-    }
+    this.historyManager.applyHistoryState(stateJson);
   }
 
   undo() {
-    if (this.clearEditDebounce) {
-      this.clearEditDebounce();
-    }
-    if (this.undoStack.length === 0) return false;
-
-    const currentState = this.snapshotState();
-    const previousState = this.undoStack.pop();
-    this.redoStack.push(currentState);
-
-    this.applyState(previousState);
-    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
-    return true;
+    return this.historyManager.undo();
   }
 
   redo() {
-    if (this.clearEditDebounce) {
-      this.clearEditDebounce();
-    }
-    if (this.redoStack.length === 0) return false;
-
-    const currentState = this.snapshotState();
-    const nextState = this.redoStack.pop();
-    this.undoStack.push(currentState);
-
-    this.applyState(nextState);
-    this.emit('history:change', { canUndo: this.canUndo(), canRedo: this.canRedo() });
-    return true;
+    return this.historyManager.redo();
   }
 
   canUndo() {
-    return this.undoStack.length > 0;
+    return this.historyManager.canUndo();
   }
 
   canRedo() {
-    return this.redoStack.length > 0;
+    return this.historyManager.canRedo();
   }
+
 
   /* -------------------------------------------------------------
    * Token Flow Simulation
