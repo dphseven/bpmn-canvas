@@ -54,4 +54,26 @@ if (typeof SVGElement !== 'undefined') {
       return Object.create(pointPrototype);
     };
   }
+
+  if (typeof SVGPathElement !== 'undefined') {
+    if (!SVGPathElement.prototype.getTotalLength) {
+      SVGPathElement.prototype.getTotalLength = function () {
+        return 200;
+      };
+    }
+    if (!SVGPathElement.prototype.getPointAtLength) {
+      SVGPathElement.prototype.getPointAtLength = function (distance) {
+        return { x: distance, y: distance };
+      };
+    }
+  }
 }
+
+
+// Polyfill document.elementFromPoint for jsdom
+if (typeof document !== 'undefined' && !document.elementFromPoint) {
+  document.elementFromPoint = function (x, y) {
+    return document.body;
+  };
+}
+
