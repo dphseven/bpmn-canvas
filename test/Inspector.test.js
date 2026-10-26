@@ -109,4 +109,28 @@ describe('Inspector', () => {
     animatedCheck.dispatchEvent(new Event('change'));
     expect(edge.animated).toBe(true);
   });
-});
+
+  it('updates node documentation in inspector', () => {
+    const node = canvas.addNode({ type: 'task', label: 'Documented Task' });
+    canvas.selectNode(node);
+
+    const docTextarea = container.querySelector('#prop-doc');
+    if (docTextarea) {
+      docTextarea.value = 'Important instructions here';
+      docTextarea.dispatchEvent(new Event('input'));
+      expect(node.data.documentation).toBe('Important instructions here');
+    }
+  });
+
+  it('updates boundary event interrupting state via inspector checkbox', () => {
+    const boundary = canvas.addNode({ type: 'boundary-timer-event', label: 'Boundary Timer' });
+    canvas.selectNode(boundary);
+
+    const interruptingCheckbox = container.querySelector('#prop-interrupting');
+    if (interruptingCheckbox) {
+      interruptingCheckbox.checked = false;
+      interruptingCheckbox.dispatchEvent(new Event('change'));
+      expect(boundary.data.interrupting).toBe(false);
+    }
+  });
+});

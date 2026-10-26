@@ -70,4 +70,27 @@ describe('Palette', () => {
     canvas.emit('registry:registerNodeType', { typeKey: 'test-type', definition: { label: 'Test' } });
     expect(renderSpy).toHaveBeenCalled();
   });
-});
+
+  it('emits palette:dragstart when item drag begins', () => {
+    const dragSpy = vi.fn();
+    palette.on('palette:dragstart', dragSpy);
+
+    const firstItem = container.querySelector('.palette-item');
+    expect(firstItem).toBeTruthy();
+
+    const dragEvent = new Event('dragstart', { bubbles: true });
+    dragEvent.dataTransfer = {
+      setData: vi.fn(),
+      setDragImage: vi.fn()
+    };
+    firstItem.dispatchEvent(dragEvent);
+
+    expect(dragSpy).toHaveBeenCalled();
+    expect(dragEvent.dataTransfer.setData).toHaveBeenCalledWith('text/plain', expect.stringContaining(firstItem.dataset.type));
+  });
+
+  it('renders fallback when no items match filter', () => {
+    palette.setFilter({ includeCategories: ['non-existent-category'] });
+    expect(container.innerHTML).toContain('No palette items available');
+  });
+});

@@ -83,9 +83,49 @@ describe('BpmnNode', () => {
     expect(node.domElement.classList.contains('non-interrupting')).toBe(false);
   });
 
+  it('renders gateway nodes with diamonds and icons', () => {
+    const exclusiveGateway = new BpmnNode({ type: 'gateway-exclusive', label: 'Decide' }, canvas);
+    expect(exclusiveGateway.domElement.querySelector('.bpmn-gateway-diamond')).toBeTruthy();
+    expect(exclusiveGateway.domElement.querySelector('.bpmn-gateway-icon').textContent).toBe('✕');
+
+    const parallelGateway = new BpmnNode({ type: 'gateway-parallel', label: 'Fork' }, canvas);
+    expect(parallelGateway.domElement.querySelector('.bpmn-gateway-icon').textContent).toBe('+');
+  });
+
+  it('renders text annotation with bracket and text', () => {
+    const annotation = new BpmnNode({ type: 'text-annotation', label: 'Review logic here' }, canvas);
+    expect(annotation.domElement.querySelector('.bpmn-annotation-bracket')).toBeTruthy();
+    expect(annotation.domElement.querySelector('.bpmn-annotation-text').textContent).toBe('Review logic here');
+  });
+
+  it('renders data object with svg path and floating label', () => {
+    const dataObj = new BpmnNode({ type: 'data-object', label: 'Invoice.pdf' }, canvas);
+    expect(dataObj.domElement.querySelector('.bpmn-data-object-icon')).toBeTruthy();
+    expect(dataObj.domElement.querySelector('.bpmn-data-object-floating-label').textContent).toBe('Invoice.pdf');
+  });
+
+
+  it('renders expanded and collapsed subprocesses', () => {
+    const collapsedSub = new BpmnNode({ type: 'subprocess', label: 'Order Processing', data: { expanded: false } }, canvas);
+    expect(collapsedSub.domElement.classList.contains('expanded')).toBe(false);
+
+    const expandedSub = new BpmnNode({ type: 'subprocess', label: 'Shipment Process', data: { expanded: true } }, canvas);
+    expect(expandedSub.domElement.classList.contains('expanded')).toBe(true);
+    expect(expandedSub.domElement.querySelector('.bpmn-subprocess-header')).toBeTruthy();
+    expect(expandedSub.domElement.querySelector('.bpmn-subprocess-resize-handle')).toBeTruthy();
+  });
+
+  it('renders intermediate timer and signal events', () => {
+    const timer = new BpmnNode({ type: 'intermediate-timer-event', label: 'Wait 3 Days' }, canvas);
+    expect(timer.domElement.querySelector('.bpmn-event-timer-icon')).toBeTruthy();
+
+    const signal = new BpmnNode({ type: 'intermediate-signal-event', label: 'Signal Received' }, canvas);
+    expect(signal.domElement.querySelector('.bpmn-event-signal-icon')).toBeTruthy();
+  });
+
   it('destroys correctly', () => {
     const node = new BpmnNode({ type: 'task' }, canvas);
     node.destroy();
     expect(node.domElement.parentNode).toBeNull();
   });
-});
+});
