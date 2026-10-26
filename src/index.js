@@ -20,3 +20,6 @@ export { Router } from './router.js';
 export { Palette } from './Palette.js';
 export { Inspector } from './Inspector.js';
 export { NodeTypeRegistry } from './NodeTypeRegistry.js';
+export { HistoryManager } from './HistoryManager.js';
+export { SelectionManager } from './SelectionManager.js';
+export * as geometry from './geometry.js';
