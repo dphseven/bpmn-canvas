@@ -2500,11 +2500,38 @@ export class BpmnCanvas {
       this.listeners.set(event, []);
     }
     this.listeners.get(event).push(handler);
+    return () => this.off(event, handler);
+  }
+
+  off(event, handler) {
+    if (!this.listeners.has(event)) return;
+    if (!handler) {
+      this.listeners.delete(event);
+      return;
+    }
+    const handlers = this.listeners.get(event);
+    const index = handlers.indexOf(handler);
+    if (index !== -1) {
+      handlers.splice(index, 1);
+    }
+    if (handlers.length === 0) {
+      this.listeners.delete(event);
+    }
+  }
+
+  once(event, handler) {
+    const wrapped = (data) => {
+      this.off(event, wrapped);
+      handler(data);
+    };
+    return this.on(event, wrapped);
   }
 
   emit(event, data) {
     if (this.listeners.has(event)) {
-      this.listeners.get(event).forEach(handler => handler(data));
+      // Clone array to prevent issues if listeners modify the list during execution
+      const handlers = [...this.listeners.get(event)];
+      handlers.forEach(handler => handler(data));
     }
   }
 }
