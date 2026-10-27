@@ -1,20 +1,44 @@
 {
   "name": "bpmn-canvas",
   "version": "1.0.0",
-  "description": "",
+  "description": "A lightweight, zero-dependency workflow canvas and diagram modeler inspired by BPMN 2.0, built with native DOM + SVG architecture.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./styles/*": "./src/styles/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dphseven/bpmn-canvas.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "bpmn",
+    "bpmn-canvas",
+    "workflow",
+    "workflow-canvas",
+    "diagram",
+    "diagramming",
+    "graph",
+    "flowchart",
+    "process-modeling",
+    "svg",
+    "zero-dependencies"
+  ],
+  "author": "Don Hussey",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/dphseven/bpmn-canvas/issues"
   },
@@ -25,3 +49,4 @@
     "vitest": "^5.0.5"
   }
 }
+
