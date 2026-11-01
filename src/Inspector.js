@@ -111,42 +111,7 @@ export class Inspector {
       <div class="inspector-field">
         <label class="inspector-label" for="prop-type">Type</label>
         <select class="inspector-select" id="prop-type">
-          <optgroup label="Activities">
-            <option value="manual-task" ${node.type === 'manual-task' || node.type === 'task' || node.type === 'activity' ? 'selected' : ''}>Manual Task</option>
-            <option value="user-task" ${node.type === 'user-task' ? 'selected' : ''}>User Task</option>
-            <option value="service-task" ${node.type === 'service-task' ? 'selected' : ''}>Service Task</option>
-            <option value="business-rule-task" ${node.type === 'business-rule-task' ? 'selected' : ''}>Business Rule Task (📊)</option>
-            <option value="script-task" ${node.type === 'script-task' ? 'selected' : ''}>Script Task (📜)</option>
-            <option value="subprocess" ${node.type === 'subprocess' ? 'selected' : ''}>Subprocess (⊞)</option>
-          </optgroup>
-          <optgroup label="Events">
-            <option value="start-event" ${node.type === 'start-event' ? 'selected' : ''}>Start Event (None)</option>
-            <option value="start-timer-event" ${node.type === 'start-timer-event' ? 'selected' : ''}>Timer Start Event (⏱)</option>
-            <option value="start-message-event" ${node.type === 'start-message-event' ? 'selected' : ''}>Message Start Event (✉️)</option>
-            <option value="start-signal-event" ${node.type === 'start-signal-event' ? 'selected' : ''}>Signal Start Event (▲)</option>
-            <option value="intermediate-event" ${node.type === 'intermediate-event' ? 'selected' : ''}>Intermediate Event (None)</option>
-            <option value="intermediate-timer-event" ${node.type === 'intermediate-timer-event' ? 'selected' : ''}>Timer Intermediate Event (⏱)</option>
-            <option value="intermediate-message-event" ${node.type === 'intermediate-message-event' ? 'selected' : ''}>Message Intermediate Event (✉️)</option>
-            <option value="intermediate-signal-event" ${node.type === 'intermediate-signal-event' ? 'selected' : ''}>Signal Intermediate Event (▲)</option>
-            <option value="end-event" ${node.type === 'end-event' ? 'selected' : ''}>End Event (None)</option>
-            <option value="end-error-event" ${node.type === 'end-error-event' ? 'selected' : ''}>Error End Event (⚡)</option>
-            <option value="end-terminate-event" ${node.type === 'end-terminate-event' ? 'selected' : ''}>Terminate End Event (⬤)</option>
-            <option value="end-message-event" ${node.type === 'end-message-event' ? 'selected' : ''}>Message End Event (✉️)</option>
-          </optgroup>
-          <optgroup label="Gateways">
-            <option value="gateway-exclusive" ${node.type === 'gateway-exclusive' ? 'selected' : ''}>Exclusive Gateway (XOR)</option>
-            <option value="gateway-parallel" ${node.type === 'gateway-parallel' ? 'selected' : ''}>Parallel Gateway (AND)</option>
-          </optgroup>
-          <optgroup label="Boundary Events">
-            <option value="boundary-timer-event" ${node.type === 'boundary-timer-event' ? 'selected' : ''}>Boundary Timer Event (⏱)</option>
-            <option value="boundary-error-event" ${node.type === 'boundary-error-event' ? 'selected' : ''}>Boundary Error Event (⚡)</option>
-            <option value="boundary-message-event" ${node.type === 'boundary-message-event' ? 'selected' : ''}>Boundary Message Event (✉️)</option>
-            <option value="boundary-signal-event" ${node.type === 'boundary-signal-event' ? 'selected' : ''}>Boundary Signal Event (▲)</option>
-          </optgroup>
-          <optgroup label="Artifacts">
-            <option value="text-annotation" ${node.type === 'text-annotation' ? 'selected' : ''}>Text Annotation ([ T)</option>
-            <option value="data-object" ${node.type === 'data-object' ? 'selected' : ''}>Data Object (📄)</option>
-          </optgroup>
+          ${this.buildTypeOptionsHtml(node.type)}
         </select>
       </div>
 
@@ -379,6 +344,53 @@ export class Inspector {
     deleteBtn.addEventListener('click', () => {
       this.canvas.removeEdge(edge.id);
     });
+  }
+
+  buildTypeOptionsHtml(currentType) {
+    if (!this.canvas || !this.canvas.registry) {
+      return `<option value="${currentType}" selected>${currentType}</option>`;
+    }
+
+    const registry = this.canvas.registry;
+    const categories = registry.getCategories();
+    const allDefs = registry.getAll();
+
+    // Map legacy aliases
+    const normalizedCurrent = (currentType === 'task' || currentType === 'activity') ? 'manual-task' : currentType;
+
+    // Group items by category
+    const catMap = new Map();
+    categories.forEach(cat => catMap.set(cat.id, { label: cat.label, items: [] }));
+    if (!catMap.has('boundary-events')) {
+      catMap.set('boundary-events', { label: 'Boundary Events', items: [] });
+    }
+
+    allDefs.forEach(def => {
+      const typeKey = def.type;
+      let targetCat = def.category || 'activities';
+      if (typeKey.startsWith('boundary-')) {
+        targetCat = 'boundary-events';
+      }
+      if (!catMap.has(targetCat)) {
+        catMap.set(targetCat, { label: targetCat, items: [] });
+      }
+      catMap.get(targetCat).items.push({
+        type: typeKey,
+        label: def.label || typeKey
+      });
+    });
+
+    let html = '';
+    catMap.forEach(({ label, items }) => {
+      if (!items.length) return;
+      const optionsHtml = items.map(item => {
+        const selected = item.type === normalizedCurrent ? 'selected' : '';
+        return `<option value="${item.type}" ${selected}>${item.label}</option>`;
+      }).join('');
+      html += `<optgroup label="${label}">${optionsHtml}</optgroup>`;
+    });
+
+    return html;
   }
 
   hide() {
