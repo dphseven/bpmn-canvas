@@ -17,6 +17,8 @@
  * Node Representation for BPMN Canvas
  */
 
+import { NodeRenderer } from './NodeRenderer.js';
+
 export class BpmnNode {
   constructor({ id, type, label, x, y, width, height, data = {} }, canvas) {
     this.canvas = canvas;
@@ -158,237 +160,20 @@ export class BpmnNode {
   }
 
   renderContent() {
-    this.domElement.innerHTML = '';
+    this.domElement.innerHTML = NodeRenderer.renderNodeHtml(this, this.canvas);
 
-    if (this.type.includes('event')) {
-      const isStart = this.type.startsWith('start-');
-      const isEnd = this.type.startsWith('end-');
-      let innerIcon = '';
-
-      if (this.type === 'start-timer-event') {
-        innerIcon = `
-          <div class="bpmn-event-inner-icon bpmn-start-timer-icon">
-            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="10" cy="10" r="8" />
-              <polyline points="10,5 10,10 13.5,10" />
-            </svg>
-          </div>
-        `;
-      } else if (this.type === 'start-message-event') {
-        innerIcon = `
-          <div class="bpmn-event-inner-icon bpmn-start-message-icon">
-            <svg width="18" height="13" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-              <polyline points="2,2 10,8.5 18,2" />
-            </svg>
-          </div>
-        `;
-      } else if (this.type === 'start-signal-event') {
-        innerIcon = `
-          <div class="bpmn-event-inner-icon bpmn-start-signal-icon">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="10,2 18,17 2,17" />
-            </svg>
-          </div>
-        `;
-      } else if (this.type.startsWith('boundary-')) {
-        if (this.type === 'boundary-timer-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-boundary-timer-icon">
-              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <polyline points="10,5 10,10 13.5,10" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'boundary-error-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-boundary-error-icon">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'boundary-message-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-boundary-message-icon">
-              <svg width="14" height="10" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                <polyline points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'boundary-signal-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-boundary-signal-icon">
-              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="10,2 18,17 2,17" />
-              </svg>
-            </div>
-          `;
-        }
-      } else if (!isStart && !isEnd) {
-        if (this.type === 'intermediate-message-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-event-message-icon">
-              <svg width="18" height="13" viewBox="0 0 20 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" />
-                <polyline points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'intermediate-signal-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-event-signal-icon">
-              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="10,2 18,17 2,17" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'intermediate-timer-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-event-timer-icon">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <polyline points="10,5 10,10 13.5,10" />
-              </svg>
-            </div>
-          `;
-        } else {
-          // Generic intermediate event (None): double rings with no inner glyph
-          innerIcon = '';
-        }
-      } else if (isEnd) {
-        if (this.type === 'end-error-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-end-error-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'end-terminate-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-end-terminate-icon">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-                <circle cx="10" cy="10" r="7" />
-              </svg>
-            </div>
-          `;
-        } else if (this.type === 'end-message-event') {
-          innerIcon = `
-            <div class="bpmn-event-inner-icon bpmn-end-message-icon">
-              <svg width="18" height="13" viewBox="0 0 20 15" fill="currentColor">
-                <rect x="1" y="1" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
-                <polygon points="2,2 10,8.5 18,2" />
-              </svg>
-            </div>
-          `;
-        }
-      }
-      
-      this.domElement.innerHTML = `
-        ${innerIcon}
-        <div class="bpmn-event-floating-label">${this.label}</div>
-      `;
-
-      if (this.type.startsWith('boundary-')) {
-        if (this.data.interrupting === false) {
-          this.domElement.classList.add('non-interrupting');
-        } else {
-          this.domElement.classList.remove('non-interrupting');
-        }
-      }
-    } else if (this.type.includes('gateway')) {
-      const isExclusive = this.type === 'gateway-exclusive';
-      const icon = isExclusive ? '✕' : '+';
-      
-      this.domElement.innerHTML = `
-        <div class="bpmn-gateway-diamond">
-          <span class="bpmn-gateway-icon">${icon}</span>
-        </div>
-        <div class="bpmn-gateway-floating-label">${this.label}</div>
-      `;
-    } else if (this.type === 'text-annotation') {
-      this.domElement.innerHTML = `
-        <div class="bpmn-annotation-bracket"></div>
-        <div class="bpmn-annotation-text" spellcheck="false">${this.label}</div>
-      `;
-    } else if (this.type === 'data-object') {
-      this.domElement.innerHTML = `
-        <div class="bpmn-data-object-icon">
-          <svg width="34" height="42" viewBox="0 0 16 20" fill="var(--bg-panel)" stroke="currentColor" stroke-width="1.5">
-            <path d="M 2 2 L 10 2 L 14 6 L 14 18 L 2 18 Z" />
-            <polyline points="10,2 10,6 14,6" fill="none" />
-          </svg>
-        </div>
-        <div class="bpmn-data-object-floating-label">${this.label}</div>
-      `;
-    } else {
-      // Activity / Task / Subprocess
-      let icon = '✋';
-      let badge = 'Manual Task';
-
-      const customDef = this.canvas?.registry?.get(this.type);
-      if (customDef) {
-        if (customDef.icon || customDef.iconSvg || customDef.symbolHtml) {
-          icon = customDef.iconSvg || customDef.symbolHtml || customDef.icon;
-        }
-        if (customDef.badge || customDef.label) {
-          badge = customDef.badge || customDef.label;
-        }
-      }
-
-      if (this.type === 'user-task') {
-        icon = '👤';
-        badge = 'User Task';
-      } else if (this.type === 'service-task') {
-        icon = '⚙️';
-        badge = 'Service Task';
-      } else if (this.type === 'business-rule-task') {
-        icon = '📊';
-        badge = 'Rule Task';
-      } else if (this.type === 'script-task') {
-        icon = '📜';
-        badge = 'Script Task';
-      } else if (this.type === 'subprocess') {
-        icon = '⊞';
-        badge = 'Subprocess';
-      }
-
-      if (this.type === 'subprocess' && this.data && this.data.expanded) {
-        this.domElement.classList.add('expanded');
-        this.domElement.innerHTML = `
-          <div class="bpmn-subprocess-header">
-            <div class="bpmn-subprocess-title-wrap">
-              <span class="bpmn-activity-icon" style="color: #818cf8;">${icon}</span>
-              <span class="bpmn-activity-label" spellcheck="false" style="font-weight: 600; font-size: 13px; color: var(--text-main); margin: 0; text-align: left;">${this.label}</span>
-            </div>
-            <div class="bpmn-subprocess-marker-header" title="Collapse Subprocess">
-              <span class="bpmn-subprocess-plus">−</span>
-            </div>
-          </div>
-          <div class="bpmn-subprocess-subcanvas-area"></div>
-          <div class="bpmn-subprocess-resize-handle" title="Drag to resize subcanvas"></div>
-        `;
+    if (this.type.startsWith('boundary-')) {
+      if (this.data.interrupting === false) {
+        this.domElement.classList.add('non-interrupting');
       } else {
-        if (this.type === 'subprocess') {
-          this.domElement.classList.remove('expanded');
-        }
-        const subprocessMarker = (this.type === 'subprocess') 
-          ? `<div class="bpmn-subprocess-marker" title="Expand Subprocess"><span class="bpmn-subprocess-plus">+</span></div>` 
-          : '';
-        
-        this.domElement.innerHTML = `
-          <div class="bpmn-activity-header">
-            <span class="bpmn-activity-icon">${icon}</span>
-            <span style="font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">${badge}</span>
-          </div>
-          <div class="bpmn-activity-label" spellcheck="false">${this.label}</div>
-          ${subprocessMarker}
-        `;
+        this.domElement.classList.remove('non-interrupting');
       }
-
+    } else if (this.type === 'subprocess') {
+      if (this.data && this.data.expanded) {
+        this.domElement.classList.add('expanded');
+      } else {
+        this.domElement.classList.remove('expanded');
+      }
     }
 
     // Inline editing sync for all label elements (activities, events, gateways, artifacts)
@@ -402,7 +187,7 @@ export class BpmnNode {
       let initialLabelOnEdit = this.label;
 
       labelEl.addEventListener('input', (e) => {
-        this.label = e.target.innerText;
+        this.label = e.target.innerText !== undefined ? e.target.innerText : e.target.textContent;
         this.canvas.emit('node:labelChange', { node: this, label: this.label });
         if (this.domElement && this.canvas) {
           const currentHeight = this.domElement.offsetHeight;
@@ -426,7 +211,7 @@ export class BpmnNode {
 
       const commitLabelChange = () => {
         labelEl.removeAttribute('contenteditable');
-        const currentText = labelEl.innerText;
+        const currentText = labelEl.innerText !== undefined ? labelEl.innerText : labelEl.textContent;
         this.label = currentText;
         if (initialLabelOnEdit !== currentText) {
           this.canvas.emit('node:labelChange', { node: this, label: this.label });
@@ -436,7 +221,7 @@ export class BpmnNode {
       };
 
       labelEl.addEventListener('focus', () => {
-        initialLabelOnEdit = labelEl.innerText;
+        initialLabelOnEdit = labelEl.innerText !== undefined ? labelEl.innerText : labelEl.textContent;
       });
 
       labelEl.addEventListener('blur', () => {
@@ -445,7 +230,11 @@ export class BpmnNode {
 
       labelEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          labelEl.innerText = initialLabelOnEdit;
+          if (labelEl.innerText !== undefined) {
+            labelEl.innerText = initialLabelOnEdit;
+          } else {
+            labelEl.textContent = initialLabelOnEdit;
+          }
           this.label = initialLabelOnEdit;
           labelEl.removeAttribute('contenteditable');
           labelEl.blur();

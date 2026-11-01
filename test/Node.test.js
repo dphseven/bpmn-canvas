@@ -228,5 +228,70 @@ describe('BpmnNode', () => {
     node.destroy();
     expect(node.domElement.parentNode).toBeNull();
   });
+
+  it('uses default labels, widths, and heights when instantiated without canvas/registry', () => {
+    const types = [
+      'start-event', 'start-timer-event', 'start-message-event', 'start-signal-event',
+      'end-event', 'end-error-event', 'end-terminate-event', 'end-message-event',
+      'intermediate-event', 'intermediate-timer-event', 'intermediate-message-event', 'intermediate-signal-event',
+      'boundary-timer-event', 'boundary-error-event', 'boundary-message-event', 'boundary-signal-event',
+      'gateway-exclusive', 'gateway-parallel',
+      'user-task', 'service-task', 'manual-task', 'business-rule-task', 'script-task',
+      'subprocess', 'text-annotation', 'data-object'
+    ];
+
+    types.forEach(t => {
+      const node = new BpmnNode({ type: t }, null);
+      expect(node.width).toBeGreaterThan(0);
+      expect(node.height).toBeGreaterThan(0);
+      expect(typeof node.label).toBe('string');
+    });
+  });
+
+  it('handles inline contenteditable label keyboard events and escape cancellation', () => {
+    const node = new BpmnNode({ type: 'user-task', label: 'Initial' }, canvas);
+    const labelEl = node.domElement.querySelector('.bpmn-activity-label');
+    expect(labelEl).toBeTruthy();
+
+    labelEl.setAttribute('contenteditable', 'true');
+    labelEl.textContent = 'Initial';
+    labelEl.dispatchEvent(new Event('focus'));
+
+    // Input changes label
+    labelEl.textContent = 'Edited Text';
+    labelEl.dispatchEvent(new Event('input'));
+    expect(node.label).toBe('Edited Text');
+
+    // Escape cancels and reverts to initial label
+    labelEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(node.label).toBe('Initial');
+    expect(labelEl.textContent).toBe('Initial');
+
+    // Enter commits change
+    labelEl.setAttribute('contenteditable', 'true');
+    labelEl.textContent = 'Initial';
+    labelEl.dispatchEvent(new Event('focus'));
+    labelEl.textContent = 'Committed Text';
+    labelEl.dispatchEvent(new Event('input'));
+    labelEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(node.label).toBe('Committed Text');
+
+    // Shift+Enter allows newline for tasks
+    labelEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }));
+    expect(node.label).toBe('Committed Text');
+  });
+
+  it('configures ports for data-object and boundary-events correctly', () => {
+    const dataObj = new BpmnNode({ type: 'data-object' }, canvas);
+    const dataPorts = Array.from(dataObj.domElement.querySelectorAll('.bpmn-port')).map(p => p.dataset.port);
+    expect(dataPorts).toEqual(['top', 'right', 'left']);
+
+    const boundary = new BpmnNode({
+      type: 'boundary-timer-event',
+      data: { hostNodeId: 'host1', dockEdge: 'bottom' }
+    }, canvas);
+    const boundaryPorts = Array.from(boundary.domElement.querySelectorAll('.bpmn-port')).map(p => p.dataset.port);
+    expect(boundaryPorts).toEqual(['bottom', 'right', 'left']);
+  });
 });
 

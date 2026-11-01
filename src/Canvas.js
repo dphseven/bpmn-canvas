@@ -19,6 +19,8 @@ import { Router } from './router.js';
 import { NodeTypeRegistry } from './NodeTypeRegistry.js';
 import { HistoryManager } from './HistoryManager.js';
 import { SelectionManager } from './SelectionManager.js';
+import { SimulationEngine } from './SimulationEngine.js';
+import { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
 import { calculateBoundaryDocking } from './geometry.js';
 
 /**
@@ -144,6 +146,47 @@ export class BpmnCanvas {
     // Event Bus Callbacks
     this.listeners = new Map();
 
+    // Simulation Engine
+    this.simulationEngine = new SimulationEngine({
+      nodes: this.nodes,
+      edges: this.edges,
+      getNode: (id) => this.getNode(id),
+      isPulsing: () => this.isPulsing(),
+      emitFn: (event, payload) => this.emit(event, payload),
+      tokenContainer: null
+    });
+
+    // Subprocess Layout Manager
+    this.subprocessLayoutManager = new SubprocessLayoutManager({
+      nodes: this.nodes,
+      edges: this.edges,
+      getNode: (id) => this.getNode(id),
+      pushHistory: (preCapturedState) => this.pushHistory(preCapturedState),
+      emitFn: (event, payload) => this.emit(event, payload),
+      updateConnectedEdges: (id) => this.updateConnectedEdges(id),
+      updateAttachedBoundaryPositions: (node, oldW, oldH) => {
+        if (this.updateAttachedBoundaryPositions) {
+          this.updateAttachedBoundaryPositions(node, oldW, oldH);
+        }
+      },
+      onExpansionCycleReset: () => {
+        if (this.simulationActive) {
+          if (this.simAnimationId) {
+            cancelAnimationFrame(this.simAnimationId);
+            this.simAnimationId = null;
+          }
+          if (this.simTimeoutId) {
+            clearTimeout(this.simTimeoutId);
+            this.simTimeoutId = null;
+          }
+          this.nodes.forEach(n => {
+            if (n.domElement) n.domElement.classList.remove('sim-active');
+          });
+          this.runSimulationCycle();
+        }
+      }
+    });
+
     const handleStructuralChange = () => {
       if (this.simulationActive) {
         if (this.simAnimationId) {
@@ -267,6 +310,41 @@ export class BpmnCanvas {
     return this.selectedNodes.size === 1 ? Array.from(this.selectedNodes)[0] : null;
   }
 
+  get simulationActive() {
+    return this.simulationEngine ? this.simulationEngine.active : false;
+  }
+  set simulationActive(val) {
+    if (this.simulationEngine) this.simulationEngine.active = val;
+  }
+
+  get simulationSpeed() {
+    return this.simulationEngine ? this.simulationEngine.speed : 1.0;
+  }
+  set simulationSpeed(val) {
+    if (this.simulationEngine) this.simulationEngine.speed = val;
+  }
+
+  get simAnimationId() {
+    return this.simulationEngine ? this.simulationEngine.animationId : null;
+  }
+  set simAnimationId(val) {
+    if (this.simulationEngine) this.simulationEngine.animationId = val;
+  }
+
+  get simTimeoutId() {
+    return this.simulationEngine ? this.simulationEngine.timeoutId : null;
+  }
+  set simTimeoutId(val) {
+    if (this.simulationEngine) this.simulationEngine.timeoutId = val;
+  }
+
+  get simTokenGroup() {
+    return this.simulationEngine ? this.simulationEngine.tokenGroup : null;
+  }
+  set simTokenGroup(val) {
+    if (this.simulationEngine) this.simulationEngine.tokenGroup = val;
+  }
+
   initDOM() {
     this.container.classList.add('bpmn-canvas-viewport');
     this.container.setAttribute('data-bpmn-pulsing', this.options.pulsing !== false ? 'true' : 'false');
@@ -307,6 +385,9 @@ export class BpmnCanvas {
     this.handlesSvg = document.createElementNS(svgNS, 'svg');
     this.handlesSvg.classList.add('bpmn-handles-layer');
     this.surface.appendChild(this.handlesSvg);
+    if (this.simulationEngine) {
+      this.simulationEngine.setTokenContainer(this.handlesSvg);
+    }
 
     this.container.appendChild(this.surface);
 
@@ -1105,90 +1186,11 @@ export class BpmnCanvas {
   }
 
   pushSurroundingNodesOnResize(subprocessNode, deltaW, deltaH = 0) {
-    if (deltaW <= 0 && deltaH <= 0) return;
-
-    if (!subprocessNode.data.pushedOffsets) {
-      subprocessNode.data.pushedOffsets = {};
-    }
-
-    const pushedOffsets = subprocessNode.data.pushedOffsets;
-    const rightEdge = subprocessNode.x + subprocessNode.width - deltaW;
-    const bottomEdge = subprocessNode.y + subprocessNode.height - deltaH;
-    const childIds = new Set(Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessNode.id).map(n => n.id));
-
-    this.nodes.forEach(node => {
-      // Skip self, contained children, and attached boundary events
-      if (node.id === subprocessNode.id) return;
-      if (childIds.has(node.id)) return;
-      if (node.data?.hostNodeId === subprocessNode.id || childIds.has(node.data?.hostNodeId)) return;
-
-      const nodeCenterX = node.x + node.width / 2;
-      const nodeCenterY = node.y + node.height / 2;
-
-      let shiftX = 0;
-      let shiftY = 0;
-
-      // In horizontal BPMN flows, any node downstream to the right shifts by deltaW
-      if (nodeCenterX >= rightEdge - 15) {
-        shiftX = deltaW;
-      } else if (node.x + node.width > subprocessNode.x && node.x < subprocessNode.x + subprocessNode.width) {
-        if (deltaH > 0 && nodeCenterY >= bottomEdge - 15) {
-          shiftY = deltaH;
-        }
-      }
-
-      if (shiftX !== 0 || shiftY !== 0) {
-        const existing = pushedOffsets[node.id] || { dx: 0, dy: 0 };
-        pushedOffsets[node.id] = { dx: existing.dx + shiftX, dy: existing.dy + shiftY };
-        node.setPosition(node.x + shiftX, node.y + shiftY);
-        if (this.updateAttachedBoundaryPositions) {
-          this.updateAttachedBoundaryPositions(node, node.width, node.height);
-        }
-      }
-    });
+    return this.subprocessLayoutManager.pushSurroundingNodesOnResize(subprocessNode, deltaW, deltaH);
   }
 
   ensureSubprocessEnclosesChildren(subprocessId) {
-    const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess' || !subprocessNode.data?.expanded) return;
-
-    const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
-    if (!children.length) return;
-
-    let maxRight = subprocessNode.x + subprocessNode.width;
-    let maxBottom = subprocessNode.y + subprocessNode.height;
-
-    children.forEach(child => {
-      const childW = child.domElement ? (child.domElement.offsetWidth || child.width) : child.width;
-      const childH = child.domElement ? (child.domElement.offsetHeight || child.height) : child.height;
-      maxRight = Math.max(maxRight, child.x + childW + 35);
-      maxBottom = Math.max(maxBottom, child.y + childH + 35);
-    });
-
-    const targetW = Math.max(subprocessNode.width, maxRight - subprocessNode.x);
-    const targetH = Math.max(subprocessNode.height, maxBottom - subprocessNode.y);
-
-    if (targetW !== subprocessNode.width || targetH !== subprocessNode.height) {
-      const oldW = subprocessNode.width;
-      const oldH = subprocessNode.height;
-      subprocessNode.width = targetW;
-      subprocessNode.height = targetH;
-      subprocessNode.domElement.style.width = `${targetW}px`;
-      subprocessNode.domElement.style.minHeight = `${targetH}px`;
-
-      const deltaW = targetW - oldW;
-      const deltaH = targetH - oldH;
-
-      // Push surrounding downstream nodes to prevent overlap on auto-growth
-      this.pushSurroundingNodesOnResize(subprocessNode, deltaW, deltaH);
-
-      subprocessNode.createPorts();
-      this.updateConnectedEdges(subprocessNode.id);
-      if (this.updateAttachedBoundaryPositions) {
-        this.updateAttachedBoundaryPositions(subprocessNode, oldW, oldH);
-      }
-      this.emit('node:update', subprocessNode);
-    }
+    return this.subprocessLayoutManager.ensureSubprocessEnclosesChildren(subprocessId);
   }
 
   startConnecting(node, port, e) {
@@ -1314,218 +1316,19 @@ export class BpmnCanvas {
   }
 
   findSubprocessAt(x, y, excludeId = null) {
-    let bestSubprocess = null;
-    let smallestArea = Infinity;
-
-    this.nodes.forEach(node => {
-      if (node.id === excludeId || node.type !== 'subprocess' || !node.data?.expanded) return;
-
-      const nodeW = node.domElement ? (node.domElement.offsetWidth || node.width) : node.width;
-      const nodeH = node.domElement ? (node.domElement.offsetHeight || node.height) : node.height;
-      const left = node.x;
-      const top = node.y;
-      const right = node.x + nodeW;
-      const bottom = node.y + nodeH;
-
-      if (x >= left && x <= right && y >= top && y <= bottom) {
-        const area = nodeW * nodeH;
-        if (area < smallestArea) {
-          smallestArea = area;
-          bestSubprocess = node;
-        }
-      }
-    });
-
-    return bestSubprocess;
+    return this.subprocessLayoutManager.findSubprocessAt(x, y, excludeId);
   }
 
   toggleSubprocessExpanded(subprocessId) {
-    const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
-
-    const isExpanded = !subprocessNode.data?.expanded;
-    this.setSubprocessExpanded(subprocessId, isExpanded);
+    return this.subprocessLayoutManager.toggleSubprocessExpanded(subprocessId);
   }
 
   setSubprocessExpanded(subprocessId, expanded) {
-    const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
-
-    this.pushHistory();
-
-    subprocessNode.data = Object.assign(subprocessNode.data || {}, {
-      expanded: !!expanded
-    });
-
-    const oldWidth = subprocessNode.width;
-    const oldHeight = subprocessNode.height;
-    let targetW = oldWidth;
-    let targetH = oldHeight;
-
-    if (expanded) {
-      // Find all contained children to determine minimum expanded container size
-      const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
-      targetW = 420;
-      targetH = 260;
-
-      if (children.length > 0) {
-        let maxRight = subprocessNode.x + targetW;
-        let maxBottom = subprocessNode.y + targetH;
-
-        children.forEach(child => {
-          const childW = child.domElement ? (child.domElement.offsetWidth || child.width) : child.width;
-          const childH = child.domElement ? (child.domElement.offsetHeight || child.height) : child.height;
-          maxRight = Math.max(maxRight, child.x + childW + 30);
-          maxBottom = Math.max(maxBottom, child.y + childH + 30);
-        });
-
-        targetW = Math.max(targetW, maxRight - subprocessNode.x);
-        targetH = Math.max(targetH, maxBottom - subprocessNode.y);
-      }
-
-      subprocessNode.width = targetW;
-      subprocessNode.height = targetH;
-      subprocessNode.domElement.style.width = `${targetW}px`;
-      subprocessNode.domElement.style.minHeight = `${targetH}px`;
-
-      // Calculate expansion deltas
-      const deltaW = targetW - oldWidth;
-      const deltaH = targetH - oldHeight;
-
-      // Anchor to mid-left: keep left edge and vertical center unchanged
-      const newY = Math.round(subprocessNode.y - deltaH / 2);
-      const shiftSubprocessY = newY - subprocessNode.y;
-      subprocessNode.setPosition(subprocessNode.x, newY);
-      subprocessNode.data.expansionYShift = shiftSubprocessY;
-
-      // Push surrounding external nodes outward
-      if (deltaW > 0 || deltaH > 0) {
-        const pushedOffsets = {};
-        const oldRight = subprocessNode.x + oldWidth;
-        const newBottom = subprocessNode.y + targetH;
-        const childIds = new Set(Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId).map(n => n.id));
-
-        this.nodes.forEach(node => {
-          // Skip self, child nodes inside this subprocess, and boundary events attached to them
-          if (node.id === subprocessId) return;
-          if (childIds.has(node.id)) return;
-          if (node.data?.hostNodeId === subprocessId || childIds.has(node.data?.hostNodeId)) return;
-
-          const nodeCenterX = node.x + node.width / 2;
-          const nodeCenterY = node.y + node.height / 2;
-
-          let shiftX = 0;
-          let shiftY = 0;
-
-          // In horizontal BPMN flows, expanding a node pushes all downstream elements to the right.
-          // Any node whose center is to the right of the subprocess shifts by deltaW.
-          // Any node directly underneath the expanded subprocess shifts down to clear the bottom edge.
-          if (nodeCenterX >= oldRight - 10) {
-            shiftX = deltaW;
-          } else if (node.x + node.width > subprocessNode.x && node.x < subprocessNode.x + targetW) {
-            if (node.y < newBottom + 20 && nodeCenterY > subprocessNode.y + targetH / 2) {
-              shiftY = Math.round(newBottom + 30 - node.y);
-            }
-          }
-
-          if (shiftX !== 0 || shiftY !== 0) {
-            pushedOffsets[node.id] = { dx: shiftX, dy: shiftY };
-            node.setPosition(node.x + shiftX, node.y + shiftY);
-            if (this.updateAttachedBoundaryPositions) {
-              this.updateAttachedBoundaryPositions(node, node.width, node.height);
-            }
-          }
-        });
-
-        subprocessNode.data.pushedOffsets = pushedOffsets;
-      }
-    } else {
-      // Revert mid-left anchor shift for the subprocess itself
-      if (subprocessNode.data.expansionYShift) {
-        subprocessNode.setPosition(subprocessNode.x, subprocessNode.y - subprocessNode.data.expansionYShift);
-        delete subprocessNode.data.expansionYShift;
-      }
-
-      // Collapsed: restore standard compact dimensions
-      subprocessNode.width = 170;
-      subprocessNode.height = 95;
-      subprocessNode.domElement.style.width = `${170}px`;
-      subprocessNode.domElement.style.minHeight = `${95}px`;
-
-      // Revert pushed surrounding nodes back to their original positions
-      const pushedOffsets = subprocessNode.data.pushedOffsets || {};
-      Object.entries(pushedOffsets).forEach(([nodeId, offset]) => {
-        const node = this.getNode(nodeId);
-        if (node) {
-          node.setPosition(node.x - offset.dx, node.y - offset.dy);
-          if (this.updateAttachedBoundaryPositions) {
-            this.updateAttachedBoundaryPositions(node, node.width, node.height);
-          }
-        }
-      });
-      delete subprocessNode.data.pushedOffsets;
-    }
-
-    subprocessNode.renderContent();
-    subprocessNode.createPorts();
-
-    // Show/hide child nodes & internal edges
-    this.updateSubprocessChildrenVisibility(subprocessId, expanded);
-
-    // Update attached boundary positions & edges
-    if (this.updateAttachedBoundaryPositions) {
-      this.updateAttachedBoundaryPositions(subprocessNode, oldWidth, oldHeight);
-    }
-    this.updateConnectedEdges(subprocessId);
-
-    this.emit('node:update', subprocessNode);
-    this.emitSelectionChange();
-
-    // If simulation is running, restart the cycle cleanly so it immediately reflects the path changes
-    if (this.simulationActive) {
-      if (this.simAnimationId) {
-        cancelAnimationFrame(this.simAnimationId);
-        this.simAnimationId = null;
-      }
-      if (this.simTimeoutId) {
-        clearTimeout(this.simTimeoutId);
-        this.simTimeoutId = null;
-      }
-      this.nodes.forEach(n => {
-        if (n.domElement) n.domElement.classList.remove('sim-active');
-      });
-      this.runSimulationCycle();
-    }
+    return this.subprocessLayoutManager.setSubprocessExpanded(subprocessId, expanded);
   }
 
   updateSubprocessChildrenVisibility(subprocessId, visible) {
-    const childIds = new Set();
-    this.nodes.forEach(n => {
-      if (n.data?.parentId === subprocessId) {
-        childIds.add(n.id);
-        if (n.domElement) {
-          n.domElement.style.display = visible ? 'flex' : 'none';
-        }
-      }
-    });
-
-    // Also hide/show boundary events attached to child nodes
-    this.nodes.forEach(n => {
-      if (n.type.startsWith('boundary-') && childIds.has(n.data?.hostNodeId)) {
-        if (n.domElement) {
-          n.domElement.style.display = visible ? 'flex' : 'none';
-        }
-      }
-    });
-
-    // Hide/show edges whose source or target is a contained child
-    this.edges.forEach(edge => {
-      if (childIds.has(edge.sourceId) || childIds.has(edge.targetId)) {
-        if (edge.groupElement) {
-          edge.groupElement.style.display = visible ? '' : 'none';
-        }
-      }
-    });
+    return this.subprocessLayoutManager.updateSubprocessChildrenVisibility(subprocessId, visible);
   }
 
   isActivityNode(node) {
@@ -2109,345 +1912,23 @@ export class BpmnCanvas {
    * Token Flow Simulation
    * ----------------------------------------------------------- */
   startSimulation(options = {}) {
-    if (this.simulationActive) return;
-
-    this.simulationActive = true;
-    this.simulationSpeed = options.speed || 1.0; // multiplier
-    this.emit('simulation:start');
-
-    if (!this.simTokenGroup) {
-      const svgNS = 'http://www.w3.org/2000/svg';
-      this.simTokenGroup = document.createElementNS(svgNS, 'g');
-      this.simTokenGroup.classList.add('bpmn-sim-token');
-      this.simTokenGroup.style.display = 'none';
-
-      const glow = document.createElementNS(svgNS, 'circle');
-      glow.classList.add('bpmn-sim-token-glow');
-      glow.setAttribute('r', '7');
-
-      const core = document.createElementNS(svgNS, 'circle');
-      core.classList.add('bpmn-sim-token-core');
-      core.setAttribute('r', '3.5');
-
-      this.simTokenGroup.appendChild(glow);
-      this.simTokenGroup.appendChild(core);
-
-      if (this.handlesSvg) {
-        this.handlesSvg.appendChild(this.simTokenGroup);
-      }
-    }
-
-    this.runSimulationCycle();
+    return this.simulationEngine.start(options);
   }
 
   stopSimulation() {
-    this.simulationActive = false;
-    if (this.simAnimationId) {
-      cancelAnimationFrame(this.simAnimationId);
-      this.simAnimationId = null;
-    }
-    if (this.simTimeoutId) {
-      clearTimeout(this.simTimeoutId);
-      this.simTimeoutId = null;
-    }
-    if (this.simTokenGroup) {
-      this.simTokenGroup.style.display = 'none';
-    }
-    // Remove active highlight from all nodes
-    this.nodes.forEach(n => {
-      if (n.domElement) n.domElement.classList.remove('sim-active');
-    });
-    this.emit('simulation:stop');
+    return this.simulationEngine.stop();
   }
 
-  toggleSimulation() {
-    if (this.simulationActive) {
-      this.stopSimulation();
-      return false;
-    } else {
-      this.startSimulation();
-      return true;
-    }
+  toggleSimulation(options = {}) {
+    return this.simulationEngine.toggle(options);
   }
 
   findSimulationPath() {
-    // Collect IDs of nodes that are hidden inside collapsed subprocesses
-    const hiddenChildIds = new Set();
-    this.nodes.forEach(n => {
-      if (n.data?.parentId) {
-        const parent = this.getNode(n.data.parentId);
-        if (parent && (!parent.data?.expanded)) {
-          hiddenChildIds.add(n.id);
-        }
-      }
-    });
-
-    // 1. Check if there are edges marked animated: true (excluding hidden collapsed internal edges)
-    const animatedEdges = Array.from(this.edges.values()).filter(e => {
-      if (!e.animated) return false;
-      if (hiddenChildIds.has(e.sourceId) || hiddenChildIds.has(e.targetId)) return false;
-      return true;
-    });
-
-    if (animatedEdges.length > 0) {
-      // Find starting point among animated edges (a node with no incoming animated edge)
-      const targetIds = new Set(animatedEdges.map(e => e.targetId));
-      let currentEdge = animatedEdges.find(e => !targetIds.has(e.sourceId)) || animatedEdges[0];
-      const path = [];
-      const visited = new Set();
-
-      while (currentEdge && !visited.has(currentEdge.id)) {
-        visited.add(currentEdge.id);
-        path.push(currentEdge);
-        const nextTargetId = currentEdge.targetId;
-
-        // First look for direct outbound animated edge from target node
-        let nextEdge = animatedEdges.find(e => e.sourceId === nextTargetId && !visited.has(e.id));
-
-        // If target node is an expanded subprocess with internal children, route through its internal flow
-        const targetNode = this.getNode(nextTargetId);
-        if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
-          const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
-          const childIds = new Set(childNodes.map(n => n.id));
-          if (childIds.size > 0) {
-            // Find internal start node (start event or node with no incoming internal edge)
-            const internalEdges = animatedEdges.filter(e => childIds.has(e.sourceId) || childIds.has(e.targetId));
-            const internalTargetIds = new Set(internalEdges.map(e => e.targetId));
-            const internalStartNode = childNodes.find(n => n.type.startsWith('start-')) ||
-                                     childNodes.find(n => !internalTargetIds.has(n.id)) ||
-                                     childNodes[0];
-
-            if (internalStartNode) {
-              let internalEdge = animatedEdges.find(e => e.sourceId === internalStartNode.id && !visited.has(e.id));
-              let lastInternalTargetId = internalStartNode.id;
-
-              while (internalEdge && !visited.has(internalEdge.id)) {
-                visited.add(internalEdge.id);
-                path.push(internalEdge);
-                lastInternalTargetId = internalEdge.targetId;
-                internalEdge = animatedEdges.find(e => e.sourceId === lastInternalTargetId && childIds.has(e.targetId) && !visited.has(e.id));
-              }
-
-              // After traversing internal flow, find exit edge from subprocess or last internal node
-              nextEdge = animatedEdges.find(e => (e.sourceId === targetNode.id || e.sourceId === lastInternalTargetId) && !childIds.has(e.targetId) && !visited.has(e.id));
-            }
-          }
-        }
-
-        // If no direct outbound edge, check if target node has an attached boundary event with an animated edge
-        if (!nextEdge) {
-          const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === nextTargetId);
-          for (const bNode of attachedBoundaryNodes) {
-            const bEdge = animatedEdges.find(e => e.sourceId === bNode.id && !visited.has(e.id));
-            if (bEdge) {
-              nextEdge = bEdge;
-              break;
-            }
-          }
-        }
-
-        currentEdge = nextEdge;
-      }
-      if (path.length > 0) return path;
-    }
-
-    // 2. Otherwise find start-event node and traverse sequentially
-    const startNode = Array.from(this.nodes.values()).find(n => n.type.startsWith('start-') && !n.data?.parentId) ||
-                      Array.from(this.nodes.values()).find(n => n.type.startsWith('start-')) ||
-                      this.nodes.values().next().value;
-    if (!startNode) return [];
-
-    const path = [];
-    let currentNodeId = startNode.id;
-    const visitedEdges = new Set();
-
-    while (currentNodeId) {
-      const targetNode = this.getNode(currentNodeId);
-
-      // If current node is an expanded subprocess, traverse its internal children
-      if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
-        const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
-        const childIds = new Set(childNodes.map(n => n.id));
-        if (childIds.size > 0) {
-          const internalStart = childNodes.find(n => n.type.startsWith('start-')) || childNodes[0];
-          let intCurrentId = internalStart.id;
-
-          while (intCurrentId) {
-            const intOutgoing = Array.from(this.edges.values()).filter(e => e.sourceId === intCurrentId && childIds.has(e.targetId) && !visitedEdges.has(e.id));
-            const nextIntEdge = intOutgoing.find(e => e.animated) || intOutgoing[0];
-            if (!nextIntEdge) break;
-
-            visitedEdges.add(nextIntEdge.id);
-            path.push(nextIntEdge);
-            intCurrentId = nextIntEdge.targetId;
-          }
-        }
-      }
-
-      const outgoing = Array.from(this.edges.values()).filter(e => {
-        if (e.sourceId !== currentNodeId || visitedEdges.has(e.id)) return false;
-        if (hiddenChildIds.has(e.targetId)) return false;
-        return true;
-      });
-      let nextEdge = outgoing.find(e => e.animated) || outgoing[0];
-
-      // If no direct outgoing edge from this node, check if it has an attached boundary event with outgoing edges
-      if (!nextEdge) {
-        const attachedBoundaryNodes = Array.from(this.nodes.values()).filter(n => n.type.startsWith('boundary-') && n.data?.hostNodeId === currentNodeId);
-        for (const bNode of attachedBoundaryNodes) {
-          const bOutgoing = Array.from(this.edges.values()).filter(e => e.sourceId === bNode.id && !visitedEdges.has(e.id));
-          const cand = bOutgoing.find(e => e.animated) || bOutgoing[0];
-          if (cand) {
-            nextEdge = cand;
-            break;
-          }
-        }
-      }
-
-      if (!nextEdge) break;
-
-      visitedEdges.add(nextEdge.id);
-      path.push(nextEdge);
-      currentNodeId = nextEdge.targetId;
-    }
-
-    return path;
+    return this.simulationEngine.findSimulationPath();
   }
 
   runSimulationCycle() {
-    if (!this.simulationActive) return;
-
-    const pathEdges = this.findSimulationPath();
-    if (!pathEdges.length) {
-      this.stopSimulation();
-      return;
-    }
-
-    let edgeIndex = 0;
-
-    const highlightNode = (nodeId, duration = 300) => {
-      if (!this.isPulsing()) return;
-      const node = this.getNode(nodeId);
-      if (node && node.domElement) {
-        node.domElement.classList.add('sim-active');
-        setTimeout(() => {
-          if (node.domElement) node.domElement.classList.remove('sim-active');
-        }, duration);
-      }
-    };
-
-    const animateEdgeStep = () => {
-      if (!this.simulationActive) return;
-
-      if (edgeIndex >= pathEdges.length) {
-        // Reached end of path: pulse final node, pause 600ms, then loop
-        const lastEdge = pathEdges[pathEdges.length - 1];
-        if (lastEdge) highlightNode(lastEdge.targetId, 500);
-
-        this.simTimeoutId = setTimeout(() => {
-          if (this.simulationActive) {
-            edgeIndex = 0;
-            animateEdgeStep();
-          }
-        }, 700);
-        return;
-      }
-
-      const edge = pathEdges[edgeIndex];
-      if (!edge || !this.edges.has(edge.id) || !edge.pathElement || !edge.pathElement.parentNode) {
-        // Edge was deleted or removed while animation was in progress
-        const remainingPath = this.findSimulationPath();
-        if (!remainingPath || remainingPath.length === 0) {
-          this.stopSimulation();
-          return;
-        }
-        edgeIndex = 0;
-        animateEdgeStep();
-        return;
-      }
-
-      const pathEl = edge.pathElement;
-      if (!pathEl.getTotalLength) {
-        edgeIndex++;
-        animateEdgeStep();
-        return;
-      }
-
-      const startNextEdgeTraversal = () => {
-        const totalLength = pathEl.getTotalLength();
-        // Speed: roughly 200 pixels per second scaled by simulationSpeed
-        const duration = Math.max(350, (totalLength / (200 * this.simulationSpeed)) * 1000);
-        let startTime = null;
-
-        this.simTokenGroup.style.display = 'block';
-
-        const step = (timestamp) => {
-          if (!this.simulationActive) return;
-          if (!startTime) startTime = timestamp;
-
-          const elapsed = timestamp - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const distance = progress * totalLength;
-          const point = pathEl.getPointAtLength(distance);
-
-          this.simTokenGroup.setAttribute('transform', `translate(${point.x}, ${point.y})`);
-
-          if (progress < 1) {
-            this.simAnimationId = requestAnimationFrame(step);
-          } else {
-            // Token reached target node!
-            highlightNode(edge.targetId, 250);
-            edgeIndex++;
-
-            // Brief pause at each node (180ms) for visual rhythm
-            this.simTimeoutId = setTimeout(() => {
-              if (this.simulationActive) {
-                animateEdgeStep();
-              }
-            }, 180);
-          }
-        };
-
-        this.simAnimationId = requestAnimationFrame(step);
-      };
-
-      // Highlight starting node of first edge
-      if (edgeIndex === 0) {
-        highlightNode(edge.sourceId, 300);
-        startNextEdgeTraversal();
-      } else {
-        const prevEdge = pathEdges[edgeIndex - 1];
-        const sourceNode = this.getNode(edge.sourceId);
-
-        // If this edge begins from a boundary event, insert a clear pause (260ms) after task before boundary pulses
-        if (sourceNode && sourceNode.type.startsWith('boundary-')) {
-          this.simTimeoutId = setTimeout(() => {
-            if (!this.simulationActive) return;
-            highlightNode(edge.sourceId, 350);
-            // After boundary pulses, start edge traversal
-            this.simTimeoutId = setTimeout(() => {
-              if (!this.simulationActive) return;
-              startNextEdgeTraversal();
-            }, 200);
-          }, 260);
-        } else if (prevEdge && prevEdge.targetId !== edge.sourceId) {
-          // If entering an internal subprocess flow (e.g. prevEdge targeted the subprocess container,
-          // and this edge begins from the internal start event), pulse the internal start event!
-          this.simTimeoutId = setTimeout(() => {
-            if (!this.simulationActive) return;
-            highlightNode(edge.sourceId, 300);
-            this.simTimeoutId = setTimeout(() => {
-              if (!this.simulationActive) return;
-              startNextEdgeTraversal();
-            }, 180);
-          }, 120);
-        } else {
-          startNextEdgeTraversal();
-        }
-      }
-    };
-
-    animateEdgeStep();
+    return this.simulationEngine.runCycle();
   }
 
   on(event, handler) {
