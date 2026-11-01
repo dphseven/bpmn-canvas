@@ -22,4 +22,5 @@ export { Inspector } from './Inspector.js';
 export { NodeTypeRegistry } from './NodeTypeRegistry.js';
 export { HistoryManager } from './HistoryManager.js';
 export { SelectionManager } from './SelectionManager.js';
+export { SimulationEngine } from './SimulationEngine.js';
 export * as geometry from './geometry.js';
