@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import { Router } from './router.js';
+import { InlineEditor } from './InlineEditor.js';
 
 /**
  * BPMN Edge connector linking two nodes via SVG paths
@@ -153,59 +154,31 @@ export class BpmnEdge {
     const p2 = targetNode.getPortPosition(this.targetPort);
     const mid = Router.getMidpoint(p1, p2);
 
-    const textarea = document.createElement('textarea');
-    textarea.className = 'bpmn-edge-inline-editor';
-    textarea.value = this.label || '';
-    textarea.placeholder = 'Label...';
-    textarea.rows = Math.max(1, (this.label || '').split('\n').length);
-    textarea.style.left = `${mid.x}px`;
-    textarea.style.top = `${mid.y}px`;
-
-    const autoResize = () => {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.max(26, textarea.scrollHeight)}px`;
-    };
-
-    const commitChange = () => {
-      const newLabel = textarea.value.trim();
-      this.setLabel(newLabel);
-      this.canvas.emit('edge:labelChange', { edge: this, label: newLabel });
-      this.closeLabelEditor();
-    };
-
-    textarea.addEventListener('pointerdown', (e) => e.stopPropagation());
-    textarea.addEventListener('dblclick', (e) => e.stopPropagation());
-    textarea.addEventListener('input', autoResize);
-
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        if (e.shiftKey) {
-          // Allow Shift+Enter to insert a newline
-          setTimeout(autoResize, 0);
-          return;
-        }
-        // Plain Enter commits changes
-        e.preventDefault();
-        commitChange();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        this.closeLabelEditor();
+    const editor = InlineEditor.open({
+      container: this.canvas.surface,
+      position: mid,
+      value: this.label || '',
+      placeholder: 'Label...',
+      className: 'bpmn-edge-inline-editor',
+      onCommit: (newLabel) => {
+        this.setLabel(newLabel);
+        this.canvas.emit('edge:labelChange', { edge: this, label: newLabel });
+        this.inlineEditor = null;
+      },
+      onCancel: () => {
+        this.inlineEditor = null;
       }
     });
 
-    textarea.addEventListener('blur', () => {
-      commitChange();
-    });
-
-    this.canvas.surface.appendChild(textarea);
-    this.inlineEditor = textarea;
-    autoResize();
-    textarea.focus();
-    textarea.select();
+    this.inlineEditor = editor.element;
+    this._editorHandle = editor;
   }
 
   closeLabelEditor() {
-    if (this.inlineEditor && this.inlineEditor.parentNode) {
+    if (this._editorHandle) {
+      this._editorHandle.close();
+      this._editorHandle = null;
+    } else if (this.inlineEditor && this.inlineEditor.parentNode) {
       this.inlineEditor.parentNode.removeChild(this.inlineEditor);
     }
     this.inlineEditor = null;

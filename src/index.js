@@ -25,4 +25,5 @@ export { SelectionManager } from './SelectionManager.js';
 export { SimulationEngine } from './SimulationEngine.js';
 export { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
 export { NodeRenderer } from './NodeRenderer.js';
+export { InlineEditor } from './InlineEditor.js';
 export * as geometry from './geometry.js';
