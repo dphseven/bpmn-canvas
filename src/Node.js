@@ -461,6 +461,23 @@ export class BpmnNode {
     this.canvas.emit('node:update', this);
   }
 
+  serialize() {
+    return {
+      id: this.id,
+      type: this.type,
+      label: this.label,
+      x: this.x,
+      y: this.y,
+      width: this.width,
+      height: this.height,
+      data: Object.assign({}, this.data)
+    };
+  }
+
+  toJSON() {
+    return this.serialize();
+  }
+
   destroy() {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

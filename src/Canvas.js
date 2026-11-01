@@ -1750,30 +1750,38 @@ export class BpmnCanvas {
   exportData() {
     const nodes = [];
     this.nodes.forEach(n => {
-      nodes.push({
-        id: n.id,
-        type: n.type,
-        label: n.label,
-        x: n.x,
-        y: n.y,
-        width: n.width,
-        height: n.height,
-        data: n.data
-      });
+      if (typeof n.serialize === 'function') {
+        nodes.push(n.serialize());
+      } else {
+        nodes.push({
+          id: n.id,
+          type: n.type,
+          label: n.label,
+          x: n.x,
+          y: n.y,
+          width: n.width,
+          height: n.height,
+          data: n.data
+        });
+      }
     });
 
     const edges = [];
     this.edges.forEach(e => {
-      edges.push({
-        id: e.id,
-        sourceId: e.sourceId,
-        targetId: e.targetId,
-        sourcePort: e.sourcePort,
-        targetPort: e.targetPort,
-        label: e.label,
-        routing: e.routing,
-        animated: e.animated
-      });
+      if (typeof e.serialize === 'function') {
+        edges.push(e.serialize());
+      } else {
+        edges.push({
+          id: e.id,
+          sourceId: e.sourceId,
+          targetId: e.targetId,
+          sourcePort: e.sourcePort,
+          targetPort: e.targetPort,
+          label: e.label,
+          routing: e.routing,
+          animated: e.animated
+        });
+      }
     });
 
     return { nodes, edges };
