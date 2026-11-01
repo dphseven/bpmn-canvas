@@ -3,8 +3,7 @@
 [![CI](https://github.com/dphseven/bpmn-canvas/actions/workflows/ci.yml/badge.svg)](https://github.com/dphseven/bpmn-canvas/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/bpmn-canvas.svg)](https://www.npmjs.com/package/bpmn-canvas)
-[![Tests](https://img.shields.io/badge/tests-143%20passed-brightgreen.svg)](https://github.com/dphseven/bpmn-canvas/actions)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://github.com/dphseven/bpmn-canvas)
+[![codecov](https://codecov.io/gh/dphseven/bpmn-canvas/branch/main/graph/badge.svg)](https://codecov.io/gh/dphseven/bpmn-canvas)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](package.json)
 
 > A lightweight, zero-dependency workflow canvas and diagram modeler inspired by BPMN 2.0, built with native DOM + SVG architecture.
