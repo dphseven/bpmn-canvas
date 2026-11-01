@@ -95,9 +95,12 @@ export class SelectionManager {
     this.clearSelection(false);
     this.nodes.forEach(node => {
       // Do not select child nodes that are currently hidden inside a collapsed subprocess
-      if (node.domElement && node.domElement.style.display === 'none') return;
+      if (typeof node.isHidden === 'function' && node.isHidden()) return;
+      if (node.domElement?.style?.display === 'none') return;
       this.selectedNodes.add(node);
-      node.setSelected(true);
+      if (typeof node.setSelected === 'function') {
+        node.setSelected(true);
+      }
     });
     this.emitSelectionChange();
   }

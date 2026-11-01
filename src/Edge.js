@@ -149,6 +149,7 @@ export class BpmnEdge {
     const sourceNode = this.canvas.getNode(this.sourceId);
     const targetNode = this.canvas.getNode(this.targetId);
     if (!sourceNode || !targetNode) return;
+    if (typeof sourceNode.getPortPosition !== 'function' || typeof targetNode.getPortPosition !== 'function') return;
 
     const p1 = sourceNode.getPortPosition(this.sourcePort);
     const p2 = targetNode.getPortPosition(this.targetPort);
@@ -189,6 +190,7 @@ export class BpmnEdge {
     const targetNode = this.canvas.getNode(this.targetId);
 
     if (!sourceNode || !targetNode) return;
+    if (typeof sourceNode.getPortPosition !== 'function' || typeof targetNode.getPortPosition !== 'function') return;
 
     const p1 = sourceNode.getPortPosition(this.sourcePort);
     const p2 = targetNode.getPortPosition(this.targetPort);
@@ -323,6 +325,27 @@ export class BpmnEdge {
   setLabel(label) {
     this.label = label;
     this.render();
+  }
+
+  serialize() {
+    const serialized = {
+      id: this.id,
+      sourceId: this.sourceId,
+      targetId: this.targetId,
+      sourcePort: this.sourcePort,
+      targetPort: this.targetPort,
+      label: this.label,
+      routing: this.routing,
+      animated: this.animated
+    };
+    if (this.data) {
+      serialized.data = Object.assign({}, this.data);
+    }
+    return serialized;
+  }
+
+  toJSON() {
+    return this.serialize();
   }
 
   destroy() {
