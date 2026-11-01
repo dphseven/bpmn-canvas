@@ -13,15 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { BpmnNode } from './Node.js';
+import { BpmnEdge } from './Edge.js';
+
 /**
  * Centralized registry and metadata service for BPMN node types.
  * Manages default dimensions, labels, categories, sub-items, icons,
- * and filtering rules for the canvas and palette.
+ * filtering rules, capabilities, renderers, and element factories for the canvas.
  */
 export class NodeTypeRegistry {
-  constructor(definitions = {}) {
+  constructor(definitions = {}, options = {}) {
     this.types = new Map();
     this.categories = new Map();
+    this.renderers = new Map();
+    this.nodeFactories = new Map();
+    this.customNodeFactory = options.nodeFactory || null;
+    this.customEdgeFactory = options.edgeFactory || null;
+    this.connectionRules = [];
+
     this.registerDefaults();
 
     if (definitions && typeof definitions === 'object') {
@@ -367,6 +376,208 @@ export class NodeTypeRegistry {
    */
   getAll() {
     return Array.from(this.types.values());
+  }
+
+  /**
+   * Get default capability flags based on type naming conventions
+   * @param {string} type
+   * @returns {Object}
+   */
+  getDefaultCapabilities(type) {
+    const isBoundary = typeof type === 'string' && type.startsWith('boundary-');
+    const isStart = typeof type === 'string' && type.startsWith('start-');
+    const isEnd = typeof type === 'string' && type.startsWith('end-');
+    const isSubprocess = type === 'subprocess';
+    const isActivity = typeof type === 'string' && (
+      !isBoundary && !isStart && !isEnd &&
+      !type.startsWith('intermediate-') && !type.startsWith('gateway-') &&
+      type !== 'text-annotation' && type !== 'data-object'
+    );
+
+    return {
+      isContainer: isSubprocess,
+      boundaryDockable: isActivity,
+      isBoundary: isBoundary,
+      allowIncoming: !isStart && !isBoundary,
+      allowOutgoing: !isEnd,
+      customPorts: type === 'data-object' ? ['top', 'right', 'left'] : null
+    };
+  }
+
+  /**
+   * Returns merged capabilities for a registered or dynamic node type
+   * @param {string} type
+   * @returns {Object}
+   */
+  getCapabilities(type) {
+    const def = this.get(type);
+    const defaults = this.getDefaultCapabilities(type);
+    if (def && def.capabilities && typeof def.capabilities === 'object') {
+      return Object.assign({}, defaults, def.capabilities);
+    }
+    return defaults;
+  }
+
+  /**
+   * Checks whether a node type possesses a specific capability flag
+   * @param {string} type
+   * @param {string} capabilityName
+   * @returns {boolean}
+   */
+  hasCapability(type, capabilityName) {
+    const caps = this.getCapabilities(type);
+    return !!caps[capabilityName];
+  }
+
+  /**
+   * Returns available attachment ports for a node or node type
+   * @param {Object|string} nodeOrType
+   * @returns {string[]}
+   */
+  getAvailablePorts(nodeOrType) {
+    const type = typeof nodeOrType === 'string' ? nodeOrType : nodeOrType?.type;
+    const caps = this.getCapabilities(type);
+    if (caps.customPorts && Array.isArray(caps.customPorts) && caps.customPorts.length > 0) {
+      return caps.customPorts;
+    }
+    return ['top', 'right', 'bottom', 'left'];
+  }
+
+  /**
+   * Registers a custom HTML/SVG renderer for a specific node type
+   * @param {string} type
+   * @param {Function} rendererFn - (node, canvas) => string
+   */
+  registerRenderer(type, rendererFn) {
+    if (typeof rendererFn !== 'function') {
+      throw new Error('NodeTypeRegistry.registerRenderer: rendererFn must be a function');
+    }
+    this.renderers.set(type, rendererFn);
+  }
+
+  /**
+   * Retrieves registered custom renderer for a node type
+   * @param {string} type
+   * @returns {Function|null}
+   */
+  getRenderer(type) {
+    if (this.renderers.has(type)) {
+      return this.renderers.get(type);
+    }
+    const def = this.get(type);
+    if (def && typeof def.renderer === 'function') {
+      return def.renderer;
+    }
+    return null;
+  }
+
+  /**
+   * Registers a connection validation rule
+   * @param {Function} ruleFn - (sourceNode, targetNode, context) => { valid: boolean, reason?: string }
+   */
+  registerConnectionRule(ruleFn) {
+    if (typeof ruleFn !== 'function') {
+      throw new Error('NodeTypeRegistry.registerConnectionRule: ruleFn must be a function');
+    }
+    this.connectionRules.push(ruleFn);
+  }
+
+  /**
+   * Validates a proposed connection against built-in BPMN rules and registered custom rules
+   * @param {Object} sourceNode
+   * @param {Object} targetNode
+   * @param {Object} [context={}]
+   * @returns {{ valid: boolean, reason?: string }}
+   */
+  validateConnection(sourceNode, targetNode, context = {}) {
+    // Built-in rule: Boundary events cannot have incoming sequence flows
+    if (targetNode && !context.isReconnectingSource) {
+      if (!this.hasCapability(targetNode.type, 'allowIncoming')) {
+        return {
+          valid: false,
+          reason: this.hasCapability(targetNode.type, 'isBoundary')
+            ? 'Boundary events cannot have incoming sequence flows.'
+            : `${targetNode.type || 'Target node'} cannot have incoming sequence flows.`
+        };
+      }
+    }
+
+    // Built-in rule: End events cannot have outgoing sequence flows
+    if (sourceNode && !context.isReconnectingTarget) {
+      if (!this.hasCapability(sourceNode.type, 'allowOutgoing')) {
+        return {
+          valid: false,
+          reason: `${sourceNode.type || 'Source node'} cannot have outgoing sequence flows.`
+        };
+      }
+    }
+
+    // Custom registered rules
+    for (const rule of this.connectionRules) {
+      const result = rule(sourceNode, targetNode, context);
+      if (result && result.valid === false) {
+        return result;
+      }
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Registers a custom node factory for a specific type or globally
+   * @param {string|Function} typeOrFactory
+   * @param {Function} [factoryFn]
+   */
+  registerNodeFactory(typeOrFactory, factoryFn = null) {
+    if (typeof typeOrFactory === 'function') {
+      this.customNodeFactory = typeOrFactory;
+    } else if (typeof typeOrFactory === 'string' && typeof factoryFn === 'function') {
+      this.nodeFactories.set(typeOrFactory, factoryFn);
+    } else {
+      throw new Error('NodeTypeRegistry.registerNodeFactory expects (type, factoryFn) or (globalFactoryFn)');
+    }
+  }
+
+  /**
+   * Registers a global edge factory
+   * @param {Function} factoryFn
+   */
+  registerEdgeFactory(factoryFn) {
+    if (typeof factoryFn !== 'function') {
+      throw new Error('NodeTypeRegistry.registerEdgeFactory: factoryFn must be a function');
+    }
+    this.customEdgeFactory = factoryFn;
+  }
+
+  /**
+   * Instantiates a node using registered factory or default BpmnNode
+   * @param {Object} config
+   * @param {Object} canvas
+   * @returns {Object}
+   */
+  createNode(config, canvas) {
+    const type = config?.type;
+    const typeFactory = type ? this.nodeFactories.get(type) : null;
+    if (typeFactory) {
+      return typeFactory(config, canvas);
+    }
+    if (this.customNodeFactory) {
+      return this.customNodeFactory(config, canvas);
+    }
+    return new BpmnNode(config, canvas);
+  }
+
+  /**
+   * Instantiates an edge using registered factory or default BpmnEdge
+   * @param {Object} config
+   * @param {Object} canvas
+   * @returns {Object}
+   */
+  createEdge(config, canvas) {
+    if (this.customEdgeFactory) {
+      return this.customEdgeFactory(config, canvas);
+    }
+    return new BpmnEdge(config, canvas);
   }
 
   /**

@@ -296,4 +296,41 @@ describe('ISP Role Contracts & Interfaces', () => {
       edge.destroy();
     });
   });
+
+  describe('CanvasContext & Peripheral Tool Role Contracts', () => {
+    it('BpmnCanvas implements all methods and properties required by CanvasContext', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const canvas = new BpmnCanvas(container);
+
+      // Event source methods
+      expect(typeof canvas.on).toBe('function');
+      expect(typeof canvas.off).toBe('function');
+      expect(typeof canvas.emit).toBe('function');
+
+      // Selection methods
+      expect(typeof canvas.clearSelection).toBe('function');
+      expect(typeof canvas.selectNode).toBe('function');
+      expect(typeof canvas.selectEdge).toBe('function');
+
+      // Command target methods
+      expect(typeof canvas.addNode).toBe('function');
+      expect(typeof canvas.removeNode).toBe('function');
+      expect(typeof canvas.updateNode).toBe('function');
+      expect(typeof canvas.removeEdge).toBe('function');
+      expect(typeof canvas.updateEdge).toBe('function');
+      expect(typeof canvas.updateEdgeEndpoints).toBe('function');
+      expect(typeof canvas.batchOperation).toBe('function');
+
+      // Registry and lookup methods
+      expect(canvas.registry).toBeDefined();
+      expect(typeof canvas.getNode).toBe('function');
+      expect(typeof canvas.getNodes).toBe('function');
+      expect(typeof canvas.getEdge).toBe('function');
+      expect(typeof canvas.getEdges).toBe('function');
+      expect(typeof canvas.clientToCanvas).toBe('function');
+
+      document.body.removeChild(container);
+    });
+  });
 });
