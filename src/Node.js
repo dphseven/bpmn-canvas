@@ -187,7 +187,7 @@ export class BpmnNode {
       let initialLabelOnEdit = this.label;
 
       labelEl.addEventListener('input', (e) => {
-        this.label = e.target.innerText;
+        this.label = e.target.innerText !== undefined ? e.target.innerText : e.target.textContent;
         this.canvas.emit('node:labelChange', { node: this, label: this.label });
         if (this.domElement && this.canvas) {
           const currentHeight = this.domElement.offsetHeight;
@@ -211,7 +211,7 @@ export class BpmnNode {
 
       const commitLabelChange = () => {
         labelEl.removeAttribute('contenteditable');
-        const currentText = labelEl.innerText;
+        const currentText = labelEl.innerText !== undefined ? labelEl.innerText : labelEl.textContent;
         this.label = currentText;
         if (initialLabelOnEdit !== currentText) {
           this.canvas.emit('node:labelChange', { node: this, label: this.label });
@@ -221,7 +221,7 @@ export class BpmnNode {
       };
 
       labelEl.addEventListener('focus', () => {
-        initialLabelOnEdit = labelEl.innerText;
+        initialLabelOnEdit = labelEl.innerText !== undefined ? labelEl.innerText : labelEl.textContent;
       });
 
       labelEl.addEventListener('blur', () => {
@@ -230,7 +230,11 @@ export class BpmnNode {
 
       labelEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          labelEl.innerText = initialLabelOnEdit;
+          if (labelEl.innerText !== undefined) {
+            labelEl.innerText = initialLabelOnEdit;
+          } else {
+            labelEl.textContent = initialLabelOnEdit;
+          }
           this.label = initialLabelOnEdit;
           labelEl.removeAttribute('contenteditable');
           labelEl.blur();

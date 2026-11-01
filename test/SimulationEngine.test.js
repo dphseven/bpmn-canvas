@@ -124,4 +124,87 @@ describe('SimulationEngine', () => {
     expect(engine.timeoutId).toBeNull();
     expect(nodeEl.classList.contains('sim-active')).toBe(false);
   });
+
+  it('traverses internal flow of expanded subprocess with animated edges', () => {
+    const sub = { id: 'sub1', type: 'subprocess', data: { expanded: true } };
+    const childStart = { id: 'childStart', type: 'start-event', data: { parentId: 'sub1' } };
+    const childTask = { id: 'childTask', type: 'user-task', data: { parentId: 'sub1' } };
+    const afterTask = { id: 'afterTask', type: 'service-task' };
+
+    nodes.set('sub1', sub);
+    nodes.set('childStart', childStart);
+    nodes.set('childTask', childTask);
+    nodes.set('afterTask', afterTask);
+
+    edges.set('eIn', { id: 'eIn', sourceId: 'start', targetId: 'sub1', animated: true });
+    edges.set('eInternal', { id: 'eInternal', sourceId: 'childStart', targetId: 'childTask', animated: true });
+    edges.set('eOut', { id: 'eOut', sourceId: 'sub1', targetId: 'afterTask', animated: true });
+
+    const path = engine.findSimulationPath();
+    expect(path.map(e => e.id)).toEqual(['eIn', 'eInternal', 'eOut']);
+  });
+
+  it('traverses boundary event path when target has an attached boundary event', () => {
+    const task = { id: 'task1', type: 'user-task' };
+    const boundary = { id: 'b1', type: 'boundary-timer-event', data: { hostNodeId: 'task1' } };
+    const nextTask = { id: 'task2', type: 'user-task' };
+
+    nodes.set('task1', task);
+    nodes.set('b1', boundary);
+    nodes.set('task2', nextTask);
+
+    edges.set('e1', { id: 'e1', sourceId: 'start', targetId: 'task1', animated: true });
+    edges.set('eBoundary', { id: 'eBoundary', sourceId: 'b1', targetId: 'task2', animated: true });
+
+    const path = engine.findSimulationPath();
+    expect(path.map(e => e.id)).toEqual(['e1', 'eBoundary']);
+  });
+
+  it('runs complete animation cycle with step updates and node pulsing', () => {
+    const startNode = { id: 'start', type: 'start-event', domElement: document.createElement('div') };
+    const endNode = { id: 'end', type: 'end-event', domElement: document.createElement('div') };
+    nodes.set('start', startNode);
+    nodes.set('end', endNode);
+
+    const pathEl = {
+      parentNode: document.createElement('div'),
+      getTotalLength: () => 100,
+      getPointAtLength: (d) => ({ x: d, y: 10 })
+    };
+
+    edges.set('e1', {
+      id: 'e1',
+      sourceId: 'start',
+      targetId: 'end',
+      animated: true,
+      pathElement: pathEl
+    });
+
+    let rafCallback = null;
+    vi.stubGlobal('requestAnimationFrame', (cb) => {
+      rafCallback = cb;
+      return 999;
+    });
+
+    engine.start({ speed: 5.0 });
+    expect(engine.active).toBe(true);
+    expect(startNode.domElement.classList.contains('sim-active')).toBe(true);
+
+    // Step animation progress
+    if (rafCallback) {
+      rafCallback(100);
+      rafCallback(1500); // Progress to 1.0
+    }
+
+    expect(endNode.domElement.classList.contains('sim-active')).toBe(true);
+
+    // Advance pause timeout to test next step
+    vi.advanceTimersByTime(200);
+
+    // End of cycle pause
+    vi.advanceTimersByTime(800);
+
+    vi.unstubAllGlobals();
+    engine.stop();
+  });
 });

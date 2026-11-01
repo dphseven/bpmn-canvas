@@ -597,6 +597,70 @@ describe('BpmnCanvas', () => {
     expect(rightB.x).toBe(host.x + host.width - rightB.width / 2);
     expect(leftB.x).toBe(host.x - leftB.width / 2);
   });
+
+  it('handles mouse wheel zoom with and without ctrlKey', () => {
+    const oldZoom = canvas.zoom;
+    container.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, ctrlKey: false, clientX: 100, clientY: 100 }));
+    expect(canvas.zoom).toBeGreaterThan(oldZoom);
+
+    const prevZoom = canvas.zoom;
+    container.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, ctrlKey: true, clientX: 100, clientY: 100 }));
+    expect(canvas.zoom).toBeLessThan(prevZoom);
+  });
+
+  it('pans viewport with middle-click and right-click pointer gestures', () => {
+    // Middle click pan
+    container.dispatchEvent(new PointerEvent('pointerdown', { button: 1, clientX: 100, clientY: 100 }));
+    expect(canvas.isPanning).toBe(true);
+
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 120 }));
+    expect(canvas.panX).not.toBe(0);
+
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 120 }));
+    expect(canvas.isPanning).toBe(false);
+
+    // Right click pan
+    container.dispatchEvent(new PointerEvent('pointerdown', { button: 2, clientX: 50, clientY: 50 }));
+    expect(canvas.isPanning).toBe(true);
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 50, clientY: 50 }));
+  });
+
+  it('detaches boundary events when dragged far away from activities', () => {
+    const host = canvas.addNode({ type: 'task', x: 100, y: 100, width: 100, height: 80 });
+    const bNode = canvas.addNode({
+      type: 'boundary-timer-event',
+      x: 140,
+      y: 90,
+      data: { hostNodeId: host.id, dockEdge: 'top' }
+    });
+
+    canvas.selectNode(bNode);
+    canvas.startDraggingNode(bNode, { clientX: 140, clientY: 90 });
+
+    // Drag far away
+    bNode.x = 900;
+    bNode.y = 900;
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 900, clientY: 900 }));
+
+    expect(bNode.data.hostNodeId).toBeUndefined();
+  });
+
+  it('supports Backspace and Ctrl+Y keyboard shortcuts', () => {
+    const n = canvas.addNode({ type: 'task', x: 50, y: 50 });
+    canvas.selectNode(n);
+
+    // Backspace deletes
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    expect(canvas.nodes.has(n.id)).toBe(false);
+
+    // Ctrl+Z undos
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+    expect(canvas.nodes.has(n.id)).toBe(true);
+
+    // Ctrl+Y redos
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }));
+    expect(canvas.nodes.has(n.id)).toBe(false);
+  });
 });
 
 
