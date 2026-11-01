@@ -170,4 +170,76 @@ describe('SubprocessLayoutManager', () => {
     expect(childEl.style.display).toBe('flex');
     expect(edgeGroup.style.display).toBe('');
   });
+
+  it('auto-grows subprocess container to enclose expanding child nodes', () => {
+    const sub = {
+      id: 'sub1',
+      type: 'subprocess',
+      x: 100,
+      y: 100,
+      width: 300,
+      height: 200,
+      data: { expanded: true },
+      domElement: document.createElement('div'),
+      createPorts: vi.fn()
+    };
+    const child = {
+      id: 'child1',
+      type: 'user-task',
+      x: 350,
+      y: 260,
+      width: 120,
+      height: 80,
+      data: { parentId: 'sub1' }
+    };
+
+    nodes.set('sub1', sub);
+    nodes.set('child1', child);
+
+    manager.ensureSubprocessEnclosesChildren('sub1');
+
+    expect(sub.width).toBeGreaterThanOrEqual(370);
+    expect(sub.height).toBeGreaterThanOrEqual(240);
+    expect(updateConnectedEdges).toHaveBeenCalledWith('sub1');
+    expect(emitFn).toHaveBeenCalledWith('node:update', sub);
+  });
+
+  it('shifts downstream nodes horizontally and vertically on resize', () => {
+    const sub = {
+      id: 'sub1',
+      type: 'subprocess',
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 300,
+      data: {}
+    };
+    const rightNode = {
+      id: 'nRight',
+      x: 450,
+      y: 150,
+      width: 100,
+      height: 80,
+      setPosition: vi.fn((x, y) => { rightNode.x = x; rightNode.y = y; })
+    };
+    const bottomNode = {
+      id: 'nBottom',
+      x: 200,
+      y: 350,
+      width: 100,
+      height: 80,
+      setPosition: vi.fn((x, y) => { bottomNode.x = x; bottomNode.y = y; })
+    };
+
+    nodes.set('sub1', sub);
+    nodes.set('nRight', rightNode);
+    nodes.set('nBottom', bottomNode);
+
+    manager.pushSurroundingNodesOnResize(sub, 50, 40);
+
+    expect(rightNode.setPosition).toHaveBeenCalledWith(500, 150);
+    expect(bottomNode.setPosition).toHaveBeenCalledWith(200, 390);
+    expect(sub.data.pushedOffsets.nRight).toEqual({ dx: 50, dy: 0 });
+    expect(sub.data.pushedOffsets.nBottom).toEqual({ dx: 0, dy: 40 });
+  });
 });

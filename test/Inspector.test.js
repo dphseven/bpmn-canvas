@@ -176,4 +176,78 @@ describe('Inspector', () => {
       expect(canvas.edges.size).toBe(0);
     }
   });
+
+  it('handles subprocess toggle button and nested parentId displays in inspector', () => {
+    const parent = canvas.addNode({ type: 'subprocess', label: 'Parent Sub', data: { expanded: false } });
+    const child = canvas.addNode({ type: 'task', label: 'Child Task', data: { parentId: parent.id } });
+
+    // Inspect subprocess
+    canvas.selectNode(parent);
+    const toggleBtn = container.querySelector('#btn-toggle-subprocess');
+    expect(toggleBtn).toBeTruthy();
+    toggleBtn.dispatchEvent(new Event('click'));
+    expect(parent.data.expanded).toBe(true);
+
+    // Inspect child
+    canvas.selectNode(child);
+    expect(container.innerHTML).toContain('Parent Sub');
+
+    // Delete element button
+    const deleteBtn = container.querySelector('#btn-delete-element');
+    deleteBtn.dispatchEvent(new Event('click'));
+    expect(canvas.nodes.has(child.id)).toBe(false);
+  });
+
+  it('syncs label inputs on external canvas labelChange and edge update events', () => {
+    const node = canvas.addNode({ type: 'task', label: 'Original' });
+    canvas.selectNode(node);
+
+    const input = container.querySelector('#prop-label');
+    canvas.emit('node:labelChange', { node, label: 'External Update' });
+    expect(input.value).toBe('External Update');
+
+    const nodeB = canvas.addNode({ type: 'task' });
+    const edge = canvas.addEdge({ sourceId: node.id, targetId: nodeB.id, label: 'Edge Old' });
+    canvas.selectEdge(edge);
+
+    const edgeInput = container.querySelector('#prop-edge-label');
+    canvas.emit('edge:labelChange', { edge, label: 'Edge New' });
+    expect(edgeInput.value).toBe('Edge New');
+
+    // edge:update and edge:reconnect
+    canvas.emit('edge:update', edge);
+    expect(inspector.currentTarget).toBe(edge);
+
+    canvas.emit('edge:reconnect', { edge });
+    expect(inspector.currentTarget).toBe(edge);
+  });
+
+  it('inspects boundary event attached to a host node and displays host info', () => {
+    const host = canvas.addNode({ type: 'task', label: 'Host Task' });
+    const boundary = canvas.addNode({
+      type: 'boundary-timer-event',
+      data: { hostNodeId: host.id, dockEdge: 'right', interrupting: false }
+    });
+
+    canvas.selectNode(boundary);
+    expect(container.innerHTML).toContain('Host Task');
+    expect(container.innerHTML).toContain('right');
+    expect(container.innerHTML).toContain('Parallel non-interrupting trigger');
+  });
+
+  it('deletes multi-selected elements via inspector delete button', () => {
+    const n1 = canvas.addNode({ type: 'task' });
+    const n2 = canvas.addNode({ type: 'task' });
+
+    canvas.selectNode(n1);
+    canvas.selectNode(n2, { shiftKey: true });
+    expect(inspector.targetType).toBe('multi');
+
+    const deleteMultiBtn = container.querySelector('#btn-delete-multi');
+    expect(deleteMultiBtn).toBeTruthy();
+    deleteMultiBtn.dispatchEvent(new Event('click'));
+
+    expect(canvas.nodes.has(n1.id)).toBe(false);
+    expect(canvas.nodes.has(n2.id)).toBe(false);
+  });
 });
