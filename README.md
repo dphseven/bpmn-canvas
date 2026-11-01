@@ -19,7 +19,7 @@
   Model familiar BPMN concepts—activities, tasks, gateways, boundary event docking, and expandable subprocesses—without wrestling with rigid 5,000-line XML schemas. Diagrams serialize cleanly to and from predictable, human-readable JSON that stores directly in PostgreSQL JSONB, MongoDB, or REST APIs
 
 - **Modular & Headless-Friendly by Design**  
-  Architected on Single Responsibility Principles with decoupled subsystems (`BpmnCanvas`, `NodeTypeRegistry`, `Palette`, `Inspector`, `HistoryManager`, and `SelectionManager`). Embed the complete out-of-the-box studio, or mount just the canvas engine and control it from your own custom React, Vue, or Angular panels
+  Architected with clean, decoupled subsystems (`BpmnCanvas`, `NodeTypeRegistry`, `Palette`, `Inspector`, `HistoryManager`, and `SelectionManager`). Embed the complete out-of-the-box studio, or mount just the canvas engine and control it from your own custom React, Vue, or Angular panels
 
 - **Design System First (CSS Variable Theming)**  
   Every visual element is styled via standard CSS custom properties (`--bg-canvas`, `--border-focus`, `--accent-primary`, etc.). Seamlessly switch between dark mode, light mode, or custom enterprise palettes with zero canvas re-rendering
@@ -207,7 +207,7 @@ flowchart TD
 You can register custom domain shapes with custom icons, badges, and default dimensions directly into the registry:
 
 ```javascript
-import { NodeTypeRegistry } from 'bpmn-canvas';
+import { NodeTypeRegistry, BpmnCanvas } from 'bpmn-canvas';
 
 const registry = new NodeTypeRegistry();
 
@@ -217,8 +217,7 @@ registry.register('ai-agent-task', {
   badge: 'AI Agent',
   icon: '🤖',
   width: 130,
-  height: 80,
-  ports: ['top', 'bottom', 'left', 'right']
+  height: 80
 });
 
 // Pass custom or shared registry to your canvas instance

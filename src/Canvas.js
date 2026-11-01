@@ -104,6 +104,12 @@ export class BpmnCanvas {
 
     // Node Type Registry
     this.registry = options.registry || new NodeTypeRegistry();
+    if (options.nodeFactory) {
+      this.registry.registerNodeFactory(options.nodeFactory);
+    }
+    if (options.edgeFactory) {
+      this.registry.registerEdgeFactory(options.edgeFactory);
+    }
 
     // Selection & Data Stores
     this.nodes = new Map();
@@ -153,7 +159,8 @@ export class BpmnCanvas {
       getNode: (id) => this.getNode(id),
       isPulsing: () => this.isPulsing(),
       emitFn: (event, payload) => this.emit(event, payload),
-      tokenContainer: null
+      tokenContainer: null,
+      isContainer: (node) => this.registry.hasCapability(node.type, 'isContainer')
     });
 
     // Subprocess Layout Manager
@@ -164,6 +171,7 @@ export class BpmnCanvas {
       pushHistory: (preCapturedState) => this.pushHistory(preCapturedState),
       emitFn: (event, payload) => this.emit(event, payload),
       updateConnectedEdges: (id) => this.updateConnectedEdges(id),
+      isContainer: (node) => this.registry.hasCapability(node.type, 'isContainer'),
       updateAttachedBoundaryPositions: (node, oldW, oldH) => {
         if (this.updateAttachedBoundaryPositions) {
           this.updateAttachedBoundaryPositions(node, oldW, oldH);
@@ -750,8 +758,10 @@ export class BpmnCanvas {
             }
           }
         }
-        
-        if (releasedNode.type !== 'subprocess' && !releasedNode.type.startsWith('boundary-')) {
+
+        const isContainer = this.registry.hasCapability(releasedNode.type, 'isContainer');
+        const isBoundary = this.registry.hasCapability(releasedNode.type, 'isBoundary');
+        if (!isContainer && !isBoundary) {
           // If a non-subprocess node was dragged, check if dropped inside an expanded subprocess
           const centerX = releasedNode.x + releasedNode.width / 2;
           const centerY = releasedNode.y + releasedNode.height / 2;
@@ -825,8 +835,13 @@ export class BpmnCanvas {
           const targetPort = elemUnder.dataset.port;
           const targetNode = this.getNode(targetNodeId);
           const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
-          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
-          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
+          const isReconnectingTarget = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'target';
+          const validation = this.registry.validateConnection(
+            isReconnectingTarget ? targetNode : (this.connectingFrom?.node || (this.reconnectingEdge?.edge && this.getNode(this.reconnectingEdge.edge.sourceId))),
+            isReconnectingSource ? (this.connectingFrom?.node || (this.reconnectingEdge?.edge && this.getNode(this.reconnectingEdge.edge.targetId))) : targetNode,
+            { isReconnectingSource, isReconnectingTarget, reconnectingEdge: this.reconnectingEdge }
+          );
+          if (!validation.valid) {
             return null;
           }
           if (targetNodeId && targetNodeId !== excludeNodeId) {
@@ -839,16 +854,19 @@ export class BpmnCanvas {
         if (nodeEl && nodeEl.id && nodeEl.id !== excludeNodeId) {
           const targetNode = this.getNode(nodeEl.id);
           const isReconnectingSource = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'source';
-          // BPMN 2.0 rule: Boundary events can only have outgoing sequence flows, no incoming flows (unless reconnecting source endpoint)
-          if (!isReconnectingSource && targetNode && targetNode.type.startsWith('boundary-')) {
+          const isReconnectingTarget = this.reconnectingEdge && this.reconnectingEdge.endpoint === 'target';
+          const validation = this.registry.validateConnection(
+            isReconnectingTarget ? targetNode : (this.connectingFrom?.node || (this.reconnectingEdge?.edge && this.getNode(this.reconnectingEdge.edge.sourceId))),
+            isReconnectingSource ? (this.connectingFrom?.node || (this.reconnectingEdge?.edge && this.getNode(this.reconnectingEdge.edge.targetId))) : targetNode,
+            { isReconnectingSource, isReconnectingTarget, reconnectingEdge: this.reconnectingEdge }
+          );
+          if (!validation.valid) {
             return null;
           }
           if (targetNode) {
             const mouseCanvas = this.clientToCanvas(clientX, clientY);
             // Available ports for this node
-            const availablePorts = (targetNode.type === 'data-object')
-              ? ['top', 'right', 'left']
-              : ['top', 'right', 'bottom', 'left'];
+            const availablePorts = this.registry.getAvailablePorts(targetNode);
 
             let bestPort = availablePorts[0];
             let bestDist = Infinity;
@@ -1137,7 +1155,7 @@ export class BpmnCanvas {
     // Also calculate offsets for contained child nodes of any selected expanded subprocesses (if not explicitly in selection)
     this.containedChildOffsets.clear();
     this.selectedNodes.forEach(selectedNode => {
-      if (selectedNode.type === 'subprocess' && selectedNode.data?.expanded) {
+      if (this.registry.hasCapability(selectedNode.type, 'isContainer') && selectedNode.data?.expanded) {
         this.nodes.forEach(n => {
           if (n.data?.parentId === selectedNode.id && !selectedIds.has(n.id)) {
             this.containedChildOffsets.set(n.id, {
@@ -1233,7 +1251,7 @@ export class BpmnCanvas {
 
   addNode(config) {
     this.pushHistory();
-    const node = new BpmnNode(config, this);
+    const node = this.registry.createNode(config, this);
     this.nodes.set(node.id, node);
     this.surface.appendChild(node.domElement);
     this.emit('node:add', node);
@@ -1333,11 +1351,7 @@ export class BpmnCanvas {
 
   isActivityNode(node) {
     if (!node) return false;
-    const type = node.type || '';
-    if (type.startsWith('boundary-') || type.startsWith('start-') || type.startsWith('end-')) return false;
-    if (type.startsWith('intermediate-') || type.startsWith('gateway-')) return false;
-    if (type === 'text-annotation' || type === 'data-object') return false;
-    return true; // task, user-task, service-task, manual-task, business-rule-task, script-task, subprocess, send-task, activity
+    return this.registry.hasCapability(node.type, 'boundaryDockable');
   }
 
   calculateBoundaryDocking(hostNode, centerX, centerY, boundaryWidth = 36, boundaryHeight = 36) {
@@ -1582,15 +1596,17 @@ export class BpmnCanvas {
   }
 
   addEdge(config) {
-    // Validate BPMN 2.0 connection rule: Boundary events cannot have incoming sequence flows
+    // Validate connection rules via registry
+    const sourceNode = this.getNode(config.sourceId);
     const targetNode = this.getNode(config.targetId);
-    if (targetNode && targetNode.type.startsWith('boundary-')) {
-      console.warn('BPMN 2.0 Violation: Boundary events cannot have incoming sequence flows.');
+    const validation = this.registry.validateConnection(sourceNode, targetNode, { config });
+    if (!validation.valid) {
+      console.warn(`BPMN 2.0 Violation: ${validation.reason || 'Invalid connection.'}`);
       return null;
     }
 
     this.pushHistory();
-    const edge = new BpmnEdge(config, this);
+    const edge = this.registry.createEdge(config, this);
     this.edges.set(edge.id, edge);
     this.edgesContainer.appendChild(edge.groupElement);
     this.emit('edge:add', edge);
@@ -1888,9 +1904,7 @@ export class BpmnCanvas {
     return this.historyManager.batch(fn, customPreBatchState);
   }
 
-  /**
-   * Alias for batchOperation
-   */
+  // Alias for batchOperation
   batch(fn, customPreBatchState = null) {
     return this.batchOperation(fn, customPreBatchState);
   }

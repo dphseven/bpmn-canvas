@@ -157,6 +157,14 @@ export class NodeRenderer {
   static renderNodeHtml(node, canvas = null) {
     const { type, label = '', data = {} } = node;
 
+    const registry = canvas?.registry;
+    if (registry && typeof registry.getRenderer === 'function') {
+      const customRenderer = registry.getRenderer(type);
+      if (customRenderer) {
+        return customRenderer(node, canvas);
+      }
+    }
+
     if (type.includes('event')) {
       const innerIcon = NodeRenderer.renderEventInnerIcon(type);
       return `

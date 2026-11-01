@@ -23,7 +23,7 @@ import { NodeTypeRegistry } from './NodeTypeRegistry.js';
 export class Palette {
   /**
    * @param {HTMLElement} containerElement - DOM element to render the palette inside
-   * @param {import('./Canvas.js').BpmnCanvas} canvas - Canvas instance to connect with
+   * @param {import('./types.js').CanvasContext|import('./Canvas.js').BpmnCanvas} canvas - Canvas context or instance to connect with
    * @param {Object} [options={}] - Palette configuration options
    * @param {NodeTypeRegistry} [options.registry] - Optional custom or shared NodeTypeRegistry
    * @param {Object|null} [options.filter=null] - Category, type, and subtype filter rules

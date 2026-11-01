@@ -39,7 +39,8 @@ export class SubprocessLayoutManager {
     emitFn,
     updateConnectedEdges,
     updateAttachedBoundaryPositions,
-    onExpansionCycleReset
+    onExpansionCycleReset,
+    isContainer = null
   }) {
     this.nodes = nodes;
     this.edges = edges;
@@ -49,6 +50,7 @@ export class SubprocessLayoutManager {
     this.updateConnectedEdges = updateConnectedEdges || (() => {});
     this.updateAttachedBoundaryPositions = updateAttachedBoundaryPositions || (() => {});
     this.onExpansionCycleReset = onExpansionCycleReset || (() => {});
+    this.isContainer = isContainer || ((node) => node?.type === 'subprocess');
   }
 
   findSubprocessAt(x, y, excludeId = null) {
@@ -56,7 +58,7 @@ export class SubprocessLayoutManager {
     let smallestArea = Infinity;
 
     this.nodes.forEach(node => {
-      if (node.id === excludeId || node.type !== 'subprocess' || !node.data?.expanded) return;
+      if (node.id === excludeId || !this.isContainer(node) || !node.data?.expanded) return;
 
       const nodeW = node.domElement ? (node.domElement.offsetWidth || node.width) : node.width;
       const nodeH = node.domElement ? (node.domElement.offsetHeight || node.height) : node.height;
@@ -79,7 +81,7 @@ export class SubprocessLayoutManager {
 
   toggleSubprocessExpanded(subprocessId) {
     const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+    if (!subprocessNode || !this.isContainer(subprocessNode)) return;
 
     const isExpanded = !subprocessNode.data?.expanded;
     this.setSubprocessExpanded(subprocessId, isExpanded);
@@ -87,7 +89,7 @@ export class SubprocessLayoutManager {
 
   setSubprocessExpanded(subprocessId, expanded) {
     const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess') return;
+    if (!subprocessNode || !this.isContainer(subprocessNode)) return;
 
     this.pushHistory();
 
@@ -258,7 +260,7 @@ export class SubprocessLayoutManager {
 
   ensureSubprocessEnclosesChildren(subprocessId) {
     const subprocessNode = this.getNode(subprocessId);
-    if (!subprocessNode || subprocessNode.type !== 'subprocess' || !subprocessNode.data?.expanded) return;
+    if (!subprocessNode || !this.isContainer(subprocessNode) || !subprocessNode.data?.expanded) return;
 
     const children = Array.from(this.nodes.values()).filter(n => n.data?.parentId === subprocessId);
     if (!children.length) return;

@@ -16,6 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BpmnCanvas } from '../src/Canvas.js';
+import { BpmnNode } from '../src/Node.js';
 import { Palette } from '../src/Palette.js';
 
 describe('External Integration & Public API', () => {
@@ -250,6 +251,114 @@ describe('External Integration & Public API', () => {
         itemDef: expect.objectContaining({ type: 'custom-widget', label: 'Widget' })
       }));
       document.body.removeChild(paletteContainer);
+    });
+  });
+
+  describe('OCP Plugin & Extensibility Integration', () => {
+    it('renders third-party node types using registered custom renderers', () => {
+      canvas.registry.register('cloud-function', {
+        category: 'activities',
+        label: 'Lambda Function',
+        width: 140,
+        height: 70,
+        capabilities: {
+          boundaryDockable: true,
+          allowIncoming: true,
+          allowOutgoing: true
+        }
+      });
+
+      canvas.registry.registerRenderer('cloud-function', (node) => {
+        return `<div class="custom-lambda-wrapper"><span class="lambda-glyph">λ</span><span class="lambda-title">${node.label}</span></div>`;
+      });
+
+      const node = canvas.addNode({
+        type: 'cloud-function',
+        label: 'ProcessPayment',
+        x: 100,
+        y: 100
+      });
+
+      expect(node.domElement.innerHTML).toContain('custom-lambda-wrapper');
+      expect(node.domElement.innerHTML).toContain('ProcessPayment');
+      expect(node.domElement.innerHTML).toContain('λ');
+    });
+
+    it('enforces custom connection rules on canvas.addEdge()', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Custom rule: disallow connecting tasks to annotations
+      canvas.registry.registerConnectionRule((source, target) => {
+        if (source?.type === 'task' && target?.type === 'text-annotation') {
+          return { valid: false, reason: 'Tasks cannot connect directly to annotations via sequence flow.' };
+        }
+        return { valid: true };
+      });
+
+      const task = canvas.addNode({ type: 'task', x: 50, y: 50 });
+      const annotation = canvas.addNode({ type: 'text-annotation', x: 250, y: 50 });
+
+      const edge = canvas.addEdge({
+        sourceId: task.id,
+        targetId: annotation.id
+      });
+
+      expect(edge).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Tasks cannot connect directly to annotations'));
+      warnSpy.mockRestore();
+    });
+
+    it('supports custom node and edge factories provided via BpmnCanvas options', () => {
+      const customContainer = document.createElement('div');
+      document.body.appendChild(customContainer);
+
+      const customNodeFactory = vi.fn((config, c) => {
+        const node = new BpmnNode(Object.assign({}, config, { label: `[Intercepted] ${config.label || ''}` }), c);
+        node.domElement.setAttribute('data-intercepted', 'true');
+        return node;
+      });
+
+      const customCanvas = new BpmnCanvas(customContainer, {
+        nodeFactory: customNodeFactory
+      });
+
+      const node = customCanvas.addNode({ type: 'task', label: 'Worker' });
+      expect(customNodeFactory).toHaveBeenCalledTimes(1);
+      expect(node.label).toBe('[Intercepted] Worker');
+      expect(node.domElement.getAttribute('data-intercepted')).toBe('true');
+
+      document.body.removeChild(customContainer);
+    });
+
+    it('supports custom container nodes with isContainer capability', () => {
+      canvas.registry.register('transaction-subprocess', {
+        category: 'activities',
+        label: 'Transaction Scope',
+        width: 200,
+        height: 120,
+        capabilities: {
+          isContainer: true,
+          boundaryDockable: true
+        }
+      });
+
+      expect(canvas.registry.hasCapability('transaction-subprocess', 'isContainer')).toBe(true);
+
+      const parentScope = canvas.addNode({
+        type: 'transaction-subprocess',
+        x: 100,
+        y: 100,
+        data: { expanded: true }
+      });
+
+      const childTask = canvas.addNode({
+        type: 'task',
+        x: 120,
+        y: 120,
+        data: { parentId: parentScope.id }
+      });
+
+      expect(childTask.data.parentId).toBe(parentScope.id);
     });
   });
 });

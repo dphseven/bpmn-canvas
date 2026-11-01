@@ -89,5 +89,84 @@
  * @property {function(Object): void} updateConnection - Reconfigures edge source/target endpoints
  */
 
+/**
+ * Capability flags for BPMN and custom node types.
+ * @typedef {Object} NodeTypeCapabilities
+ * @property {boolean} [isContainer=false] - Whether this node can contain and manage child nodes (e.g. subprocess)
+ * @property {boolean} [boundaryDockable=true] - Whether boundary events can dock onto this element boundary
+ * @property {boolean} [isBoundary=false] - Whether this element is an attached boundary event
+ * @property {boolean} [allowIncoming=true] - Whether incoming sequence flows/edges are allowed
+ * @property {boolean} [allowOutgoing=true] - Whether outgoing sequence flows/edges are allowed
+ * @property {string[]|null} [customPorts=null] - Custom available attachment ports, or null for default 4 ports
+ */
+
+/**
+ * Result returned by connection rules.
+ * @typedef {Object} ConnectionValidationResult
+ * @property {boolean} valid - Whether the connection is permitted
+ * @property {string} [reason] - Human-readable explanation if connection is rejected
+ */
+
+/**
+ * Connection rule validator callback.
+ * @typedef {function(Object, Object, Object=): ConnectionValidationResult} ConnectionRule
+ */
+
+/**
+ * Node instantiation factory function.
+ * @typedef {function(Object, Object): Object} NodeFactory
+ */
+
+/**
+ * Edge instantiation factory function.
+ * @typedef {function(Object, Object): Object} EdgeFactory
+ */
+
+/**
+ * Custom node HTML/SVG renderer function.
+ * @typedef {function(Object, Object=): string} CustomRenderer
+ */
+
+/**
+ * Event bus capabilities required by canvas tools and panels.
+ * @typedef {Object} CanvasEventSource
+ * @property {function(string, function): function} on - Subscribes event listener, returning unsubscribe callback
+ * @property {function(string, function=): void} off - Unsubscribes event listener
+ * @property {function(string, *=): void} emit - Emits event to subscribers
+ */
+
+/**
+ * Selection provider interface for inspecting or updating selected elements.
+ * @typedef {Object} CanvasSelectionSource
+ * @property {function(): void} [clearSelection] - Clears all current element selections
+ * @property {function(Object, Object=): void} [selectNode] - Selects a specific node
+ * @property {function(Object): void} [selectEdge] - Selects a specific edge
+ */
+
+/**
+ * Command mutation target for canvas modifications.
+ * @typedef {Object} CanvasCommandTarget
+ * @property {function(Object): Object} [addNode] - Instantiates and mounts a node
+ * @property {function(string): boolean} [removeNode] - Deletes a node by identifier
+ * @property {function(string, Object): Object} [updateNode] - Modifies node properties
+ * @property {function(string): boolean} [removeEdge] - Deletes an edge by identifier
+ * @property {function(string, Object): Object} [updateEdge] - Modifies edge properties
+ * @property {function(string, Object): Object} [updateEdgeEndpoints] - Reconnects edge source or target
+ * @property {function(function): *} [batchOperation] - Executes batch mutations atomically with consolidated undo/redo
+ */
+
+/**
+ * Abstract host canvas contract for peripheral tools (Palette, Inspector).
+ * Decouples external tools from concrete BpmnCanvas internals.
+ * @typedef {CanvasEventSource & CanvasSelectionSource & CanvasCommandTarget & Object} CanvasContext
+ * @property {HTMLElement} [container] - Canvas root container element
+ * @property {import('./NodeTypeRegistry.js').NodeTypeRegistry} [registry] - Metadata and capability registry
+ * @property {function(string): Object} [getNode] - Lookup node by identifier
+ * @property {function(): Object[]} [getNodes] - Retrieve all nodes
+ * @property {function(string): Object} [getEdge] - Lookup edge by identifier
+ * @property {function(): Object[]} [getEdges] - Retrieve all edges
+ * @property {function(number, number): { x: number, y: number }} [clientToCanvas] - Viewport to canvas coordinate transform
+ */
+
 export {};
 

@@ -17,6 +17,10 @@
  * Real-time Properties Inspector Panel
  */
 export class Inspector {
+  /**
+   * @param {HTMLElement} containerElement - DOM container element to mount the inspector
+   * @param {import('./types.js').CanvasContext|import('./Canvas.js').BpmnCanvas} canvas - Canvas context or instance
+   */
   constructor(containerElement, canvas) {
     this.container = containerElement;
     this.canvas = canvas;
@@ -131,7 +135,7 @@ export class Inspector {
       </div>
       ` : ''}
 
-      ${node.type === 'subprocess' ? `
+      ${(this.canvas?.registry?.hasCapability ? this.canvas.registry.hasCapability(node.type, 'isContainer') : node.type === 'subprocess') ? `
       <div class="inspector-field" style="margin-top: 6px;">
         <label class="inspector-label">Subprocess View</label>
         <div style="display: flex; gap: 8px; margin-top: 4px;">

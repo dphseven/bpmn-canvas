@@ -29,13 +29,14 @@ export class SimulationEngine {
    * @param {Function} options.emitFn - Event bus emitter
    * @param {SVGElement} [options.tokenContainer] - Layer where token SVG is mounted
    */
-  constructor({ nodes, edges, getNode, isPulsing, emitFn, tokenContainer = null }) {
+  constructor({ nodes, edges, getNode, isPulsing, emitFn, tokenContainer = null, isContainer = null }) {
     this.nodes = nodes;
     this.edges = edges;
     this.getNode = getNode;
     this.isPulsing = isPulsing || (() => true);
     this.emitFn = emitFn || (() => {});
     this.tokenContainer = tokenContainer;
+    this.isContainer = isContainer || ((node) => node?.type === 'subprocess');
 
     this.active = false;
     this.speed = 1.0;
@@ -151,9 +152,9 @@ export class SimulationEngine {
         // First look for direct outbound animated edge from target node
         let nextEdge = animatedEdges.find(e => e.sourceId === nextTargetId && !visited.has(e.id));
 
-        // If target node is an expanded subprocess with internal children, route through its internal flow
+        // If target node is an expanded container with internal children, route through its internal flow
         const targetNode = this.getNode(nextTargetId);
-        if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
+        if (targetNode && this.isContainer(targetNode) && targetNode.data?.expanded) {
           const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
           const childIds = new Set(childNodes.map(n => n.id));
           if (childIds.size > 0) {
@@ -211,8 +212,8 @@ export class SimulationEngine {
     while (currentNodeId) {
       const targetNode = this.getNode(currentNodeId);
 
-      // If current node is an expanded subprocess, traverse its internal children
-      if (targetNode && targetNode.type === 'subprocess' && targetNode.data?.expanded) {
+      // If current node is an expanded container, traverse its internal children
+      if (targetNode && this.isContainer(targetNode) && targetNode.data?.expanded) {
         const childNodes = Array.from(this.nodes.values()).filter(n => n.data?.parentId === targetNode.id);
         const childIds = new Set(childNodes.map(n => n.id));
         if (childIds.size > 0) {
