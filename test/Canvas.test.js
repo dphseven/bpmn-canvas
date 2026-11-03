@@ -703,6 +703,19 @@ describe('BpmnCanvas', () => {
     expect(canvas.autoArrange()).toBe(false);
     expect(n1.x).toBe(500);
   });
+
+  it('triggers autoArrange via Alt+A keyboard shortcut with default fitView', () => {
+    const fitViewSpy = vi.spyOn(canvas, 'fitView');
+    const n1 = canvas.addNode({ type: 'start-event', x: 500, y: 400 });
+    const n2 = canvas.addNode({ type: 'task', x: 100, y: 100 });
+    canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+
+    // Alt+A triggers autoArrange and fitView
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', altKey: true, bubbles: true }));
+
+    expect(canvas.getNode(n1.id).x).toBeLessThan(canvas.getNode(n2.id).x);
+    expect(fitViewSpy).toHaveBeenCalled();
+  });
 });
 
 

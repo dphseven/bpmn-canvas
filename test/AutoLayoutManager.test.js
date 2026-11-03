@@ -266,5 +266,107 @@ describe('AutoLayoutManager', () => {
     expect(sub.y + sub.height / 2).toBe(140);
     expect(gw.y + gw.height / 2).toBe(140);
   });
+
+  it('arranges workflows in Top-to-Bottom (TB) orientation', () => {
+    const a = createMockNode({ id: 'a', type: 'start-event', width: 48, height: 48 });
+    const b1 = createMockNode({ id: 'b1', type: 'task', width: 100, height: 80 });
+    const b2 = createMockNode({ id: 'b2', type: 'task', width: 100, height: 80 });
+    const c = createMockNode({ id: 'c', type: 'end-event', width: 48, height: 48 });
+
+    [a, b1, b2, c].forEach(n => nodes.set(n.id, n));
+
+    const e1 = createMockEdge({ sourceId: 'a', targetId: 'b1' });
+    const e2 = createMockEdge({ sourceId: 'a', targetId: 'b2' });
+    const e3 = createMockEdge({ sourceId: 'b1', targetId: 'c' });
+    const e4 = createMockEdge({ sourceId: 'c', targetId: 'a' }); // loopback in TB
+
+    edges.set('e1', e1);
+    edges.set('e2', e2);
+    edges.set('e3', e3);
+    edges.set('e4', e4);
+
+    const ok = manager.autoArrange({ direction: 'TB', startX: 150, startY: 80, verticalGap: 60 });
+    expect(ok).toBe(true);
+
+    // In TB mode: y increases progressively
+    expect(a.y).toBeLessThan(b1.y);
+    expect(b1.y).toBe(b2.y);
+    expect(b1.y).toBeLessThan(c.y);
+
+    // Forward edge ports in TB
+    expect(e1.updateConnection).toHaveBeenCalledWith({ sourcePort: 'bottom', targetPort: 'top' });
+    // Loopback edge ports in TB
+    expect(e4.updateConnection).toHaveBeenCalledWith({ sourcePort: 'right', targetPort: 'right' });
+  });
+
+  it('handles deeply nested subprocesses', () => {
+    const outer = createMockNode({ id: 'outer', type: 'subprocess', data: { expanded: true } });
+    const inner = createMockNode({ id: 'inner', type: 'subprocess', data: { expanded: true, parentId: 'outer' } });
+    const child = createMockNode({ id: 'child', type: 'task', data: { parentId: 'inner' } });
+
+    nodes.set('outer', outer);
+    nodes.set('inner', inner);
+    nodes.set('child', child);
+
+    const ok = manager.autoArrange();
+    expect(ok).toBe(true);
+    expect(child.setPosition).toHaveBeenCalled();
+  });
+
+  it('returns false when all nodes are boundary events or nested without parents', () => {
+    const boundary = createMockNode({ id: 'b', type: 'boundary-timer-event', data: { hostNodeId: 'missing' } });
+    nodes.set('b', boundary);
+
+    expect(manager.autoArrange()).toBe(false);
+  });
+
+  it('optimizes ports for vertical neighbors and custom boundary dock edges', () => {
+    const task = createMockNode({ id: 'task', type: 'task', x: 100, y: 100, width: 100, height: 80 });
+    const bRight = createMockNode({
+      id: 'bRight',
+      type: 'boundary-message-event',
+      data: { hostNodeId: 'task', dockEdge: 'right' }
+    });
+    const target = createMockNode({ id: 'target', type: 'task', x: 300, y: 100, width: 100, height: 80 });
+    const upper = createMockNode({ id: 'upper', type: 'task', x: 300, y: 20, width: 100, height: 80 });
+
+    [task, bRight, target, upper].forEach(n => nodes.set(n.id, n));
+
+    const eBoundary = createMockEdge({ id: 'eb', sourceId: 'bRight', targetId: 'target' });
+    const eVerticalUp = createMockEdge({ id: 'evu', sourceId: 'target', targetId: 'upper' }); // dy < 0
+    const eVerticalDown = createMockEdge({ id: 'evd', sourceId: 'upper', targetId: 'target' }); // dy > 0
+
+    edges.set('eb', eBoundary);
+    edges.set('evu', eVerticalUp);
+    edges.set('evd', eVerticalDown);
+
+    manager.optimizeEdgePorts('LR');
+
+    expect(eBoundary.updateConnection).toHaveBeenCalledWith({ sourcePort: 'right', targetPort: 'left' });
+    expect(eVerticalUp.updateConnection).toHaveBeenCalledWith({ sourcePort: 'top', targetPort: 'bottom' });
+    expect(eVerticalDown.updateConnection).toHaveBeenCalledWith({ sourcePort: 'bottom', targetPort: 'top' });
+  });
+
+  it('supports instantiation with minimal default constructor options', () => {
+    const bareNodes = new Map();
+    const bareEdges = new Map();
+    const bareNode = createMockNode({ id: 'n1', type: 'task' });
+    bareNodes.set('n1', bareNode);
+
+    const bareManager = new AutoLayoutManager({ nodes: bareNodes, edges: bareEdges });
+    expect(bareManager.autoArrange()).toBe(true);
+  });
+
+  it('handles fully cyclic graphs with no natural root start events', () => {
+    const a = createMockNode({ id: 'a', type: 'task' });
+    const b = createMockNode({ id: 'b', type: 'task' });
+    nodes.set('a', a);
+    nodes.set('b', b);
+
+    edges.set('e1', createMockEdge({ sourceId: 'a', targetId: 'b' }));
+    edges.set('e2', createMockEdge({ sourceId: 'b', targetId: 'a' }));
+
+    expect(manager.autoArrange()).toBe(true);
+  });
 });
 
