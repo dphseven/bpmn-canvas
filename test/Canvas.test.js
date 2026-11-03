@@ -661,6 +661,61 @@ describe('BpmnCanvas', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }));
     expect(canvas.nodes.has(n.id)).toBe(false);
   });
+
+  it('autoArrange batches repositioning into a single undo step', () => {
+    const n1 = canvas.addNode({ type: 'start-event', x: 500, y: 400 });
+    const n2 = canvas.addNode({ type: 'task', x: 100, y: 100 });
+    canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+
+    const initialN1X = n1.x;
+    const initialN2X = n2.x;
+
+    const arrangeSpy = vi.fn();
+    canvas.on('canvas:autoarrange', arrangeSpy);
+
+    const changed = canvas.autoArrange({ fitView: false });
+    expect(changed).toBe(true);
+    expect(arrangeSpy).toHaveBeenCalled();
+
+    // In LR layout, start-event n1 should now be to the left of task n2
+    expect(n1.x).toBeLessThan(n2.x);
+
+    // Single undo reverts all nodes to their pre-arranged coordinates
+    canvas.undo();
+    expect(canvas.getNode(n1.id).x).toBe(initialN1X);
+    expect(canvas.getNode(n2.id).x).toBe(initialN2X);
+
+    // Redo restores the arranged layout
+    canvas.redo();
+    expect(canvas.getNode(n1.id).x).toBeLessThan(canvas.getNode(n2.id).x);
+  });
+
+  it('autoArrange is blocked when allowDrag capability is false or readOnly is true', () => {
+    const n1 = canvas.addNode({ type: 'start-event', x: 500, y: 400 });
+    const n2 = canvas.addNode({ type: 'task', x: 100, y: 100 });
+    canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+
+    canvas.setCapabilities({ allowDrag: false });
+    expect(canvas.autoArrange()).toBe(false);
+    expect(n1.x).toBe(500);
+
+    canvas.setCapabilities({ allowDrag: true, readOnly: true });
+    expect(canvas.autoArrange()).toBe(false);
+    expect(n1.x).toBe(500);
+  });
+
+  it('triggers autoArrange via Alt+A keyboard shortcut with default fitView', () => {
+    const fitViewSpy = vi.spyOn(canvas, 'fitView');
+    const n1 = canvas.addNode({ type: 'start-event', x: 500, y: 400 });
+    const n2 = canvas.addNode({ type: 'task', x: 100, y: 100 });
+    canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+
+    // Alt+A triggers autoArrange and fitView
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', altKey: true, bubbles: true }));
+
+    expect(canvas.getNode(n1.id).x).toBeLessThan(canvas.getNode(n2.id).x);
+    expect(fitViewSpy).toHaveBeenCalled();
+  });
 });
 
 
