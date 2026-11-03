@@ -56,6 +56,9 @@
         <button class="btn btn-primary" id="btn-config-drawer-toggle" title="Open Client Configuration & Capabilities Showcase">
           <span>⚙️</span> Client Config
         </button>
+        <button class="btn" id="btn-auto-arrange" title="Auto-arrange Diagram Layout (Alt+A)">
+          <span>🪄</span> Auto Arrange
+        </button>
         <button class="btn" id="btn-fit-view">
           <span>🎯</span> Fit View
         </button>
@@ -531,6 +534,10 @@
       zoomInBtn.disabled = !canZoom;
       zoomOutBtn.disabled = !canZoom;
       resetViewBtn.disabled = !canZoom && !canPan;
+      const autoArrangeBtn = document.getElementById('btn-auto-arrange');
+      if (autoArrangeBtn) {
+        autoArrangeBtn.disabled = !canvas.hasCapability('allowDrag');
+      }
     }
 
     canvas.on('capabilities:change', () => {
@@ -552,6 +559,13 @@
 
     document.getElementById('btn-fit-view').addEventListener('click', () => {
       canvas.fitView();
+    });
+
+    document.getElementById('btn-auto-arrange').addEventListener('click', () => {
+      const changed = canvas.autoArrange({ direction: 'LR', fitView: true });
+      if (changed) {
+        showToast('Auto-arranged workflow diagram');
+      }
     });
 
     // 5. Token Flow Simulation Toggle

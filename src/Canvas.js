@@ -21,6 +21,7 @@ import { HistoryManager } from './HistoryManager.js';
 import { SelectionManager } from './SelectionManager.js';
 import { SimulationEngine } from './SimulationEngine.js';
 import { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
+import { AutoLayoutManager } from './AutoLayoutManager.js';
 import { calculateBoundaryDocking } from './geometry.js';
 
 /**
@@ -193,6 +194,20 @@ export class BpmnCanvas {
           this.runSimulationCycle();
         }
       }
+    });
+
+    // Auto Layout Manager
+    this.autoLayoutManager = new AutoLayoutManager({
+      nodes: this.nodes,
+      edges: this.edges,
+      getNode: (id) => this.getNode(id),
+      updateConnectedEdges: (id) => this.updateConnectedEdges(id),
+      updateAttachedBoundaryPositions: (node, oldW, oldH) => {
+        if (this.updateAttachedBoundaryPositions) {
+          this.updateAttachedBoundaryPositions(node, oldW, oldH);
+        }
+      },
+      ensureSubprocessEnclosesChildren: (id) => this.ensureSubprocessEnclosesChildren(id)
     });
 
     const handleStructuralChange = () => {
@@ -966,6 +981,9 @@ export class BpmnCanvas {
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
         this.selectAll();
+      } else if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        this.autoArrange();
       }
     });
   }
@@ -1761,6 +1779,27 @@ export class BpmnCanvas {
 
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
+  }
+
+  /**
+   * Automatically lays out workflow nodes and edges into a clean DAG diagram.
+   * Executes as an atomic operation wrapped in a single undo step.
+   * @param {Object} [options={}] - Layout configuration options
+   * @param {'LR'|'TB'} [options.direction='LR'] - Flow orientation
+   * @param {boolean} [options.fitView=true] - Whether to zoom-to-fit after layout
+   * @returns {boolean} Whether layout changes were executed
+   */
+  autoArrange(options = {}) {
+    if (!this.hasCapability('allowDrag')) return false;
+
+    return this.batch(() => {
+      const changed = this.autoLayoutManager.autoArrange(options);
+      if (changed && options.fitView !== false) {
+        this.fitView();
+      }
+      this.emit('canvas:autoarrange', { options, changed });
+      return changed;
+    });
   }
 
   exportData() {
