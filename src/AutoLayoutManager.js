@@ -72,7 +72,7 @@ export class AutoLayoutManager {
 
     if (this.nodes.size === 0) return false;
 
-    // 1. Separate nodes: top-level regular nodes vs boundary events vs nested subprocess children
+    // 1. Separate nodes: boundary events vs container children vs top-level nodes
     const allNodesList = Array.from(this.nodes.values());
     const boundaryNodes = new Set();
     const childrenByParent = new Map();
@@ -88,12 +88,86 @@ export class AutoLayoutManager {
       }
     });
 
-    // 2. Layout nested children inside each expanded subprocess container first
-    childrenByParent.forEach((children, parentId) => {
-      const parentNode = this.getNode(parentId);
-      if (parentNode) {
-        this.layoutSubprocessScope(parentNode, children, config);
+    // 2. Bottom-up: Pre-layout children inside each container in local coordinates and compute container dimensions
+    const childRelativeOffsets = new Map();
+
+    // Order containers deepest first if nested
+    const containerNodes = Array.from(childrenByParent.keys())
+      .map(id => this.getNode(id))
+      .filter(Boolean);
+
+    const getDepth = (node) => {
+      let d = 0;
+      let curr = node;
+      while (curr && curr.data?.parentId) {
+        d++;
+        curr = this.getNode(curr.data.parentId);
       }
+      return d;
+    };
+    containerNodes.sort((a, b) => getDepth(b) - getDepth(a));
+
+    containerNodes.forEach(parentNode => {
+      const children = childrenByParent.get(parentNode.id) || [];
+      if (!children.length) return;
+
+      const isExpanded = parentNode.data?.expanded !== false;
+      if (!isExpanded) return; // Collapsed subprocesses hide children
+
+      // Layout children in relative coordinates starting at (0, 0)
+      this.layoutComponent(children, {
+        ...config,
+        startX: 0,
+        startY: 0,
+        horizontalGap: 70,
+        verticalGap: 50,
+        gridSize: 0
+      });
+
+      // Measure bounding box of laid-out children
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      children.forEach(c => {
+        const w = c.domElement?.offsetWidth || c.width || 100;
+        const h = c.domElement?.offsetHeight || c.height || 80;
+        minX = Math.min(minX, c.x);
+        minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x + w);
+        maxY = Math.max(maxY, c.y + h);
+      });
+
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+
+      const padLeft = 40;
+      const padRight = 40;
+      const padTop = 60;  // Ample clearance below the 36px header bar
+      const padBottom = 30; // Clearance above bottom resize grip
+
+      const requiredW = Math.max(parentNode.width || 300, contentW + padLeft + padRight);
+      const requiredH = Math.max(parentNode.height || 200, contentH + padTop + padBottom);
+
+      const grid = config.gridSize > 0 ? config.gridSize : 20;
+      parentNode.width = Math.ceil(requiredW / grid) * grid;
+      parentNode.height = Math.ceil(requiredH / grid) * grid;
+
+      if (parentNode.domElement) {
+        parentNode.domElement.style.width = `${parentNode.width}px`;
+        parentNode.domElement.style.minHeight = `${parentNode.height}px`;
+      }
+      if (typeof parentNode.createPorts === 'function') {
+        parentNode.createPorts();
+      }
+
+      const usableH = parentNode.height - padTop - padBottom;
+      const yOffsetInBody = (usableH - contentH) / 2;
+
+      children.forEach(c => {
+        childRelativeOffsets.set(c.id, {
+          parentId: parentNode.id,
+          relX: padLeft + (c.x - minX),
+          relY: padTop + yOffsetInBody + (c.y - minY)
+        });
+      });
     });
 
     // 3. Collect top-level layout candidate nodes (non-boundary, not nested inside another container)
@@ -121,14 +195,33 @@ export class AutoLayoutManager {
       }
     });
 
-    // 6. Dock all attached boundary events securely to their new host positions
+    // 6. Top-down: Position children at container.x + relX, container.y + relY
+    childRelativeOffsets.forEach((offset, childId) => {
+      const child = this.getNode(childId);
+      const parent = this.getNode(offset.parentId);
+      if (child && parent) {
+        let posX = parent.x + offset.relX;
+        let posY = parent.y + offset.relY;
+        if (config.gridSize > 0) {
+          posX = Math.round(posX / config.gridSize) * config.gridSize;
+          posY = Math.round(posY / config.gridSize) * config.gridSize;
+        }
+        child.setPosition(posX, posY);
+      }
+    });
+
+    containerNodes.forEach(parentNode => {
+      this.ensureSubprocessEnclosesChildren(parentNode.id);
+    });
+
+    // 7. Dock all attached boundary events securely to their new host positions
     allNodesList.forEach(node => {
       if (!this.isBoundary(node)) {
         this.updateAttachedBoundaryPositions(node, node.width, node.height);
       }
     });
 
-    // 7. Re-align edge ports if requested and re-render all edges
+    // 8. Re-align edge ports if requested and re-render all edges
     if (config.optimizePorts) {
       this.optimizeEdgePorts(config.direction);
     }
@@ -213,29 +306,6 @@ export class AutoLayoutManager {
     });
 
     return components;
-  }
-
-  /**
-   * Internal recursive layout for child nodes nested inside a subprocess container.
-   */
-  layoutSubprocessScope(parentNode, children, config) {
-    if (!children.length) return;
-
-    const childIds = new Set(children.map(c => c.id));
-    const isLR = config.direction === 'LR';
-
-    // Start inside the subprocess with a comfortable internal padding
-    const internalStartX = parentNode.x + 40;
-    const internalStartY = parentNode.y + 60;
-
-    this.layoutComponent(children, {
-      ...config,
-      startX: internalStartX,
-      startY: internalStartY
-    });
-
-    // Make sure container auto-sizes to comfortably contain its positioned children
-    this.ensureSubprocessEnclosesChildren(parentNode.id);
   }
 
   /**
@@ -511,4 +581,3 @@ export class AutoLayoutManager {
     });
   }
 }
-

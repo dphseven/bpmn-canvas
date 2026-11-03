@@ -180,8 +180,8 @@ describe('AutoLayoutManager', () => {
       height: 200,
       data: { expanded: true }
     });
-    const child1 = createMockNode({ id: 'c1', type: 'start-event', data: { parentId: 'sub1' } });
-    const child2 = createMockNode({ id: 'c2', type: 'task', data: { parentId: 'sub1' } });
+    const child1 = createMockNode({ id: 'c1', type: 'start-event', width: 48, height: 48, data: { parentId: 'sub1' } });
+    const child2 = createMockNode({ id: 'c2', type: 'task', width: 120, height: 80, data: { parentId: 'sub1' } });
 
     nodes.set('sub1', sub);
     nodes.set('c1', child1);
@@ -194,6 +194,17 @@ describe('AutoLayoutManager', () => {
     expect(child1.setPosition).toHaveBeenCalled();
     expect(child2.setPosition).toHaveBeenCalled();
     expect(ensureSubprocessEnclosesChildren).toHaveBeenCalledWith('sub1');
+
+    // Children must be strictly contained inside the subprocess container
+    expect(child1.x).toBeGreaterThanOrEqual(sub.x);
+    expect(child1.x + child1.width).toBeLessThanOrEqual(sub.x + sub.width);
+    expect(child1.y).toBeGreaterThanOrEqual(sub.y + 40); // below header
+    expect(child1.y + child1.height).toBeLessThanOrEqual(sub.y + sub.height);
+
+    expect(child2.x).toBeGreaterThanOrEqual(sub.x);
+    expect(child2.x + child2.width).toBeLessThanOrEqual(sub.x + sub.width);
+    expect(child2.y).toBeGreaterThanOrEqual(sub.y + 40);
+    expect(child2.y + child2.height).toBeLessThanOrEqual(sub.y + sub.height);
   });
 
   it('stacks multiple disconnected workflow components without overlap', () => {
