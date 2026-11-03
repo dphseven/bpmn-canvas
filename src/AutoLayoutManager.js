@@ -54,8 +54,8 @@ export class AutoLayoutManager {
    * @param {number} [options.horizontalGap=100] - Space between horizontal columns (px)
    * @param {number} [options.verticalGap=80] - Space between parallel vertical rows (px)
    * @param {number} [options.startX=100] - Top-left starting X coordinate
-   * @param {number} [options.startY=140] - Top-left starting Y baseline coordinate
-   * @param {number} [options.gridSize=20] - Grid snap size in px
+   * @param {number} [options.startY=140] - Baseline center Y coordinate for primary flow
+   * @param {number} [options.gridSize=20] - Grid snap size in px for column positions
    * @param {boolean} [options.optimizePorts=true] - Whether to reassign edge ports to natural flow
    * @returns {boolean} Whether any layout modifications were made
    */
@@ -127,8 +127,8 @@ export class AutoLayoutManager {
       // Measure bounding box of laid-out children
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       children.forEach(c => {
-        const w = c.domElement?.offsetWidth || c.width || 100;
-        const h = c.domElement?.offsetHeight || c.height || 80;
+        const w = c.width || 100;
+        const h = c.height || 80;
         minX = Math.min(minX, c.x);
         minY = Math.min(minY, c.y);
         maxX = Math.max(maxX, c.x + w);
@@ -138,13 +138,13 @@ export class AutoLayoutManager {
       const contentW = maxX - minX;
       const contentH = maxY - minY;
 
-      const padLeft = 40;
-      const padRight = 40;
-      const padTop = 60;  // Ample clearance below the 36px header bar
-      const padBottom = 30; // Clearance above bottom resize grip
+      const padLeft = 50;
+      const padRight = 50;
+      const padTop = 56;  // Clearance below the 36px header bar
+      const padBottom = 34; // Clearance above bottom resize grip
 
       const requiredW = Math.max(parentNode.width || 300, contentW + padLeft + padRight);
-      const requiredH = Math.max(parentNode.height || 200, contentH + padTop + padBottom);
+      const requiredH = Math.max(parentNode.height || 240, contentH + padTop + padBottom);
 
       const grid = config.gridSize > 0 ? config.gridSize : 20;
       parentNode.width = Math.ceil(requiredW / grid) * grid;
@@ -158,14 +158,11 @@ export class AutoLayoutManager {
         parentNode.createPorts();
       }
 
-      const usableH = parentNode.height - padTop - padBottom;
-      const yOffsetInBody = (usableH - contentH) / 2;
-
       children.forEach(c => {
         childRelativeOffsets.set(c.id, {
           parentId: parentNode.id,
           relX: padLeft + (c.x - minX),
-          relY: padTop + yOffsetInBody + (c.y - minY)
+          relCenterY: c.y + c.height / 2
         });
       });
     });
@@ -195,16 +192,17 @@ export class AutoLayoutManager {
       }
     });
 
-    // 6. Top-down: Position children at container.x + relX, container.y + relY
+    // 6. Top-down: Position children inside parent container with center-line alignment
     childRelativeOffsets.forEach((offset, childId) => {
       const child = this.getNode(childId);
       const parent = this.getNode(offset.parentId);
       if (child && parent) {
         let posX = parent.x + offset.relX;
-        let posY = parent.y + offset.relY;
+        let parentCenterY = parent.y + parent.height / 2;
+        let posY = (parentCenterY + offset.relCenterY) - child.height / 2;
+
         if (config.gridSize > 0) {
           posX = Math.round(posX / config.gridSize) * config.gridSize;
-          posY = Math.round(posY / config.gridSize) * config.gridSize;
         }
         child.setPosition(posX, posY);
       }
@@ -309,7 +307,7 @@ export class AutoLayoutManager {
   }
 
   /**
-   * Lays out a single connected component of nodes.
+   * Lays out a single connected component of nodes with center-line alignment.
    */
   layoutComponent(nodes, config) {
     const isLR = config.direction === 'LR';
@@ -342,7 +340,7 @@ export class AutoLayoutManager {
 
     // 2. Identify and separate feedback (cycle) edges via DFS
     const feedbackEdges = new Set();
-    const dfsState = new Map(); // 0: unvisited, 1: visiting, 2: visited
+    const dfsState = new Map();
 
     const detectCycles = (u) => {
       dfsState.set(u, 1);
@@ -350,7 +348,6 @@ export class AutoLayoutManager {
       for (const v of neighbors) {
         const state = dfsState.get(v) || 0;
         if (state === 1) {
-          // Back-edge detected
           feedbackEdges.add(`${u}->${v}`);
         } else if (state === 0) {
           detectCycles(v);
@@ -359,7 +356,6 @@ export class AutoLayoutManager {
       dfsState.set(u, 2);
     };
 
-    // Prioritize start events as DFS root nodes
     nodes.slice().sort((a, b) => {
       const aStart = a.type?.startsWith('start-') ? 1 : 0;
       const bStart = b.type?.startsWith('start-') ? 1 : 0;
@@ -383,8 +379,7 @@ export class AutoLayoutManager {
       });
     });
 
-    // Nodes with 0 forward in-degree become Layer 0 roots
-    const layers = new Map(); // nodeId -> layer
+    const layers = new Map();
     const queue = [];
 
     nodes.forEach(n => {
@@ -394,13 +389,11 @@ export class AutoLayoutManager {
       }
     });
 
-    // Fallback if all nodes are cyclic
     if (queue.length === 0 && nodes.length > 0) {
       layers.set(nodes[0].id, 0);
       queue.push(nodes[0].id);
     }
 
-    // Topological forward propagation
     while (queue.length > 0) {
       const u = queue.shift();
       const currentLayer = layers.get(u);
@@ -417,14 +410,12 @@ export class AutoLayoutManager {
       }
     }
 
-    // Any unassigned nodes (disconnected within component) go to Layer 0
     nodes.forEach(n => {
       if (!layers.has(n.id)) {
         layers.set(n.id, 0);
       }
     });
 
-    // 4. Group nodes into layer buckets
     const layerBuckets = new Map();
     nodes.forEach(n => {
       const layer = layers.get(n.id);
@@ -436,12 +427,35 @@ export class AutoLayoutManager {
 
     const sortedLayerKeys = Array.from(layerBuckets.keys()).sort((a, b) => a - b);
 
-    // 5. Vertical / cross-axis ordering using Barycenter heuristic to minimize crossings
+    let currentMainAxisPos = isLR ? config.startX : config.startY;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
     sortedLayerKeys.forEach(layerIdx => {
       const bucket = layerBuckets.get(layerIdx);
 
+      // Compute barycenters from already-positioned lower-layer predecessors
+      bucket.forEach(node => {
+        const incomingNodes = [];
+        this.edges.forEach(edge => {
+          let sId = edge.sourceId;
+          let tId = edge.targetId;
+          const sNode = this.getNode(sId);
+          if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
+
+          if (tId === node.id && nodeMap.has(sId) && layers.get(sId) < layerIdx) {
+            incomingNodes.push(nodeMap.get(sId));
+          }
+        });
+
+        if (incomingNodes.length > 0) {
+          const sumPos = incomingNodes.reduce((acc, p) => acc + (isLR ? (p.y + p.height / 2) : (p.x + p.width / 2)), 0);
+          node._barycenter = sumPos / incomingNodes.length;
+        } else {
+          node._barycenter = null;
+        }
+      });
+
       if (layerIdx === 0) {
-        // Sort Layer 0 roots: start events first, then by existing vertical position
         bucket.sort((a, b) => {
           const aStart = a.type?.startsWith('start-') ? 1 : 0;
           const bStart = b.type?.startsWith('start-') ? 1 : 0;
@@ -449,65 +463,32 @@ export class AutoLayoutManager {
           return isLR ? a.y - b.y : a.x - b.x;
         });
       } else {
-        // Calculate barycenter based on incoming predecessors from lower layers
-        bucket.forEach(node => {
-          const incomingNodes = [];
-          this.edges.forEach(edge => {
-            let sId = edge.sourceId;
-            let tId = edge.targetId;
-            const sNode = this.getNode(sId);
-            if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
-
-            if (tId === node.id && nodeMap.has(sId) && layers.get(sId) < layerIdx) {
-              incomingNodes.push(nodeMap.get(sId));
-            }
-          });
-
-          if (incomingNodes.length > 0) {
-            const sumPos = incomingNodes.reduce((acc, p) => acc + (isLR ? p.y : p.x), 0);
-            node._barycenter = sumPos / incomingNodes.length;
-          } else {
-            node._barycenter = isLR ? node.y : node.x;
-          }
-        });
-
-        bucket.sort((a, b) => (a._barycenter || 0) - (b._barycenter || 0));
-        bucket.forEach(n => delete n._barycenter);
+        bucket.sort((a, b) => (a._barycenter ?? 0) - (b._barycenter ?? 0));
       }
-    });
 
-    // 6. Assign clean, non-overlapping coordinates snapped to grid
-    let currentMainAxisPos = isLR ? config.startX : config.startY;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-    sortedLayerKeys.forEach(layerIdx => {
-      const bucket = layerBuckets.get(layerIdx);
-
-      // Main axis dimension (width if LR, height if TB)
+      // Authoritative width/height directly from model, immune to in-flight CSS transitions
       const maxMainAxisSize = Math.max(
-        ...bucket.map(n => isLR ? (n.domElement?.offsetWidth || n.width) : (n.domElement?.offsetHeight || n.height))
+        ...bucket.map(n => isLR ? (n.width || 100) : (n.height || 80))
       );
 
-      // Calculate total cross-axis span of this column/row
-      const crossAxisSizes = bucket.map(n => isLR ? (n.domElement?.offsetHeight || n.height) : (n.domElement?.offsetWidth || n.width));
-      const totalCrossSpan = crossAxisSizes.reduce((sum, s) => sum + s, 0) + (bucket.length - 1) * (isLR ? config.verticalGap : config.horizontalGap);
-
-      // Center nodes vertically around baseline
       const crossBaseline = isLR ? config.startY : config.startX;
-      let currentCrossPos = crossBaseline - totalCrossSpan / 2;
 
-      bucket.forEach((node, i) => {
-        const nodeW = node.domElement?.offsetWidth || node.width;
-        const nodeH = node.domElement?.offsetHeight || node.height;
-        const nodeCrossSize = isLR ? nodeH : nodeW;
+      if (bucket.length === 1) {
+        const node = bucket[0];
+        const nodeW = node.width || 100;
+        const nodeH = node.height || 80;
 
-        let posX = isLR ? currentMainAxisPos : currentCrossPos;
-        let posY = isLR ? currentCrossPos : currentMainAxisPos;
+        // Single node aligns its center precisely with predecessor center or baseline
+        const targetCenter = (node._barycenter !== null && node._barycenter !== undefined)
+          ? node._barycenter
+          : crossBaseline;
 
-        // Snap to grid
+        let posX = isLR ? currentMainAxisPos : (targetCenter - nodeW / 2);
+        let posY = isLR ? (targetCenter - nodeH / 2) : currentMainAxisPos;
+
         if (config.gridSize > 0) {
-          posX = Math.round(posX / config.gridSize) * config.gridSize;
-          posY = Math.round(posY / config.gridSize) * config.gridSize;
+          if (isLR) posX = Math.round(posX / config.gridSize) * config.gridSize;
+          else posY = Math.round(posY / config.gridSize) * config.gridSize;
         }
 
         node.setPosition(posX, posY);
@@ -516,11 +497,56 @@ export class AutoLayoutManager {
         minY = Math.min(minY, posY);
         maxX = Math.max(maxX, posX + nodeW);
         maxY = Math.max(maxY, posY + nodeH);
+      } else {
+        // Multi-node column (gateway branches, etc.)
+        const maxNodeCrossSize = Math.max(
+          ...bucket.map(n => isLR ? (n.height || 80) : (n.width || 100))
+        );
+        const rowPitch = maxNodeCrossSize + (isLR ? config.verticalGap : config.horizontalGap);
+        const totalSpan = (bucket.length - 1) * rowPitch;
+        const startCenter = crossBaseline - totalSpan / 2;
 
-        currentCrossPos += nodeCrossSize + (isLR ? config.verticalGap : config.horizontalGap);
-      });
+        // Check if all nodes in bucket have distinct, non-overlapping predecessor barycenters
+        const allHaveBary = bucket.every(n => n._barycenter !== null && n._barycenter !== undefined);
+        let canUseBarycenters = allHaveBary;
+        if (allHaveBary && bucket.length > 1) {
+          for (let i = 0; i < bucket.length - 1; i++) {
+            if (bucket[i + 1]._barycenter - bucket[i]._barycenter < maxNodeCrossSize + 20) {
+              canUseBarycenters = false;
+              break;
+            }
+          }
+        }
 
-      currentMainAxisPos += maxMainAxisSize + (isLR ? config.horizontalGap : config.verticalGap);
+        bucket.forEach((node, i) => {
+          const nodeW = node.width || 100;
+          const nodeH = node.height || 80;
+
+          let targetCenter = canUseBarycenters ? node._barycenter : (startCenter + i * rowPitch);
+
+          let posX = isLR ? currentMainAxisPos : (targetCenter - nodeW / 2);
+          let posY = isLR ? (targetCenter - nodeH / 2) : currentMainAxisPos;
+
+          if (config.gridSize > 0) {
+            if (isLR) posX = Math.round(posX / config.gridSize) * config.gridSize;
+            else posY = Math.round(posY / config.gridSize) * config.gridSize;
+          }
+
+          node.setPosition(posX, posY);
+
+          minX = Math.min(minX, posX);
+          minY = Math.min(minY, posY);
+          maxX = Math.max(maxX, posX + nodeW);
+          maxY = Math.max(maxY, posY + nodeH);
+        });
+      }
+
+      bucket.forEach(n => delete n._barycenter);
+
+      // Ample clearance after subprocess containers to guarantee edges don't double back
+      const isSubproc = bucket.some(n => n.type === 'subprocess' || n.data?.expanded);
+      const gap = isSubproc ? Math.max(config.horizontalGap, 130) : config.horizontalGap;
+      currentMainAxisPos += maxMainAxisSize + gap;
     });
 
     return { minX, minY, maxX, maxY };
@@ -538,9 +564,7 @@ export class AutoLayoutManager {
 
       if (!sourceNode || !targetNode) return;
 
-      // Do not override custom ports on boundary events unless needed
       if (this.isBoundary(sourceNode)) {
-        // Boundary events typically connect from their outward port
         const dockEdge = sourceNode.data?.dockEdge || 'bottom';
         let sPort = dockEdge;
         if (dockEdge === 'bottom') sPort = 'bottom';

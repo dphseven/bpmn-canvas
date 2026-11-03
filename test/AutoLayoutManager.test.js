@@ -84,10 +84,15 @@ describe('AutoLayoutManager', () => {
     expect(start.x).toBeLessThan(task.x);
     expect(task.x).toBeLessThan(end.x);
 
-    // Verify grid snapping (snapped to 20 by default)
+    // Verify grid snapping for columns (snapped to 20 by default)
     expect(start.x % 20).toBe(0);
     expect(task.x % 20).toBe(0);
     expect(end.x % 20).toBe(0);
+
+    // Verify perfect vertical center alignment across nodes of different heights
+    expect(start.y + start.height / 2).toBe(100);
+    expect(task.y + task.height / 2).toBe(100);
+    expect(end.y + end.height / 2).toBe(100);
 
     // Verify connected edges were updated
     expect(updateConnectedEdges).toHaveBeenCalledWith('start');
@@ -227,6 +232,39 @@ describe('AutoLayoutManager', () => {
     // Both components laid out; Component 2 must be offset vertically below Component 1
     expect(a1.y).not.toBe(b1.y);
     expect(Math.abs(b1.y - a1.y)).toBeGreaterThanOrEqual(100);
+  });
+
+  it('guarantees ample clearance and center alignment between subprocess and downstream nodes', () => {
+    const sub = createMockNode({
+      id: 'sub1',
+      type: 'subprocess',
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 200,
+      data: { expanded: true }
+    });
+    const gw = createMockNode({
+      id: 'gw1',
+      type: 'exclusive-gateway',
+      width: 56,
+      height: 56
+    });
+
+    nodes.set('sub1', sub);
+    nodes.set('gw1', gw);
+    edges.set('e1', createMockEdge({ sourceId: 'sub1', targetId: 'gw1' }));
+
+    manager.autoArrange({ direction: 'LR', horizontalGap: 100, startY: 140 });
+
+    // Clearance between subprocess right border and gateway left border must be >= 120px
+    const subRight = sub.x + sub.width;
+    const clearance = gw.x - subRight;
+    expect(clearance).toBeGreaterThanOrEqual(120);
+
+    // Both should have identical vertical center line
+    expect(sub.y + sub.height / 2).toBe(140);
+    expect(gw.y + gw.height / 2).toBe(140);
   });
 });
 
