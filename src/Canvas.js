@@ -1624,6 +1624,11 @@ export class BpmnCanvas {
     const validation = this.registry.validateConnection(sourceNode, targetNode, { config });
     if (!validation.valid) {
       console.warn(`BPMN 2.0 Violation: ${validation.reason || 'Invalid connection.'}`);
+      this.emit('connection:rejected', {
+        sourceId: config.sourceId,
+        targetId: config.targetId,
+        reason: validation.reason || 'Invalid connection.'
+      });
       return null;
     }
 
@@ -1895,6 +1900,89 @@ export class BpmnCanvas {
    */
   onSemanticTelemetry(callback) {
     return this.semanticAdapter.onTelemetry(callback);
+  }
+
+  /**
+   * Subscribes a listener to human user intent signals (selections, violations).
+   * @param {Function} callback
+   * @returns {Function} Unsubscribe function
+   */
+  onSemanticIntent(callback) {
+    return this.semanticAdapter.onIntent(callback);
+  }
+
+  /**
+   * Centers viewport on the specified node.
+   * @param {string} nodeId
+   * @param {Object} [options={}]
+   * @returns {boolean}
+   */
+  focusNode(nodeId, options = {}) {
+    return this.semanticAdapter.focusNode(nodeId, options);
+  }
+
+  /**
+   * Highlights nodes with visual badges and halos.
+   * @param {string[]} nodeIds
+   * @param {Object} [options={}]
+   */
+  highlightNodes(nodeIds, options = {}) {
+    return this.semanticAdapter.highlightNodes(nodeIds, options);
+  }
+
+  /**
+   * Clears all active agent highlights.
+   */
+  clearHighlights() {
+    return this.semanticAdapter.clearHighlights();
+  }
+
+  /**
+   * Runs the BPMN 2.0 Semantic Linter on the current graph.
+   * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+   */
+  validateWorkflow() {
+    return this.semanticAdapter.validateWorkflow();
+  }
+
+  /**
+   * Retrieves upstream nodes for the given node.
+   * @param {string} nodeId
+   * @param {Object} [options={}]
+   * @returns {Array<import('./Node.js').BpmnNode>}
+   */
+  getUpstreamNodes(nodeId, options = {}) {
+    return this.semanticAdapter.getUpstreamNodes(nodeId, options);
+  }
+
+  /**
+   * Retrieves downstream nodes for the given node.
+   * @param {string} nodeId
+   * @param {Object} [options={}]
+   * @returns {Array<import('./Node.js').BpmnNode>}
+   */
+  getDownstreamNodes(nodeId, options = {}) {
+    return this.semanticAdapter.getDownstreamNodes(nodeId, options);
+  }
+
+  /**
+   * Finds all distinct sequence flow paths between startId and endId.
+   * @param {string} startId
+   * @param {string} endId
+   * @param {Object} [options={}]
+   * @returns {Array<string[]>}
+   */
+  findPaths(startId, endId, options = {}) {
+    return this.semanticAdapter.findPaths(startId, endId, options);
+  }
+
+  /**
+   * Runs deterministic path simulation based on branch decisions.
+   * @param {Object} [options={}]
+   * @returns {{ success: boolean, endReached: string|null, visitedNodes: string[], cycles: number }}
+   */
+  simulatePath(options = {}) {
+    return this.semanticAdapter.simulatePath(options);
   }
 
   loadData(data) {

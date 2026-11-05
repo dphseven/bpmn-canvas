@@ -494,6 +494,7 @@ describe('SemanticAdapter', () => {
         type: 'start-event',
         label: 'Start',
         parentId: null,
+        hostNodeId: null,
         properties: { role: 'admin' }
       });
       // Coordinates and DOM references must NOT be present
@@ -551,6 +552,272 @@ describe('SemanticAdapter', () => {
       ]);
 
       expect(canvas.getNode('direct_task').label).toBe('Updated Directly');
+    });
+  });
+
+  // ==========================================
+  // Area 8: Advanced BPMN Mutations
+  // ==========================================
+  describe('Advanced BPMN Mutations', () => {
+    it('attaches a boundary event to an activity and connects outgoing sequence flow', () => {
+      const host = canvas.addNode({ id: 'host_task', type: 'task', label: 'Host Activity', x: 200, y: 150 });
+      const target = canvas.addNode({ id: 'err_handler', type: 'task', label: 'Error Handler', x: 450, y: 300 });
+
+      const result = adapter.attachBoundaryEvent({
+        hostId: 'host_task',
+        type: 'boundary-timer-event',
+        label: 'Timeout',
+        edge: 'bottom',
+        outgoingFlow: {
+          targetId: 'err_handler',
+          label: 'On Timeout'
+        }
+      });
+
+      expect(result.boundaryNode).toBeDefined();
+      expect(result.boundaryNode.data.hostNodeId).toBe('host_task');
+      expect(result.edge).toBeDefined();
+      expect(result.edge.sourceId).toBe(result.boundaryNode.id);
+      expect(result.edge.targetId).toBe('err_handler');
+      expect(result.edge.label).toBe('On Timeout');
+    });
+
+    it('throws error when attaching boundary event to non-dockable node', () => {
+      canvas.addNode({ id: 'start_1', type: 'start-event', label: 'Start' });
+
+      expect(() => {
+        adapter.attachBoundaryEvent({
+          hostId: 'start_1',
+          type: 'boundary-timer-event'
+        });
+      }).toThrow(/cannot host boundary events/);
+    });
+
+    it('adds a text annotation linked via association edge', () => {
+      const task = canvas.addNode({ id: 'annotated_task', type: 'task', label: 'Important Task', x: 100, y: 100 });
+
+      const result = adapter.addAnnotation({
+        targetId: 'annotated_task',
+        text: 'Explanation of business logic',
+        placement: { position: 'above', offset: 30 }
+      });
+
+      expect(result.annotationNode).toBeDefined();
+      expect(result.annotationNode.type).toBe('text-annotation');
+      expect(result.annotationNode.label).toBe('Explanation of business logic');
+      expect(result.edge).toBeDefined();
+      expect(result.edge.sourceId).toBe('annotated_task');
+      expect(result.edge.targetId).toBe(result.annotationNode.id);
+    });
+
+    it('morphs node type in-place while preserving connections and ID', () => {
+      canvas.addNode({ id: 'm1', type: 'task', label: 'Generic Task' });
+      canvas.addNode({ id: 'm2', type: 'task', label: 'Target' });
+      canvas.addEdge({ id: 'me1', sourceId: 'm1', targetId: 'm2' });
+
+      const morphed = adapter.morphNode('m1', 'service-task');
+
+      expect(morphed.type).toBe('service-task');
+      expect(morphed.id).toBe('m1');
+      expect(canvas.edges.get('me1').sourceId).toBe('m1');
+    });
+
+    it('wraps multiple nodes in a subprocess and extracts them cleanly', () => {
+      const n1 = canvas.addNode({ id: 'sub_c1', type: 'task', label: 'Child 1', x: 100, y: 100, width: 100, height: 80 });
+      const n2 = canvas.addNode({ id: 'sub_c2', type: 'task', label: 'Child 2', x: 250, y: 100, width: 100, height: 80 });
+
+      // Wrap in subprocess
+      const sub = adapter.wrapInSubprocess({
+        nodeIds: ['sub_c1', 'sub_c2'],
+        label: 'Encapsulated Process',
+        id: 'parent_sub'
+      });
+
+      expect(sub).toBeDefined();
+      expect(sub.type).toBe('subprocess');
+      expect(n1.data.parentId).toBe('parent_sub');
+      expect(n2.data.parentId).toBe('parent_sub');
+
+      // Extract from subprocess
+      const extracted = adapter.extractFromSubprocess('parent_sub');
+      expect(extracted).toBe(true);
+
+      expect(canvas.getNode('parent_sub')).toBeUndefined();
+      expect(canvas.getNode('sub_c1')).toBeDefined();
+      expect(canvas.getNode('sub_c2')).toBeDefined();
+      expect(canvas.getNode('sub_c1').data.parentId).toBeUndefined();
+      expect(canvas.getNode('sub_c2').data.parentId).toBeUndefined();
+    });
+  });
+
+  // ==========================================
+  // Area 9: Visual Voice & Attention Tools
+  // ==========================================
+  describe('Visual Voice & Attention Tools', () => {
+    it('focuses viewport on a specific node', () => {
+      const node = canvas.addNode({ id: 'target_focus', type: 'task', label: 'Center Me', x: 600, y: 400 });
+
+      const focused = adapter.focusNode('target_focus');
+      expect(focused).toBe(true);
+      expect(Number.isFinite(canvas.panX)).toBe(true);
+      expect(Number.isFinite(canvas.panY)).toBe(true);
+    });
+
+    it('applies and clears highlights with color classes and message badges', () => {
+      const n1 = canvas.addNode({ id: 'h1', type: 'task', label: 'H1' });
+      const n2 = canvas.addNode({ id: 'h2', type: 'task', label: 'H2' });
+
+      adapter.highlightNodes(['h1'], { color: 'cyan', pulse: true, message: 'Look Here' });
+
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight')).toBe(true);
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight-cyan')).toBe(true);
+      expect(n1.domElement.classList.contains('bpmn-agent-pulse')).toBe(true);
+
+      const badge = n1.domElement.querySelector('.bpmn-agent-badge');
+      expect(badge).toBeDefined();
+      expect(badge.textContent).toBe('Look Here');
+
+      // Clear highlights
+      adapter.clearHighlights();
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+      expect(n1.domElement.querySelector('.bpmn-agent-badge')).toBeNull();
+    });
+  });
+
+  // ==========================================
+  // Area 10: Graph Reasoning & Semantic Linter
+  // ==========================================
+  describe('Graph Reasoning & Semantic Linter', () => {
+    it('accurately traces upstream and downstream node lineage', () => {
+      canvas.addNode({ id: 'start', type: 'start-event', label: 'Start' });
+      canvas.addNode({ id: 'step1', type: 'task', label: 'Step 1' });
+      canvas.addNode({ id: 'step2', type: 'task', label: 'Step 2' });
+      canvas.addNode({ id: 'end', type: 'end-event', label: 'End' });
+
+      canvas.addEdge({ sourceId: 'start', targetId: 'step1' });
+      canvas.addEdge({ sourceId: 'step1', targetId: 'step2' });
+      canvas.addEdge({ sourceId: 'step2', targetId: 'end' });
+
+      const upstreamOfStep2 = adapter.getUpstreamNodes('step2');
+      const upstreamIds = upstreamOfStep2.map(n => n.id);
+      expect(upstreamIds).toContain('step1');
+      expect(upstreamIds).toContain('start');
+
+      const downstreamOfStep1 = adapter.getDownstreamNodes('step1');
+      const downstreamIds = downstreamOfStep1.map(n => n.id);
+      expect(downstreamIds).toContain('step2');
+      expect(downstreamIds).toContain('end');
+    });
+
+    it('finds distinct path sequences between nodes', () => {
+      canvas.addNode({ id: 's', type: 'start-event', label: 'S' });
+      canvas.addNode({ id: 'gw', type: 'gateway-exclusive', label: 'Branch' });
+      canvas.addNode({ id: 'p1', type: 'task', label: 'Path 1' });
+      canvas.addNode({ id: 'p2', type: 'task', label: 'Path 2' });
+      canvas.addNode({ id: 'e', type: 'end-event', label: 'E' });
+
+      canvas.addEdge({ sourceId: 's', targetId: 'gw' });
+      canvas.addEdge({ sourceId: 'gw', targetId: 'p1' });
+      canvas.addEdge({ sourceId: 'gw', targetId: 'p2' });
+      canvas.addEdge({ sourceId: 'p1', targetId: 'e' });
+      canvas.addEdge({ sourceId: 'p2', targetId: 'e' });
+
+      const paths = adapter.findPaths('s', 'e');
+      expect(paths.length).toBe(2);
+      expect(paths[0]).toEqual(['s', 'gw', 'p1', 'e']);
+      expect(paths[1]).toEqual(['s', 'gw', 'p2', 'e']);
+    });
+
+    it('validates workflow and reports errors for BPMN violations', () => {
+      // Create orphan node and detached boundary event
+      canvas.addNode({ id: 'orphan', type: 'task', label: 'Lonely Task' });
+      canvas.addNode({ id: 'start_node', type: 'start-event', label: 'Start' });
+      canvas.addNode({ id: 'bad_boundary', type: 'boundary-timer-event', label: 'Detached Timer' });
+
+      // Directly add an invalid flow into start event to test linter detection
+      canvas.edges.set('invalid_flow', { id: 'invalid_flow', sourceId: 'orphan', targetId: 'start_node' });
+
+      const report = adapter.validateWorkflow();
+      expect(report.valid).toBe(false);
+      expect(report.errors.some(e => e.includes('Start event') && e.includes('cannot have incoming'))).toBe(true);
+      expect(report.errors.some(e => e.includes('Detached boundary event'))).toBe(true);
+    });
+
+    it('validates a clean workflow successfully', () => {
+      canvas.applySemanticGraph({
+        nodes: [
+          { id: 's', type: 'start-event', label: 'Start' },
+          { id: 't', type: 'task', label: 'Do Work' },
+          { id: 'e', type: 'end-event', label: 'End' }
+        ],
+        edges: [
+          { source: 's', target: 't' },
+          { source: 't', target: 'e' }
+        ]
+      });
+
+      const report = adapter.validateWorkflow();
+      expect(report.valid).toBe(true);
+      expect(report.errors.length).toBe(0);
+    });
+  });
+
+  // ==========================================
+  // Area 11: Intent Telemetry & Simulation
+  // ==========================================
+  describe('Intent Telemetry & Simulation Control', () => {
+    it('transmits human user:select intent telemetry when a node is selected', () => {
+      const intentHandler = vi.fn();
+      adapter.onIntent(intentHandler);
+
+      const node = canvas.addNode({ id: 'user_picked', type: 'task', label: 'Selected Task' });
+      canvas.selectionManager.selectNode(node);
+
+      expect(intentHandler).toHaveBeenCalled();
+      const payload = intentHandler.mock.calls[0][0];
+      expect(payload.type).toBe('user:select');
+      expect(payload.nodeId).toBe('user_picked');
+    });
+
+    it('runs deterministic path simulation with branch decisions', () => {
+      canvas.applySemanticGraph({
+        nodes: [
+          { id: 'start', type: 'start-event', label: 'Start' },
+          { id: 'gw', type: 'gateway-exclusive', label: 'Decision' },
+          { id: 'appr', type: 'task', label: 'Approved Task' },
+          { id: 'rej', type: 'task', label: 'Rejected Task' },
+          { id: 'end_ok', type: 'end-event', label: 'Success' },
+          { id: 'end_fail', type: 'end-event', label: 'Failed' }
+        ],
+        edges: [
+          { source: 'start', target: 'gw' },
+          { source: 'gw', target: 'appr', label: 'Yes' },
+          { source: 'gw', target: 'rej', label: 'No' },
+          { source: 'appr', target: 'end_ok' },
+          { source: 'rej', target: 'end_fail' }
+        ]
+      });
+
+      // Simulate branch 'Yes'
+      const simYes = adapter.simulatePath({
+        startId: 'start',
+        decisions: { 'gw': 'Yes' }
+      });
+
+      expect(simYes.success).toBe(true);
+      expect(simYes.endReached).toBe('end_ok');
+      expect(simYes.visitedNodes).toContain('appr');
+      expect(simYes.visitedNodes).not.toContain('rej');
+
+      // Simulate branch 'No'
+      const simNo = adapter.simulatePath({
+        startId: 'start',
+        decisions: { 'gw': 'No' }
+      });
+
+      expect(simNo.success).toBe(true);
+      expect(simNo.endReached).toBe('end_fail');
+      expect(simNo.visitedNodes).toContain('rej');
     });
   });
 });
