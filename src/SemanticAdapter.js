@@ -581,17 +581,16 @@ export class SemanticAdapter {
       let targetPort = 'bottom';
 
       if (targetNode) {
-        let pos = placement.position;
-        if (!pos || pos === 'auto') {
-          // If clearance above the target is too tight (< 30px to ceiling), place below
-          if (targetNode.y - annotH - offset < 20) {
-            pos = 'below';
-          } else {
-            pos = 'above';
-          }
-        }
+        const pos = placement.position || 'auto';
 
         switch (pos) {
+          case 'auto':
+          case 'top-right':
+            x = targetNode.x + targetNode.width - 20;
+            y = targetNode.y - annotH - (placement.offset || 25);
+            sourcePort = 'top';
+            targetPort = 'left';
+            break;
           case 'above':
             x = targetNode.x + Math.max(0, (targetNode.width - annotW) / 2);
             y = targetNode.y - annotH - offset;
@@ -617,10 +616,10 @@ export class SemanticAdapter {
             targetPort = 'right';
             break;
           default:
-            x = targetNode.x;
-            y = targetNode.y - annotH - offset;
+            x = targetNode.x + targetNode.width - 20;
+            y = targetNode.y - annotH - (placement.offset || 25);
             sourcePort = 'top';
-            targetPort = 'bottom';
+            targetPort = 'left';
         }
       } else {
         x = 100;

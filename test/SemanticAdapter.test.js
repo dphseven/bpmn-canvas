@@ -631,8 +631,8 @@ describe('SemanticAdapter', () => {
       const collides = overlapsX && overlapsY;
 
       expect(collides).toBe(false);
-      // Auto-placement places it below where there is clear space
-      expect(annot.y).toBeGreaterThanOrEqual(taskBottom);
+      // Top-right diagonal placement stays strictly clear above the task
+      expect(annotBottom).toBeLessThanOrEqual(task.y);
     });
 
     it('morphs node type in-place while preserving connections and ID', () => {
