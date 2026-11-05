@@ -716,6 +716,76 @@ describe('BpmnCanvas', () => {
     expect(canvas.getNode(n1.id).x).toBeLessThan(canvas.getNode(n2.id).x);
     expect(fitViewSpy).toHaveBeenCalled();
   });
+
+  describe('Semantic Layer & Agentic Integration', () => {
+    it('initializes SemanticAdapter on Canvas instance with full delegation API', () => {
+      expect(canvas.semanticAdapter).toBeDefined();
+
+      // applySemanticGraph
+      const res = canvas.applySemanticGraph({
+        nodes: [
+          { id: 'start_node', type: 'start-event', label: 'Start' },
+          { id: 'task_node', type: 'task', label: 'Work' },
+          { id: 'end_node', type: 'end-event', label: 'End' }
+        ],
+        edges: [
+          { source: 'start_node', target: 'task_node' },
+          { source: 'task_node', target: 'end_node' }
+        ]
+      }, { autoLayout: false });
+      expect(res.nodes.length).toBe(3);
+      expect(res.edges.length).toBe(2);
+
+      // getSemanticSnapshot
+      const snapshot = canvas.getSemanticSnapshot();
+      expect(snapshot.nodes.length).toBe(3);
+      expect(snapshot.edges.length).toBe(2);
+
+      // graph reasoning queries
+      const upstream = canvas.getUpstreamNodes('task_node');
+      expect(upstream.map(n => n.id)).toContain('start_node');
+
+      const downstream = canvas.getDownstreamNodes('task_node');
+      expect(downstream.map(n => n.id)).toContain('end_node');
+
+      const paths = canvas.findPaths('start_node', 'end_node');
+      expect(paths).toEqual([['start_node', 'task_node', 'end_node']]);
+
+      // linter validation
+      const validation = canvas.validateWorkflow();
+      expect(validation.valid).toBe(true);
+
+      // simulation
+      const sim = canvas.simulatePath({ startId: 'start_node' });
+      expect(sim.success).toBe(true);
+      expect(sim.endReached).toBe('end_node');
+
+      // visual attention
+      expect(canvas.focusNode('task_node')).toBe(true);
+      canvas.highlightNodes(['task_node'], { color: 'amber', comment: 'Needs review' });
+      expect(canvas.semanticAdapter.highlightedNodes.has('task_node')).toBe(true);
+      canvas.clearHighlights();
+      expect(canvas.semanticAdapter.highlightedNodes.has('task_node')).toBe(false);
+
+      // telemetry and intent listeners
+      const teleFn = vi.fn();
+      const unsubTele = canvas.onSemanticTelemetry(teleFn);
+      expect(typeof unsubTele).toBe('function');
+      unsubTele();
+
+      const intentFn = vi.fn();
+      const unsubIntent = canvas.onSemanticIntent(intentFn);
+      expect(typeof unsubIntent).toBe('function');
+      unsubIntent();
+
+      // executeSemanticCommands
+      const cmdRes = canvas.executeSemanticCommands([
+        { action: 'update_node', id: 'task_node', label: 'Updated Work' }
+      ]);
+      expect(cmdRes.length).toBe(1);
+      expect(canvas.getNode('task_node').label).toBe('Updated Work');
+    });
+  });
 });
 
 

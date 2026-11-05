@@ -884,7 +884,10 @@ export class SemanticAdapter {
           selectNodes(nodeIds) {
             if (!Array.isArray(nodeIds) || !this.canvas.selectionManager) return;
             const nodes = nodeIds.map(id => this.canvas.getNode(id)).filter(Boolean);
-            this.canvas.selectionManager.selectNodes(nodes);
+            this.canvas.selectionManager.clearSelection(false);
+            nodes.forEach((n, idx) => {
+              this.canvas.selectionManager.selectNode(n, idx > 0 ? { shiftKey: true } : {});
+            });
           }
 
           // ==========================================

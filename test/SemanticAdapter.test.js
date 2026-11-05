@@ -855,5 +855,378 @@ describe('SemanticAdapter', () => {
       expect(simNo.endReached).toBe('end_fail');
       expect(simNo.visitedNodes).toContain('rej');
     });
+
+    it('transmits edge selection and multi-selection intent telemetry', () => {
+      const intentHandler = vi.fn();
+      canvas.onSemanticIntent(intentHandler);
+
+      const n1 = canvas.addNode({ id: 's1', type: 'task', label: 'T1' });
+      const n2 = canvas.addNode({ id: 's2', type: 'task', label: 'T2' });
+      const edge = canvas.addEdge({ id: 'edge_select', sourceId: 's1', targetId: 's2', label: 'Flow' });
+
+      // Select edge
+      canvas.selectionManager.selectEdge(edge);
+      expect(intentHandler).toHaveBeenCalled();
+      const edgeCall = intentHandler.mock.calls.find(c => c[0].target === 'edge');
+      expect(edgeCall).toBeDefined();
+      expect(edgeCall[0].edgeId).toBe('edge_select');
+
+      // Multi-select
+      adapter.selectNodes(['s1', 's2']);
+      const multiCall = intentHandler.mock.calls.find(c => c[0].target === 'multi');
+      expect(multiCall).toBeDefined();
+      expect(multiCall[0].count).toBe(2);
+    });
+  });
+
+  // ==========================================
+  // Area 12: Edge Cases, Diagnostics & Passthroughs
+  // ==========================================
+  describe('Edge Cases, Diagnostics & Passthroughs', () => {
+    it('skips invalid edges gracefully during applyGraph', () => {
+      const result = adapter.applyGraph({
+        nodes: [{ id: 'n1', type: 'task', label: 'N1' }],
+        edges: [
+          { source: '', target: 'n1' },
+          { source: 'n1', target: '' }
+        ]
+      }, { autoLayout: false });
+
+      expect(result.nodes.length).toBe(1);
+      expect(result.edges.length).toBe(0);
+    });
+
+    it('handles unknown actions, non-arrays, and invalid IDs in executeCommands', () => {
+      expect(adapter.executeCommands(null)).toEqual([]);
+      expect(adapter.executeCommands('not an array')).toEqual([]);
+
+      const results = adapter.executeCommands([
+        { action: 'unknown_magic_action' },
+        { action: 'remove_node', id: 'does_not_exist' },
+        { action: 'update_node', id: 'does_not_exist' },
+        { action: 'remove_edge', id: 'does_not_exist' }
+      ]);
+
+      expect(results[0]).toBeNull();
+      expect(results[1]).toBe(false);
+      expect(results[2]).toBeNull();
+      expect(results[3]).toBe(false);
+    });
+
+    it('handles falsy arguments in splitEdge, createBranch, and removeEdge', () => {
+      expect(adapter.splitEdge(null, null)).toBe(false);
+      expect(adapter.createBranch({})).toEqual([]);
+      expect(adapter.createBranch({ sourceId: 'src', branches: 'not an array' })).toEqual([]);
+      expect(adapter.removeEdge(null)).toBe(false);
+      expect(adapter.removeEdge({ source: 'missing_1', target: 'missing_2' })).toBe(false);
+    });
+
+    it('handles placement when no anchor exists and supports left/below placement', () => {
+      adapter.lastAddedNodeId = null;
+      const standalone = adapter.addNode({ label: 'Orphan Float' });
+      expect(standalone.x).toBe(80);
+      expect(standalone.y).toBe(100);
+
+      const toLeft = adapter.addNode({
+        id: 'left_placed',
+        placement: { relativeTo: standalone.id, position: 'left', offset: 30 }
+      });
+      expect(toLeft.x).toBe(standalone.x - 120 - 30);
+    });
+
+    it('safely handles non-existent nodes in focusNode and clearHighlights', () => {
+      expect(adapter.focusNode('imaginary_id')).toBe(false);
+
+      // Calling clearHighlights when nothing is highlighted does not throw
+      expect(() => adapter.clearHighlights()).not.toThrow();
+    });
+
+    it('applies rose and emerald theme highlights and handles non-array input', () => {
+      expect(() => adapter.highlightNodes(null)).not.toThrow();
+      expect(() => adapter.selectNodes(null)).not.toThrow();
+
+      const n1 = canvas.addNode({ id: 'rose_task', type: 'task', label: 'Rose' });
+      adapter.highlightNodes(['rose_task'], { color: 'rose' });
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight-rose')).toBe(true);
+
+      const n2 = canvas.addNode({ id: 'emerald_task', type: 'task', label: 'Emerald' });
+      adapter.highlightNodes(['emerald_task'], { color: 'emerald' });
+      expect(n2.domElement.classList.contains('bpmn-agent-highlight-emerald')).toBe(true);
+    });
+
+    it('safely catches listener errors in telemetry and intent dispatchers', () => {
+      const faultyTelemetry = () => { throw new Error('Boom'); };
+      const faultyIntent = () => { throw new Error('Crash'); };
+
+      adapter.onTelemetry(faultyTelemetry);
+      adapter.onIntent(faultyIntent);
+
+      // Does not throw when flushing
+      canvas.addNode({ id: 'err_test', type: 'task', label: 'Test' });
+      expect(() => adapter.flushTelemetry()).not.toThrow();
+
+      // Does not throw when dispatching intent
+      canvas.selectionManager.selectNode(canvas.getNode('err_test'));
+
+      // Test offTelemetry
+      adapter.offTelemetry(faultyTelemetry);
+      expect(adapter.telemetryListeners.has(faultyTelemetry)).toBe(false);
+    });
+
+    it('formats Markdown diff for type changes, container moves, and edge modifications', () => {
+      adapter.syncBaseline();
+
+      const sub = canvas.addNode({ id: 'c_sub', type: 'subprocess', label: 'Container' });
+      const task = canvas.addNode({ id: 'c_task', type: 'task', label: 'Worker', data: { parentId: 'c_sub' } });
+
+      const diff = adapter.computeDiff();
+      const markdown = adapter.formatMarkdownDiff(diff);
+      expect(markdown).toContain('in container c_sub');
+
+      // Update type and parent
+      task.setType('service-task');
+      delete task.data.parentId;
+      adapter.syncBaseline();
+      task.setType('user-task');
+
+      const updateDiff = adapter.computeDiff();
+      const updateMarkdown = adapter.formatMarkdownDiff(updateDiff);
+      expect(updateMarkdown).toContain('Changed c_task type');
+    });
+
+    it('reports empty workflow and dead ends in validateWorkflow', () => {
+      // Empty canvas
+      const emptyCanvas = new BpmnCanvas(document.createElement('div'));
+      const emptyReport = emptyCanvas.validateWorkflow();
+      expect(emptyReport.valid).toBe(true);
+      expect(emptyReport.warnings[0]).toContain('completely empty');
+
+      // Dead end task and unlabelled gateway branch
+      const testCanvas = new BpmnCanvas(document.createElement('div'));
+      testCanvas.addNode({ id: 'start', type: 'start-event', label: 'Start' });
+      testCanvas.addNode({ id: 'gw', type: 'gateway-exclusive', label: 'Gate' });
+      testCanvas.addNode({ id: 'dead_task', type: 'task', label: 'Dead End' });
+      testCanvas.addNode({ id: 'other_task', type: 'task', label: 'Other' });
+      testCanvas.addEdge({ sourceId: 'start', targetId: 'gw' });
+      testCanvas.addEdge({ sourceId: 'gw', targetId: 'dead_task' }); // Unlabelled
+      testCanvas.addEdge({ sourceId: 'gw', targetId: 'other_task' }); // Unlabelled
+
+      const report = testCanvas.validateWorkflow();
+      expect(report.warnings.some(w => w.includes('outgoing branch(es) without labels'))).toBe(true);
+      expect(report.warnings.some(w => w.includes('Dead end'))).toBe(true);
+
+      // End event with outgoing flow error
+      testCanvas.addNode({ id: 'end_bad', type: 'end-event', label: 'End' });
+      testCanvas.edges.set('bad_end_flow', { id: 'bad_end_flow', sourceId: 'end_bad', targetId: 'other_task' });
+      const badEndReport = testCanvas.validateWorkflow();
+      expect(badEndReport.errors.some(e => e.includes('End event') && e.includes('cannot have outgoing'))).toBe(true);
+    });
+
+    it('handles simulatePath with missing nodes, cycles, and canvas passthroughs', () => {
+      // Missing start
+      const emptyCanvas = new BpmnCanvas(document.createElement('div'));
+      expect(emptyCanvas.simulatePath().success).toBe(false);
+
+      // Cycle / loop terminates safely at maxCycles
+      canvas.applySemanticGraph({
+        nodes: [
+          { id: 'loop_a', type: 'task', label: 'A' },
+          { id: 'loop_b', type: 'task', label: 'B' }
+        ],
+        edges: [
+          { source: 'loop_a', target: 'loop_b' },
+          { source: 'loop_b', target: 'loop_a' }
+        ]
+      }, { autoLayout: false });
+
+      const cycleResult = canvas.simulatePath({ startId: 'loop_a', maxCycles: 15 });
+      expect(cycleResult.success).toBe(false);
+      expect(cycleResult.cycles).toBe(15);
+
+      // Verify canvas passthroughs
+      expect(canvas.getUpstreamNodes('loop_b').length).toBeGreaterThan(0);
+      expect(canvas.getDownstreamNodes('loop_a').length).toBeGreaterThan(0);
+      expect(canvas.findPaths('loop_a', 'loop_b').length).toBeGreaterThan(0);
+      expect(canvas.focusNode('loop_a')).toBe(true);
+
+      canvas.highlightNodes(['loop_a'], { color: 'cyan' });
+      canvas.clearHighlights();
+    });
+
+    it('covers executeCommands command types and autoLayout option', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      // 1. Initial nodes
+      const results = ad.executeCommands([
+        { action: 'add_node', id: 'start_cmd', type: 'start-event', label: 'Start', placement: { direction: 'right' } },
+        { action: 'add_node', id: 'task_cmd', type: 'task', label: 'Task', parentId: 'sub1', properties: { retries: 3 } },
+        { action: 'add_edge', source: 'start_cmd', target: 'task_cmd', label: 'to_task' },
+        { action: 'attach_boundary_event', hostId: 'task_cmd', edge: 'top', type: 'boundary-timer' },
+        { action: 'attach_boundary_event', hostId: 'task_cmd', edge: 'left', type: 'boundary-error' },
+        { action: 'attach_boundary_event', hostId: 'task_cmd', edge: 'right', type: 'boundary-message' },
+        { action: 'add_annotation', targetId: 'task_cmd', text: 'Note below', placement: { direction: 'below' } },
+        { action: 'add_annotation', targetId: 'task_cmd', text: 'Note right', placement: { direction: 'right' } },
+        { action: 'add_annotation', targetId: 'task_cmd', text: 'Note left', placement: { direction: 'left' } },
+        { action: 'add_annotation', targetId: 'non_existent_host', text: 'Floating note' },
+        { action: 'morph_node', id: 'task_cmd', newType: 'user-task' },
+        { action: 'focus_node', id: 'task_cmd' },
+        { action: 'highlight_nodes', nodeIds: ['task_cmd'], color: 'magenta' },
+        { action: 'clear_highlights' },
+        { action: 'select_nodes', nodeIds: ['task_cmd', 'start_cmd'] }
+      ], { autoLayout: true });
+
+      expect(results.length).toBe(15);
+      expect(c.getNode('task_cmd').type).toBe('user-task');
+      expect(c.getNode('task_cmd').data.parentId).toBe('sub1');
+      expect(c.getNode('task_cmd').data.properties.retries).toBe(3);
+
+      // wrap and extract
+      ad.executeCommands([
+        { action: 'wrap_in_subprocess', nodeIds: ['task_cmd'], subprocessId: 'my_sub' },
+        { action: 'extract_from_subprocess', subprocessId: 'my_sub' }
+      ]);
+    });
+
+    it('covers node/edge updates, removals, and validation edge cases', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      // addNode with parentId and properties
+      const node = ad.addNode({
+        id: 'n_props',
+        type: 'task',
+        label: 'Node With Props',
+        parentId: 'parent_box',
+        properties: { cost: 100 }
+      });
+      expect(node.data.parentId).toBe('parent_box');
+      expect(node.data.properties.cost).toBe(100);
+
+      // updateNode with type change
+      ad.updateNode('n_props', { type: 'service-task', properties: { cost: 200 } });
+      expect(node.type).toBe('service-task');
+      expect(node.data.properties.cost).toBe(200);
+
+      // removeNode removing lastAddedNodeId
+      expect(ad.lastAddedNodeId).toBe('n_props');
+      ad.removeNode('n_props');
+      expect(ad.lastAddedNodeId).toBeNull();
+
+      // addEdge validation
+      expect(() => ad.addEdge({ sourceId: '', targetId: 'x' })).toThrow(/requires valid source and target/);
+
+      // removeEdge by object with id
+      const n1 = c.addNode({ id: 'edge_n1', type: 'task' });
+      const n2 = c.addNode({ id: 'edge_n2', type: 'task' });
+      const edge = c.addEdge({ id: 'edge_rem', sourceId: 'edge_n1', targetId: 'edge_n2' });
+      expect(c.edges.has('edge_rem')).toBe(true);
+      ad.removeEdge({ id: 'edge_rem' });
+      expect(c.edges.has('edge_rem')).toBe(false);
+
+      // attachBoundaryEvent host missing
+      expect(() => ad.attachBoundaryEvent({ hostId: 'missing_host', type: 'boundary-timer' })).toThrow(/does not exist/);
+
+      // Linter coverage: startless workflow and boundary with incoming edge
+      const linterCanvas = new BpmnCanvas(document.createElement('div'));
+      const linterAd = linterCanvas.semanticAdapter;
+      const host = linterCanvas.addNode({ id: 'h1', type: 'task', label: 'Host' });
+      const bRes = linterAd.attachBoundaryEvent({ hostId: 'h1', type: 'boundary-timer-event' });
+      const orphan = linterCanvas.addNode({ id: 'orp', type: 'task' });
+      linterCanvas.edges.set('invalid_boundary_edge', { id: 'invalid_boundary_edge', sourceId: 'orp', targetId: bRes.boundaryNode.id });
+
+      const report = linterAd.validateWorkflow();
+      expect(report.warnings.some(w => w.includes('no start event'))).toBe(true);
+      expect(report.errors.some(e => e.includes('Boundary event') && e.includes('cannot have incoming'))).toBe(true);
+    });
+
+    it('covers relative placement directions and helper methods', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      c.addNode({ id: 'anchor', type: 'task', x: 200, y: 200, width: 100, height: 80 });
+
+      const posAbove = ad.calculateNodePlacement({ relativeTo: 'anchor', position: 'above', offset: 30 });
+      expect(posAbove.y).toBeLessThan(200);
+
+      const posLeft = ad.calculateNodePlacement({ relativeTo: 'anchor', position: 'left', offset: 30 });
+      expect(posLeft.x).toBeLessThan(200);
+
+      const posBelow = ad.calculateNodePlacement({ relativeTo: 'anchor', position: 'below', offset: 30 });
+      expect(posBelow.y).toBeGreaterThan(200);
+
+      const posDefault = ad.calculateNodePlacement({ relativeTo: 'anchor', position: 'unsupported_dir', offset: 30 });
+      expect(posDefault.x).toBeGreaterThan(200);
+
+      // formatType
+      expect(ad.formatType('start-timer-event')).toBe('Start Timer Event');
+      expect(ad.formatType('')).toBe('Node');
+
+      // diffObjects
+      const diff = ad.diffObjects({ a: 1, b: 2 }, { a: 1, b: 3, c: 4 });
+      expect(diff.b).toEqual({ from: 2, to: 3 });
+      expect(diff.c).toEqual({ from: undefined, to: 4 });
+      expect(ad.diffObjects({ a: 1 }, { a: 1 })).toBeNull();
+
+      // resolveNodeName
+      expect(ad.resolveNodeName('nonexistent')).toBe('nonexistent');
+      ad.baselineNodes.set('base_only', { id: 'base_only', label: 'Base Label' });
+      expect(ad.resolveNodeName('base_only', true)).toBe('"Base Label"');
+    });
+
+    it('covers connection violation intent and telemetry diff of properties/edges', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      // Intent listener and connection:rejected
+      const intentFn = vi.fn();
+      const unsubIntent = ad.onIntent(intentFn);
+
+      c.emit('connection:rejected', {
+        reason: 'Self-loops not allowed',
+        sourceId: 'n1',
+        targetId: 'n1'
+      });
+      expect(intentFn).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'user:violation',
+        reason: 'Self-loops not allowed'
+      }));
+
+      // Unsubscribe intent
+      unsubIntent();
+      intentFn.mockClear();
+      c.emit('connection:rejected', { reason: 'Another violation' });
+      expect(intentFn).not.toHaveBeenCalled();
+
+      // Telemetry diffs for property update and edge reconnection
+      const telemetryFn = vi.fn();
+      ad.onTelemetry(telemetryFn);
+
+      // Create initial baseline
+      const node1 = c.addNode({ id: 'tele_n1', type: 'task', label: 'T1', data: { properties: { v: 1 } } });
+      const node2 = c.addNode({ id: 'tele_n2', type: 'task', label: 'T2' });
+      const edge = c.addEdge({ id: 'tele_e1', sourceId: 'tele_n1', targetId: 'tele_n2', label: 'Flow 1' });
+      ad.syncBaseline();
+
+      // Update property and reconnect edge
+      node1.data.properties.v = 2;
+      node1.data.hostNodeId = 'host_xyz';
+      edge.targetId = 'tele_n1';
+      edge.label = 'Flow Modified';
+      edge.condition = 'true';
+
+      const diff = ad.computeDiff();
+      expect(diff.hasChanges).toBe(true);
+      expect(diff.nodesUpdated.length).toBeGreaterThan(0);
+      expect(diff.edgesUpdated.length).toBeGreaterThan(0);
+
+      const summary = ad.formatMarkdownDiff(diff);
+      expect(summary).toContain('properties');
+      expect(summary).toContain('Reconnected flow');
+
+      // destroy
+      ad.destroy();
+      expect(ad.unsubscribers.length).toBe(0);
+    });
   });
 });
