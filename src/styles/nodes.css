@@ -41,8 +41,15 @@
 }
 
 @keyframes pulseHalo {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 0.4; }
+
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* 1. Activity / Task Node Styling */
@@ -155,7 +162,8 @@
 
 /* Expanded Subprocess Container Styling */
 .bpmn-node-subprocess.expanded {
-  z-index: 5; /* Container stays below SVG edges (z-index 15) and contained child nodes (z-index 20) */
+  z-index: 5;
+  /* Container stays below SVG edges (z-index 15) and contained child nodes (z-index 20) */
   align-items: stretch;
   justify-content: flex-start;
   flex-direction: column;
@@ -205,7 +213,8 @@
   position: relative;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Let clicks pass to canvas/children inside */
+  pointer-events: none;
+  /* Let clicks pass to canvas/children inside */
   border-radius: 0 0 12px 12px;
 }
 
@@ -566,7 +575,8 @@
 }
 
 .bpmn-node.bpmn-node-text-annotation.selected::after {
-  display: none; /* Suppress generic rectangular halo for text annotations */
+  display: none;
+  /* Suppress generic rectangular halo for text annotations */
 }
 
 .bpmn-annotation-bracket {
@@ -750,12 +760,98 @@
 }
 
 @keyframes agent-pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
   }
+
   50% {
     box-shadow: 0 0 20px rgba(245, 158, 11, 0.9);
   }
+}
+
+/* Gateway Specialization: highlight the rotated diamond instead of square container */
+.bpmn-node:has(.bpmn-gateway-diamond).bpmn-agent-highlight,
+.bpmn-node.bpmn-node-gateway.bpmn-agent-highlight,
+.bpmn-node.bpmn-node-gateway-exclusive.bpmn-agent-highlight,
+.bpmn-node.bpmn-node-gateway-parallel.bpmn-agent-highlight {
+  outline: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+.bpmn-node.bpmn-agent-highlight .bpmn-gateway-diamond {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4), 0 0 18px rgba(245, 158, 11, 0.8) !important;
+}
+
+.bpmn-node.bpmn-agent-highlight-cyan .bpmn-gateway-diamond {
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.4), 0 0 18px rgba(6, 182, 212, 0.8) !important;
+}
+
+.bpmn-node.bpmn-agent-highlight-emerald .bpmn-gateway-diamond {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4), 0 0 18px rgba(16, 185, 129, 0.8) !important;
+}
+
+.bpmn-node.bpmn-agent-highlight-rose .bpmn-gateway-diamond {
+  border-color: #f43f5e !important;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.4), 0 0 18px rgba(244, 63, 94, 0.8) !important;
+}
+
+.bpmn-node.bpmn-agent-pulse .bpmn-gateway-diamond {
+  animation: agent-diamond-pulse 1.5s infinite ease-in-out !important;
+}
+
+@keyframes agent-diamond-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35), 0 0 10px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.7), 0 0 24px rgba(245, 158, 11, 0.95);
+  }
+}
+
+/* Gateway Selection Halo: suppress square container halo and highlight diamond */
+.bpmn-node:has(.bpmn-gateway-diamond).selected::after,
+.bpmn-node.bpmn-node-gateway.selected::after,
+.bpmn-node.bpmn-node-gateway-exclusive.selected::after,
+.bpmn-node.bpmn-node-gateway-parallel.selected::after {
+  display: none;
+}
+
+.bpmn-node.selected .bpmn-gateway-diamond {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 16px var(--border-focus) !important;
+}
+
+/* Text Annotation Specialization: highlight the bracket instead of box */
+.bpmn-node.bpmn-node-text-annotation.bpmn-agent-highlight {
+  outline: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+.bpmn-node.bpmn-node-text-annotation.bpmn-agent-highlight .bpmn-annotation-bracket {
+  border-color: #f59e0b !important;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8)) !important;
+}
+
+.bpmn-node.bpmn-node-text-annotation.bpmn-agent-highlight-cyan .bpmn-annotation-bracket {
+  border-color: #06b6d4 !important;
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.8)) !important;
+}
+
+.bpmn-node.bpmn-node-text-annotation.bpmn-agent-highlight-emerald .bpmn-annotation-bracket {
+  border-color: #10b981 !important;
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.8)) !important;
+}
+
+.bpmn-node.bpmn-node-text-annotation.bpmn-agent-highlight-rose .bpmn-annotation-bracket {
+  border-color: #f43f5e !important;
+  filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.8)) !important;
 }
 
 .bpmn-agent-badge {

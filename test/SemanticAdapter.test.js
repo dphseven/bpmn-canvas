@@ -682,6 +682,17 @@ describe('SemanticAdapter', () => {
       expect(n1.domElement.classList.contains('bpmn-agent-highlight')).toBe(false);
       expect(n1.domElement.querySelector('.bpmn-agent-badge')).toBeNull();
     });
+
+    it('highlights gateway diamond shape without square container outline', () => {
+      const gw = canvas.addNode({ id: 'gw1', type: 'gateway-exclusive', label: 'Decision' });
+      adapter.highlightNodes(['gw1'], { color: 'amber', pulse: true, message: 'Branching point' });
+
+      expect(gw.domElement.classList.contains('bpmn-agent-highlight')).toBe(true);
+      const diamond = gw.domElement.querySelector('.bpmn-gateway-diamond');
+      expect(diamond).not.toBeNull();
+      const badge = gw.domElement.querySelector('.bpmn-agent-badge');
+      expect(badge.textContent).toBe('Branching point');
+    });
   });
 
   // ==========================================
