@@ -22,6 +22,7 @@ import { SelectionManager } from './SelectionManager.js';
 import { SimulationEngine } from './SimulationEngine.js';
 import { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
 import { AutoLayoutManager } from './AutoLayoutManager.js';
+import { SemanticAdapter } from './SemanticAdapter.js';
 import { calculateBoundaryDocking } from './geometry.js';
 
 /**
@@ -277,6 +278,9 @@ export class BpmnCanvas {
 
     this.initDOM();
     this.bindEvents();
+
+    // Two-way Semantic Adapter for human-agent collaboration
+    this.semanticAdapter = new SemanticAdapter(this, this.options.semanticAdapter || {});
   }
 
   get undoStack() {
@@ -1854,6 +1858,43 @@ export class BpmnCanvas {
    */
   importFromJson(data) {
     return this.loadData(data);
+  }
+
+  /**
+   * Ingests a declarative workflow graph without manual coordinates via the SemanticAdapter.
+   * @param {Object} graph
+   * @param {Object} [options={}]
+   * @returns {{ nodes: Array<Object>, edges: Array<Object> }}
+   */
+  applySemanticGraph(graph, options = {}) {
+    return this.semanticAdapter.applyGraph(graph, options);
+  }
+
+  /**
+   * Executes a batch of semantic commands atomically via the SemanticAdapter.
+   * @param {Array<Object>} commands
+   * @param {Object} [options={}]
+   * @returns {Array<*>}
+   */
+  executeSemanticCommands(commands, options = {}) {
+    return this.semanticAdapter.executeCommands(commands, options);
+  }
+
+  /**
+   * Retrieves a token-efficient semantic snapshot of the workflow graph.
+   * @returns {{ nodes: Array<Object>, edges: Array<Object> }}
+   */
+  getSemanticSnapshot() {
+    return this.semanticAdapter.getSemanticSnapshot();
+  }
+
+  /**
+   * Subscribes a listener to semantic telemetry diffs and summaries.
+   * @param {Function} callback
+   * @returns {Function} Unsubscribe function
+   */
+  onSemanticTelemetry(callback) {
+    return this.semanticAdapter.onTelemetry(callback);
   }
 
   loadData(data) {
