@@ -610,6 +610,31 @@ describe('SemanticAdapter', () => {
       expect(result.edge.targetId).toBe(result.annotationNode.id);
     });
 
+    it('automatically positions annotation without overlapping tasks near canvas ceiling', () => {
+      // Simulating task_process in demo flow at y = 97
+      const task = canvas.addNode({ id: 'top_task', type: 'service-task', label: 'Charge Credit Card', x: 1099, y: 97, width: 150, height: 94 });
+
+      const result = adapter.addAnnotation({
+        targetId: 'top_task',
+        text: 'Processes payments via Stripe API v2 with 3x retry policy'
+      });
+
+      expect(result.annotationNode).toBeDefined();
+      const annot = result.annotationNode;
+
+      // Ensure annotation does not overlap top_task
+      const annotBottom = annot.y + annot.height;
+      const taskBottom = task.y + task.height;
+
+      const overlapsY = (annot.y < taskBottom) && (annotBottom > task.y);
+      const overlapsX = (annot.x < task.x + task.width) && (annot.x + annot.width > task.x);
+      const collides = overlapsX && overlapsY;
+
+      expect(collides).toBe(false);
+      // Auto-placement places it below where there is clear space
+      expect(annot.y).toBeGreaterThanOrEqual(taskBottom);
+    });
+
     it('morphs node type in-place while preserving connections and ID', () => {
       canvas.addNode({ id: 'm1', type: 'task', label: 'Generic Task' });
       canvas.addNode({ id: 'm2', type: 'task', label: 'Target' });

@@ -561,7 +561,7 @@ export class SemanticAdapter {
     const {
       targetId,
       text = '',
-      placement = { position: 'above', offset: 40 },
+      placement = {},
       id
     } = cmd;
 
@@ -570,22 +570,84 @@ export class SemanticAdapter {
       const targetNode = targetId ? this.canvas.getNode(targetId) : null;
       const rawId = id || `annot_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
-      const annotNode = this.addNode({
+      // Calculate comfortable dimensions based on text length
+      const textLen = (text || '').length;
+      const annotW = cmd.width || Math.min(260, Math.max(160, Math.round(textLen * 3.8)));
+      const annotH = cmd.height || Math.max(50, Math.ceil(textLen / (annotW / 8.5)) * 18 + 24);
+      const offset = placement.offset || 40;
+
+      let x, y;
+      let sourcePort = 'top';
+      let targetPort = 'bottom';
+
+      if (targetNode) {
+        let pos = placement.position;
+        if (!pos || pos === 'auto') {
+          // If clearance above the target is too tight (< 30px to ceiling), place below
+          if (targetNode.y - annotH - offset < 20) {
+            pos = 'below';
+          } else {
+            pos = 'above';
+          }
+        }
+
+        switch (pos) {
+          case 'above':
+            x = targetNode.x + Math.max(0, (targetNode.width - annotW) / 2);
+            y = targetNode.y - annotH - offset;
+            sourcePort = 'top';
+            targetPort = 'bottom';
+            break;
+          case 'below':
+            x = targetNode.x + Math.max(0, (targetNode.width - annotW) / 2);
+            y = targetNode.y + targetNode.height + offset;
+            sourcePort = 'bottom';
+            targetPort = 'top';
+            break;
+          case 'right':
+            x = targetNode.x + targetNode.width + offset;
+            y = targetNode.y + Math.max(0, (targetNode.height - annotH) / 2);
+            sourcePort = 'right';
+            targetPort = 'left';
+            break;
+          case 'left':
+            x = targetNode.x - annotW - offset;
+            y = targetNode.y + Math.max(0, (targetNode.height - annotH) / 2);
+            sourcePort = 'left';
+            targetPort = 'right';
+            break;
+          default:
+            x = targetNode.x;
+            y = targetNode.y - annotH - offset;
+            sourcePort = 'top';
+            targetPort = 'bottom';
+        }
+      } else {
+        x = 100;
+        y = 100;
+      }
+
+      if (Number.isFinite(cmd.x)) x = cmd.x;
+      if (Number.isFinite(cmd.y)) y = cmd.y;
+
+      const annotNode = this.canvas.addNode({
         id: rawId,
         type: 'text-annotation',
         label: text,
-        placement: targetNode ? {
-          relativeTo: targetId,
-          position: placement.position || 'above',
-          offset: placement.offset || 40
-        } : null
+        x,
+        y,
+        width: annotW,
+        height: annotH
       });
+      this.lastAddedNodeId = annotNode.id;
 
       let createdEdge = null;
       if (targetNode) {
         createdEdge = this.canvas.addEdge({
           sourceId: targetNode.id,
           targetId: annotNode.id,
+          sourcePort,
+          targetPort,
           routing: 'bezier'
         });
       }
@@ -1562,37 +1624,39 @@ export class SemanticAdapter {
             return { nodes, edges };
           }
 
-          /**
-           * Computes non-overlapping placement coordinates based on relative position hints.
-           * @private
-           */
-          calculateNodePlacement(placement) {
-            const spacing = placement?.offset || this.options.defaultNodeSpacing;
-            const relativeId = placement?.relativeTo || this.lastAddedNodeId;
-            const anchor = relativeId ? this.canvas.getNode(relativeId) : null;
+  /**
+   * Computes non-overlapping placement coordinates based on relative position hints.
+   * @private
+   */
+  calculateNodePlacement(placement) {
+    const spacing = placement?.offset || this.options.defaultNodeSpacing;
+    const relativeId = placement?.relativeTo || this.lastAddedNodeId;
+    const anchor = relativeId ? this.canvas.getNode(relativeId) : null;
 
-            if (!anchor) {
-              // Default initial canvas coordinates
-              return { x: 80, y: 100 };
-            }
+    if (!anchor) {
+      // Default initial canvas coordinates
+      return { x: 80, y: 100 };
+    }
 
-            const pos = placement?.position || (this.options.direction === 'TB' ? 'below' : 'right');
-            const anchorW = anchor.width || 120;
-            const anchorH = anchor.height || 80;
+    const pos = placement?.position || (this.options.direction === 'TB' ? 'below' : 'right');
+    const anchorW = anchor.width || 120;
+    const anchorH = anchor.height || 80;
+    const nodeW = placement?.width || 120;
+    const nodeH = placement?.height || 80;
 
-            switch (pos) {
-              case 'right':
-                return { x: anchor.x + anchorW + spacing, y: anchor.y };
-              case 'below':
-                return { x: anchor.x, y: anchor.y + anchorH + spacing };
-              case 'left':
-                return { x: Math.max(20, anchor.x - anchorW - spacing), y: anchor.y };
-              case 'above':
-                return { x: anchor.x, y: Math.max(20, anchor.y - anchorH - spacing) };
-              default:
-                return { x: anchor.x + anchorW + spacing, y: anchor.y };
-            }
-          }
+    switch (pos) {
+      case 'right':
+        return { x: anchor.x + anchorW + spacing, y: anchor.y };
+      case 'below':
+        return { x: anchor.x, y: anchor.y + anchorH + spacing };
+      case 'left':
+        return { x: anchor.x - nodeW - spacing, y: anchor.y };
+      case 'above':
+        return { x: anchor.x, y: anchor.y - nodeH - spacing };
+      default:
+        return { x: anchor.x + anchorW + spacing, y: anchor.y };
+    }
+  }
 
           /**
            * Resolves a human-readable name for a node ID.
