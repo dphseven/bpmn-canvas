@@ -425,6 +425,40 @@ export class AutoLayoutManager {
       }
     });
 
+    // Identify long edges spanning across intermediate layers to reserve track clearance
+    const edgeDummiesByLayer = new Map();
+    this.edges.forEach(edge => {
+      let sId = edge.sourceId;
+      let tId = edge.targetId;
+      const sNode = this.getNode(sId);
+      const tNode = this.getNode(tId);
+      if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
+      if (tNode && this.isBoundary(tNode) && tNode.data?.hostNodeId) tId = tNode.data.hostNodeId;
+
+      if (nodeIds.has(sId) && nodeIds.has(tId)) {
+        const sLayer = layers.get(sId);
+        const tLayer = layers.get(tId);
+        if (sLayer !== undefined && tLayer !== undefined && tLayer - sLayer > 1 && !feedbackEdges.has(`${sId}->${tId}`)) {
+          for (let k = sLayer + 1; k < tLayer; k++) {
+            if (!edgeDummiesByLayer.has(k)) {
+              edgeDummiesByLayer.set(k, []);
+            }
+            const dummy = {
+              id: `__dummy_${edge.id}_${k}`,
+              isDummy: true,
+              edge,
+              sourceId: sId,
+              targetId: tId,
+              width: 0,
+              height: 0
+            };
+            edgeDummiesByLayer.get(k).push(dummy);
+            nodeMap.set(dummy.id, dummy);
+          }
+        }
+      }
+    });
+
     const layerBuckets = new Map();
     nodes.forEach(n => {
       const layer = layers.get(n.id);
@@ -432,6 +466,13 @@ export class AutoLayoutManager {
         layerBuckets.set(layer, []);
       }
       layerBuckets.get(layer).push(n);
+    });
+
+    edgeDummiesByLayer.forEach((dummies, layer) => {
+      if (!layerBuckets.has(layer)) {
+        layerBuckets.set(layer, []);
+      }
+      dummies.forEach(d => layerBuckets.get(layer).push(d));
     });
 
     const sortedLayerKeys = Array.from(layerBuckets.keys()).sort((a, b) => a - b);
@@ -445,20 +486,41 @@ export class AutoLayoutManager {
       // Compute barycenters from already-positioned lower-layer predecessors
       bucket.forEach(node => {
         const incomingNodes = [];
-        this.edges.forEach(edge => {
-          let sId = edge.sourceId;
-          let tId = edge.targetId;
-          const sNode = this.getNode(sId);
-          if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
+        if (node.isDummy) {
+          const sLayer = layers.get(node.sourceId);
+          const prev = (layerIdx - 1 === sLayer)
+            ? nodeMap.get(node.sourceId)
+            : nodeMap.get(`__dummy_${node.edge.id}_${layerIdx - 1}`);
+          if (prev) incomingNodes.push(prev);
+        } else {
+          this.edges.forEach(edge => {
+            let sId = edge.sourceId;
+            let tId = edge.targetId;
+            const sNode = this.getNode(sId);
+            if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
 
-          if (tId === node.id && nodeMap.has(sId) && layers.get(sId) < layerIdx) {
-            incomingNodes.push(nodeMap.get(sId));
-          }
-        });
+            if (tId === node.id && nodeMap.has(sId)) {
+              const sLayer = layers.get(sId);
+              if (sLayer === layerIdx - 1) {
+                incomingNodes.push(nodeMap.get(sId));
+              } else if (sLayer !== undefined && sLayer < layerIdx - 1) {
+                const dummy = nodeMap.get(`__dummy_${edge.id}_${layerIdx - 1}`);
+                if (dummy) incomingNodes.push(dummy);
+              }
+            }
+          });
+        }
 
         if (incomingNodes.length > 0) {
-          const sumPos = incomingNodes.reduce((acc, p) => acc + (isLR ? (p.y + p.height / 2) : (p.x + p.width / 2)), 0);
-          node._barycenter = sumPos / incomingNodes.length;
+          const dummyPred = incomingNodes.find(p => p.isDummy);
+          if (dummyPred && incomingNodes.length > 1) {
+            node._barycenter = isLR
+              ? (dummyPred.y + (dummyPred.height || 0) / 2)
+              : (dummyPred.x + (dummyPred.width || 0) / 2);
+          } else {
+            const sumPos = incomingNodes.reduce((acc, p) => acc + (isLR ? (p.y + (p.height || 0) / 2) : (p.x + (p.width || 0) / 2)), 0);
+            node._barycenter = sumPos / incomingNodes.length;
+          }
         } else {
           node._barycenter = null;
         }
@@ -472,20 +534,28 @@ export class AutoLayoutManager {
           return isLR ? a.y - b.y : a.x - b.x;
         });
       } else {
-        bucket.sort((a, b) => (a._barycenter ?? 0) - (b._barycenter ?? 0));
+        bucket.sort((a, b) => {
+          const diff = (a._barycenter ?? 0) - (b._barycenter ?? 0);
+          if (Math.abs(diff) > 1) return diff;
+          // Prioritize long edge corridors (dummies) on the straight path over secondary branches
+          if (a.isDummy !== b.isDummy) return a.isDummy ? -1 : 1;
+          return 0;
+        });
       }
 
-      // Authoritative width/height directly from model, immune to in-flight CSS transitions
+      // Authoritative width/height directly from model (only real nodes)
+      const realNodes = bucket.filter(n => !n.isDummy);
       const maxMainAxisSize = Math.max(
-        ...bucket.map(n => isLR ? (n.width || 100) : (n.height || 80))
+        0,
+        ...realNodes.map(n => isLR ? (n.width || 100) : (n.height || 80))
       );
 
       const crossBaseline = isLR ? config.startY : config.startX;
 
       if (bucket.length === 1) {
         const node = bucket[0];
-        const nodeW = node.width || 100;
-        const nodeH = node.height || 80;
+        const nodeW = node.isDummy ? 0 : (node.width || 100);
+        const nodeH = node.isDummy ? 0 : (node.height || 80);
 
         // Single node aligns its center precisely with predecessor center or baseline
         const targetCenter = (node._barycenter !== null && node._barycenter !== undefined)
@@ -500,17 +570,22 @@ export class AutoLayoutManager {
           else posY = Math.round(posY / config.gridSize) * config.gridSize;
         }
 
-        node.setPosition(posX, posY);
-
-        minX = Math.min(minX, posX);
-        minY = Math.min(minY, posY);
-        maxX = Math.max(maxX, posX + nodeW);
-        maxY = Math.max(maxY, posY + nodeH);
+        if (!node.isDummy) {
+          node.setPosition(posX, posY);
+          minX = Math.min(minX, posX);
+          minY = Math.min(minY, posY);
+          maxX = Math.max(maxX, posX + nodeW);
+          maxY = Math.max(maxY, posY + nodeH);
+        } else {
+          node.x = posX;
+          node.y = posY;
+        }
       } else {
-        // Multi-node column (gateway branches, etc.)
+        // Multi-node column (gateway branches, bypass tracks, etc.)
         const maxNodeCrossSize = Math.max(
-          ...bucket.map(n => isLR ? (n.height || 80) : (n.width || 100))
-        );
+          0,
+          ...realNodes.map(n => isLR ? (n.height || 80) : (n.width || 100))
+        ) || 80;
         const rowPitch = maxNodeCrossSize + (isLR ? config.verticalGap : config.horizontalGap);
         const totalSpan = (bucket.length - 1) * rowPitch;
         const startCenter = crossBaseline - totalSpan / 2;
@@ -527,11 +602,18 @@ export class AutoLayoutManager {
           }
         }
 
-        bucket.forEach((node, i) => {
-          const nodeW = node.width || 100;
-          const nodeH = node.height || 80;
+        const hasDummy = bucket.some(n => n.isDummy);
+        const anchorCenter = (hasDummy && bucket[0]._barycenter !== null)
+          ? bucket[0]._barycenter
+          : startCenter;
 
-          let targetCenter = canUseBarycenters ? node._barycenter : (startCenter + i * rowPitch);
+        bucket.forEach((node, i) => {
+          const nodeW = node.isDummy ? 0 : (node.width || 100);
+          const nodeH = node.isDummy ? 0 : (node.height || 80);
+
+          let targetCenter = canUseBarycenters
+            ? node._barycenter
+            : (hasDummy ? (anchorCenter + i * rowPitch) : (startCenter + i * rowPitch));
 
           let posX = isLR ? currentMainAxisPos : (targetCenter - nodeW / 2);
           let posY = isLR ? (targetCenter - nodeH / 2) : currentMainAxisPos;
@@ -541,12 +623,16 @@ export class AutoLayoutManager {
             else posY = Math.round(posY / config.gridSize) * config.gridSize;
           }
 
-          node.setPosition(posX, posY);
-
-          minX = Math.min(minX, posX);
-          minY = Math.min(minY, posY);
-          maxX = Math.max(maxX, posX + nodeW);
-          maxY = Math.max(maxY, posY + nodeH);
+          if (!node.isDummy) {
+            node.setPosition(posX, posY);
+            minX = Math.min(minX, posX);
+            minY = Math.min(minY, posY);
+            maxX = Math.max(maxX, posX + nodeW);
+            maxY = Math.max(maxY, posY + nodeH);
+          } else {
+            node.x = posX;
+            node.y = posY;
+          }
         });
       }
 
@@ -566,6 +652,34 @@ export class AutoLayoutManager {
    */
   optimizeEdgePorts(direction = 'LR') {
     const isLR = direction === 'LR';
+
+    // Index forward outgoing and incoming edges for branching and convergence resolution
+    const outgoingForward = new Map();
+    const incomingForward = new Map();
+
+    this.edges.forEach(edge => {
+      const sNode = this.getNode(edge.sourceId);
+      const tNode = this.getNode(edge.targetId);
+      if (!sNode || !tNode) return;
+
+      if (isLR) {
+        if (tNode.x - sNode.x > 30) {
+          if (!outgoingForward.has(sNode.id)) outgoingForward.set(sNode.id, []);
+          outgoingForward.get(sNode.id).push({ edge, target: tNode });
+
+          if (!incomingForward.has(tNode.id)) incomingForward.set(tNode.id, []);
+          incomingForward.get(tNode.id).push({ edge, source: sNode });
+        }
+      } else {
+        if (tNode.y - sNode.y > 30) {
+          if (!outgoingForward.has(sNode.id)) outgoingForward.set(sNode.id, []);
+          outgoingForward.get(sNode.id).push({ edge, target: tNode });
+
+          if (!incomingForward.has(tNode.id)) incomingForward.set(tNode.id, []);
+          incomingForward.get(tNode.id).push({ edge, source: sNode });
+        }
+      }
+    });
 
     this.edges.forEach(edge => {
       const sourceNode = this.getNode(edge.sourceId);
@@ -589,8 +703,30 @@ export class AutoLayoutManager {
         const dy = targetNode.y - sourceNode.y;
 
         if (dx > 30) {
-          // Standard forward flow: right -> left
-          edge.updateConnection({ sourcePort: 'right', targetPort: 'left' });
+          let sPort = 'right';
+          let tPort = 'left';
+
+          const outEdges = outgoingForward.get(sourceNode.id) || [];
+          if (outEdges.length > 1) {
+            const sorted = outEdges.slice().sort((a, b) => a.target.y - b.target.y);
+            if (edge.id === sorted[sorted.length - 1].edge.id && targetNode.y > sourceNode.y + 20) {
+              sPort = 'bottom';
+            } else if (edge.id === sorted[0].edge.id && targetNode.y < sourceNode.y - 20) {
+              sPort = 'top';
+            }
+          }
+
+          const inEdges = incomingForward.get(targetNode.id) || [];
+          if (inEdges.length > 1) {
+            const sorted = inEdges.slice().sort((a, b) => a.source.y - b.source.y);
+            if (edge.id === sorted[sorted.length - 1].edge.id && sourceNode.y > targetNode.y + 20) {
+              tPort = 'bottom';
+            } else if (edge.id === sorted[0].edge.id && sourceNode.y < targetNode.y - 20) {
+              tPort = 'top';
+            }
+          }
+
+          edge.updateConnection({ sourcePort: sPort, targetPort: tPort });
         } else if (dx < -30) {
           // Backward / loopback flow: route cleanly underneath via bottom -> bottom
           edge.updateConnection({ sourcePort: 'bottom', targetPort: 'bottom' });

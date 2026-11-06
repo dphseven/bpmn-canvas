@@ -400,5 +400,41 @@ describe('AutoLayoutManager', () => {
     expect(autoManager.autoArrange({ fitView: false })).toBe(true);
     expect(fitViewSpy).not.toHaveBeenCalled();
   });
+
+  it('preserves bypass corridor clearance and ports on multi-layer skip branches', () => {
+    const reject = createMockNode({ id: 'reject', type: 'manual-task', width: 120, height: 80 });
+    const gw2 = createMockNode({ id: 'gw2', type: 'gateway-exclusive', width: 50, height: 50 });
+    const happy = createMockNode({ id: 'happy', type: 'manual-task', width: 120, height: 80 });
+    const cancelled = createMockNode({ id: 'cancelled', type: 'end-event', width: 52, height: 52 });
+
+    [reject, gw2, happy, cancelled].forEach(n => nodes.set(n.id, n));
+
+    const eRej = createMockEdge({ id: 'e_rej', sourceId: 'reject', targetId: 'gw2' });
+    const eHappy = createMockEdge({ id: 'e_happy', sourceId: 'gw2', targetId: 'happy' });
+    const eSad = createMockEdge({ id: 'e_sad', sourceId: 'gw2', targetId: 'cancelled' });
+    const eFinish = createMockEdge({ id: 'e_finish', sourceId: 'happy', targetId: 'cancelled' });
+
+    edges.set('e_rej', eRej);
+    edges.set('e_happy', eHappy);
+    edges.set('e_sad', eSad);
+    edges.set('e_finish', eFinish);
+
+    manager.autoArrange();
+
+    // Intermediate task must not collide with the direct bypass edge
+    expect(gw2.x).toBeLessThan(happy.x);
+    expect(happy.x).toBeLessThan(cancelled.x);
+
+    // happy task is separated vertically below the gw2 -> cancelled corridor
+    expect(happy.y).toBeGreaterThanOrEqual(gw2.y + 100);
+
+    // Cancelled aligns with straight flow from gw2
+    expect(Math.abs((gw2.y + gw2.height / 2) - (cancelled.y + cancelled.height / 2))).toBeLessThanOrEqual(5);
+
+    // Port optimizations
+    expect(eSad.updateConnection).toHaveBeenCalledWith({ sourcePort: 'right', targetPort: 'left' });
+    expect(eHappy.updateConnection).toHaveBeenCalledWith({ sourcePort: 'bottom', targetPort: 'left' });
+    expect(eFinish.updateConnection).toHaveBeenCalledWith({ sourcePort: 'right', targetPort: 'bottom' });
+  });
 });
 

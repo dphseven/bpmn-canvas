@@ -28,5 +28,6 @@ export { AutoLayoutManager } from './AutoLayoutManager.js';
 export { SemanticAdapter } from './SemanticAdapter.js';
 export { NodeRenderer } from './NodeRenderer.js';
 export { InlineEditor } from './InlineEditor.js';
+export { BpmnXmlSerializer, BPMN_NAMESPACES } from './BpmnXmlSerializer.js';
 export * as geometry from './geometry.js';
 export * as types from './types.js';
