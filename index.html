@@ -16,52 +16,65 @@
     <!-- Header Navigation -->
     <header class="top-nav">
       <div class="brand-section">
-        <span class="brand-badge">BPMN Canvas</span>
-        <span class="brand-title">Workflow Studio</span>
-        <span class="brand-subtitle">Native HTML + SVG Architecture</span>
+        <span class="brand-title">bpmn-canvas</span>
       </div>
 
       <div class="nav-actions">
-        <button class="btn" id="btn-theme-toggle" title="Toggle Theme">
-          <span>🌙</span> <span id="theme-label">Dark</span>
-        </button>
-        <button class="btn" id="btn-simulate" title="Simulate Token Flow" style="border-color: var(--border-focus)">
-          <span>▶</span> <span id="sim-label">Pause Flow</span>
-        </button>
-        <button class="btn" id="btn-grid-toggle" title="Toggle Grid Visibility" style="border-color: var(--border-focus)">
-          <span>▦</span> Grid: <span id="grid-status">On</span>
-        </button>
-        <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
-          <span>🧲</span> Grid Snap: <span id="snap-status">On</span>
-        </button>
-        <button class="btn" id="btn-pulse-toggle" title="Toggle Pulsing Visual Feedback" style="border-color: var(--border-focus)">
-          <span>✨</span> Pulse: <span id="pulse-status">On</span>
-        </button>
-        <button class="btn" id="btn-export-json">
-          <span>📥</span> Export JSON
-        </button>
-        <button class="btn" id="btn-import-json">
-          <span>📤</span> Import JSON
-        </button>
-        <input type="file" id="file-import-input" accept=".json,application/json" style="display: none;" />
-        <button class="btn" id="btn-demo-flow">
-          <span>✨</span> Demo Flow
-        </button>
-        <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" disabled>
-          <span>↩</span> Undo
-        </button>
-        <button class="btn" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>
-          <span>↪</span> Redo
-        </button>
-        <button class="btn btn-primary" id="btn-config-drawer-toggle" title="Open Client Configuration & Capabilities Showcase">
-          <span>⚙️</span> Client Config
-        </button>
-        <button class="btn" id="btn-auto-arrange" title="Auto-arrange Diagram Layout (Alt+A)">
-          <span>🪄</span> Auto Arrange
-        </button>
-        <button class="btn" id="btn-fit-view">
-          <span>🎯</span> Fit View
-        </button>
+        <!-- Model / File Actions -->
+        <div class="nav-group" role="group" aria-label="Model & File Actions">
+          <button class="btn" id="btn-demo-flow" title="Load Demo Workflow">
+            <span>✨</span> Demo
+          </button>
+          <button class="btn" id="btn-import-json" title="Import BPMN JSON Diagram">
+            <span>📤</span> Import
+          </button>
+          <button class="btn" id="btn-export-json" title="Export BPMN JSON Diagram">
+            <span>📥</span> Export
+          </button>
+          <input type="file" id="file-import-input" accept=".json,application/json" style="display: none;" />
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Layout & Navigation Controls -->
+        <div class="nav-group" role="group" aria-label="Layout & Navigation Controls">
+          <button class="btn" id="btn-auto-arrange" title="Auto-arrange Diagram Layout (Alt+A)">
+            <span>🪄</span> Auto Arrange
+          </button>
+          <button class="btn" id="btn-fit-view" title="Fit Entire Diagram in View">
+            <span>🎯</span> Fit View
+          </button>
+          <button class="btn" id="btn-grid-toggle" title="Toggle Grid Visibility" style="border-color: var(--border-focus)">
+            <span>▦</span> Grid: <span id="grid-status">On</span>
+          </button>
+          <button class="btn" id="btn-snap-toggle" title="Snap to Grid" style="border-color: var(--border-focus)">
+            <span>🧲</span> Snap: <span id="snap-status">On</span>
+          </button>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Simulation Tools -->
+        <div class="nav-group" role="group" aria-label="Simulation Controls">
+          <button class="btn" id="btn-simulate" title="Simulate Token Flow" style="border-color: var(--border-focus)">
+            <span>▶</span> <span id="sim-label">Pause Flow</span>
+          </button>
+          <button class="btn" id="btn-pulse-toggle" title="Toggle Pulsing Visual Feedback" style="border-color: var(--border-focus)">
+            <span>✨</span> Pulse: <span id="pulse-status">On</span>
+          </button>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Settings & Configuration -->
+        <div class="nav-group" role="group" aria-label="Settings & Configuration">
+          <button class="btn" id="btn-theme-toggle" title="Toggle Theme">
+            <span>🌙</span> <span id="theme-label">Dark</span>
+          </button>
+          <button class="btn btn-primary" id="btn-config-drawer-toggle" title="Open Client Configuration & Capabilities Showcase">
+            <span>⚙️</span> Client Config
+          </button>
+        </div>
       </div>
     </header>
 
@@ -84,7 +97,7 @@
       <aside id="inspector-container"></aside>
 
       <!-- Client Configuration Drawer / Showcase Panel -->
-      <aside id="config-drawer" class="config-drawer">
+      <aside id="config-drawer" class="config-drawer hidden">
         <div class="config-drawer-header">
           <div class="config-drawer-title-group">
             <span class="config-badge">Dev Showcase</span>
@@ -564,6 +577,7 @@
     document.getElementById('btn-auto-arrange').addEventListener('click', () => {
       const changed = canvas.autoArrange({ direction: 'LR', fitView: true });
       if (changed) {
+        canvas.fitView();
         showToast('Auto-arranged workflow diagram');
       }
     });
@@ -625,6 +639,7 @@
     themeBtn.addEventListener('click', () => {
       isLight = !isLight;
       document.body.classList.toggle('theme-light', isLight);
+      canvas.setTheme(isLight ? 'theme-light' : null);
       themeLabel.textContent = isLight ? 'Light' : 'Dark';
     });
 
@@ -766,22 +781,24 @@
       showToast('Loaded demo workflow');
     });
 
-    // 9. Undo & Redo Controls
+    // 9. Undo & Redo Controls (Keyboard shortcuts Ctrl+Z / Ctrl+Y remain active)
     const undoBtn = document.getElementById('btn-undo');
     const redoBtn = document.getElementById('btn-redo');
 
-    undoBtn.addEventListener('click', () => {
-      canvas.undo();
-    });
+    if (undoBtn && redoBtn) {
+      undoBtn.addEventListener('click', () => {
+        canvas.undo();
+      });
 
-    redoBtn.addEventListener('click', () => {
-      canvas.redo();
-    });
+      redoBtn.addEventListener('click', () => {
+        canvas.redo();
+      });
 
-    canvas.on('history:change', ({ canUndo, canRedo }) => {
-      undoBtn.disabled = !canUndo;
-      redoBtn.disabled = !canRedo;
-    });
+      canvas.on('history:change', ({ canUndo, canRedo }) => {
+        undoBtn.disabled = !canUndo;
+        redoBtn.disabled = !canRedo;
+      });
+    }
 
     // 10. Client Configuration Showcase Panel Interactions
     const configDrawer = document.getElementById('config-drawer');
