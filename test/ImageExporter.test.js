@@ -113,6 +113,28 @@ describe('ImageExporter', () => {
       expect(bounds.width).toBe((500 - 100) + 40);
       expect(bounds.height).toBe((400 - 100) + 40);
     });
+
+    it('accounts for floating labels attached to events or gateways', () => {
+      const node = createMockNode({ id: 'n1', type: 'event', x: 100, y: 100, width: 50, height: 50 });
+      const label = document.createElement('div');
+      label.className = 'bpmn-event-floating-label';
+      Object.defineProperty(label, 'offsetTop', { value: 60 });
+      Object.defineProperty(label, 'offsetHeight', { value: 25 });
+      node.domElement.appendChild(label);
+      nodes.set('n1', node);
+
+      const bounds = exporter.getDiagramBounds(10);
+      // node.y (100) + offsetTop (60) + offsetHeight (25) = 185
+      expect(bounds.maxY).toBe(185);
+      expect(bounds.height).toBe((185 - 100) + 20);
+    });
+
+    it('falls back to default dimensions when node coordinates are non-finite', () => {
+      nodes.set('invalid', { id: 'invalid', type: 'task', x: NaN, y: Infinity, width: NaN, height: NaN });
+      const bounds = exporter.getDiagramBounds(20);
+      expect(bounds.width).toBe(640);
+      expect(bounds.height).toBe(440);
+    });
   });
 
   describe('Theme resolution', () => {
@@ -125,6 +147,18 @@ describe('ImageExporter', () => {
       mockCanvas.currentThemeClass = null;
       mockCanvas.container.setAttribute('data-bpmn-theme', 'ocean');
       expect(exporter.getTheme()).toBe('theme-ocean');
+
+      // Test body class fallback
+      mockCanvas.container = null;
+      document.body.classList.add('theme-light');
+      expect(exporter.getTheme()).toBe('theme-light');
+      document.body.classList.remove('theme-light');
+
+      document.body.classList.add('theme-ocean');
+      expect(exporter.getTheme()).toBe('theme-ocean');
+      document.body.classList.remove('theme-ocean');
+
+      expect(exporter.getTheme()).toBe('theme-dark');
     });
 
     it('maps theme identifier to solid background hex', () => {
@@ -159,6 +193,15 @@ describe('ImageExporter', () => {
 
       const { svgElement: transSvg } = exporter.buildSvg({ background: 'transparent' });
       expect(transSvg.querySelector('rect')).toBeNull();
+
+      const { svgElement: customSvg } = exporter.buildSvg({ background: '#ef4444' });
+      expect(customSvg.querySelector('rect')?.getAttribute('fill')).toBe('#ef4444');
+    });
+
+    it('gracefully skips nodes without domElement in buildSvg', () => {
+      nodes.set('bare', { id: 'bare', type: 'task', x: 10, y: 10, width: 100, height: 60 });
+      const { svgElement } = exporter.buildSvg();
+      expect(svgElement).toBeDefined();
     });
 
     it('strips interactive ports and handles in exported DOM elements', () => {
@@ -283,6 +326,100 @@ describe('ImageExporter', () => {
       expect(blob.type).toBe('image/jpeg');
       expect(toCanvasSpy).toHaveBeenCalledWith(expect.objectContaining({ background: '#0f172a' }));
       expect(downloadSpy).toHaveBeenCalledWith(blob, 'my-flow.jpg');
+    });
+
+    it('rejects exportPng when canvas.toBlob returns null', async () => {
+      const mockCanvasEl = document.createElement('canvas');
+      mockCanvasEl.toBlob = vi.fn(function(cb) {
+        cb(null);
+      });
+      vi.spyOn(exporter, 'toCanvas').mockResolvedValue(mockCanvasEl);
+
+      await expect(exporter.exportPng({ download: false })).rejects.toThrow('Failed to generate PNG blob');
+    });
+
+    it('rejects exportJpeg when canvas.toBlob returns null', async () => {
+      const mockCanvasEl = document.createElement('canvas');
+      mockCanvasEl.toBlob = vi.fn(function(cb) {
+        cb(null);
+      });
+      vi.spyOn(exporter, 'toCanvas').mockResolvedValue(mockCanvasEl);
+
+      await expect(exporter.exportJpeg({ download: false })).rejects.toThrow('Failed to generate JPEG blob');
+    });
+  });
+
+  describe('toCanvas rasterization', () => {
+    it('creates canvas and loads image from Base64 data URI', async () => {
+      nodes.set('n1', createMockNode({ id: 'n1', x: 0, y: 0, width: 100, height: 100 }));
+
+      const origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+        scale: vi.fn(),
+        drawImage: vi.fn()
+      });
+
+      const origImage = global.Image;
+      class MockImage {
+        constructor() {
+          this._src = '';
+          this.onload = null;
+          this.onerror = null;
+        }
+        set src(val) {
+          this._src = val;
+          setTimeout(() => {
+            if (this.onload) this.onload();
+          }, 0);
+        }
+        get src() {
+          return this._src;
+        }
+      }
+      global.Image = MockImage;
+
+      try {
+        const canvas = await exporter.toCanvas({ scale: 2 });
+        expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+        expect(canvas.width).toBeGreaterThan(0);
+        expect(canvas.height).toBeGreaterThan(0);
+      } finally {
+        global.Image = origImage;
+        HTMLCanvasElement.prototype.getContext = origGetContext;
+      }
+    });
+
+    it('rejects when image loading fails', async () => {
+      nodes.set('n1', createMockNode({ id: 'n1', x: 0, y: 0, width: 100, height: 100 }));
+
+      const origImage = global.Image;
+      class FailingImage {
+        set src(val) {
+          setTimeout(() => {
+            if (this.onerror) this.onerror(new Error('Network error'));
+          }, 0);
+        }
+      }
+      global.Image = FailingImage;
+
+      try {
+        await expect(exporter.toCanvas()).rejects.toThrow('Failed to load SVG for rasterization');
+      } finally {
+        global.Image = origImage;
+      }
+    });
+  });
+
+  describe('downloadBlob', () => {
+    it('creates an anchor element, triggers click, and removes it', () => {
+      const blob = new Blob(['hello'], { type: 'text/plain' });
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+      exporter.downloadBlob(blob, 'download-test.txt');
+
+      expect(createObjectURLSpy).toHaveBeenCalledWith(blob);
+      expect(clickSpy).toHaveBeenCalled();
     });
   });
 
