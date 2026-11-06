@@ -25,12 +25,36 @@
           <button class="btn" id="btn-demo-flow" title="Load Demo Workflow">
             <span>✨</span> Demo
           </button>
-          <button class="btn" id="btn-import-json" title="Import BPMN JSON Diagram">
-            <span>📤</span> Import
-          </button>
-          <button class="btn" id="btn-export-json" title="Export BPMN JSON Diagram">
-            <span>📥</span> Export
-          </button>
+
+          <div class="dropdown-wrapper" id="file-dropdown-wrapper">
+            <button class="btn" id="btn-file-dropdown-toggle" title="Import & Export Diagram Options" aria-haspopup="true" aria-expanded="false">
+              <span>📁</span> Import/Export <span class="dropdown-arrow">▾</span>
+            </button>
+            <div class="dropdown-menu hidden" id="file-dropdown-menu" role="menu">
+              <!-- JSON section at top -->
+              <div class="dropdown-section-title">Model Data</div>
+              <button class="dropdown-item" id="btn-import-json" role="menuitem">
+                <span>📤</span> Import JSON
+              </button>
+              <button class="dropdown-item" id="btn-export-json" role="menuitem">
+                <span>📥</span> Export JSON
+              </button>
+
+              <div class="dropdown-divider"></div>
+
+              <!-- Image section below divider -->
+              <div class="dropdown-section-title">Image Export</div>
+              <button class="dropdown-item" id="btn-export-png" role="menuitem">
+                <span>🖼️</span> Export PNG (HD)
+              </button>
+              <button class="dropdown-item" id="btn-export-jpeg" role="menuitem">
+                <span>🖼️</span> Export JPEG
+              </button>
+              <button class="dropdown-item" id="btn-export-svg" role="menuitem">
+                <span>📐</span> Export SVG (Vector)
+              </button>
+            </div>
+          </div>
           <input type="file" id="file-import-input" accept=".json,application/json" style="display: none;" />
         </div>
 
@@ -685,8 +709,49 @@
       }
     }
 
-    // 8. Export / Import Data
+    // 8. File Dropdown & Export / Import Actions
+    const fileDropdownWrapper = document.getElementById('file-dropdown-wrapper');
+    const fileDropdownToggle = document.getElementById('btn-file-dropdown-toggle');
+    const fileDropdownMenu = document.getElementById('file-dropdown-menu');
+
+    function toggleFileDropdown(open) {
+      if (!fileDropdownMenu || !fileDropdownWrapper) return;
+      const isOpen = open !== undefined ? open : fileDropdownMenu.classList.contains('hidden');
+      if (isOpen) {
+        fileDropdownMenu.classList.remove('hidden');
+        fileDropdownWrapper.classList.add('open');
+        fileDropdownToggle?.setAttribute('aria-expanded', 'true');
+      } else {
+        fileDropdownMenu.classList.add('hidden');
+        fileDropdownWrapper.classList.remove('open');
+        fileDropdownToggle?.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    if (fileDropdownToggle) {
+      fileDropdownToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFileDropdown();
+      });
+    }
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (fileDropdownWrapper && !fileDropdownWrapper.contains(e.target)) {
+        toggleFileDropdown(false);
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && fileDropdownMenu && !fileDropdownMenu.classList.contains('hidden')) {
+        toggleFileDropdown(false);
+      }
+    });
+
+    // Export JSON
     document.getElementById('btn-export-json').addEventListener('click', () => {
+      toggleFileDropdown(false);
       const data = canvas.exportData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -698,11 +763,49 @@
       showToast('Workflow JSON downloaded');
     });
 
+    // Image Exports
+    document.getElementById('btn-export-png').addEventListener('click', async () => {
+      toggleFileDropdown(false);
+      try {
+        showToast('Generating high-resolution PNG...');
+        await canvas.exportImage('png', { scale: 2, fileName: 'bpmn-workflow.png' });
+        showToast('PNG image downloaded');
+      } catch (err) {
+        console.error('PNG export error:', err);
+        showToast(`PNG export failed: ${err.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-export-jpeg').addEventListener('click', async () => {
+      toggleFileDropdown(false);
+      try {
+        showToast('Generating JPEG image...');
+        await canvas.exportImage('jpeg', { scale: 2, fileName: 'bpmn-workflow.jpg' });
+        showToast('JPEG image downloaded');
+      } catch (err) {
+        console.error('JPEG export error:', err);
+        showToast(`JPEG export failed: ${err.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-export-svg').addEventListener('click', async () => {
+      toggleFileDropdown(false);
+      try {
+        showToast('Generating SVG vector graphic...');
+        await canvas.exportImage('svg', { fileName: 'bpmn-workflow.svg' });
+        showToast('SVG image downloaded');
+      } catch (err) {
+        console.error('SVG export error:', err);
+        showToast(`SVG export failed: ${err.message}`, 'error');
+      }
+    });
+
     const fileImportInput = document.getElementById('file-import-input');
     const importBtn = document.getElementById('btn-import-json');
 
     // Trigger file chooser dialog
     importBtn.addEventListener('click', () => {
+      toggleFileDropdown(false);
       fileImportInput.value = '';
       fileImportInput.click();
     });

@@ -785,6 +785,27 @@ describe('BpmnCanvas', () => {
       expect(cmdRes.length).toBe(1);
       expect(canvas.getNode('task_node').label).toBe('Updated Work');
     });
+
+    it('delegates exportImage to ImageExporter and emits canvas:export event', async () => {
+      const exportSpy = vi.fn();
+      canvas.on('canvas:export', exportSpy);
+
+      vi.spyOn(canvas.imageExporter, 'exportSvg').mockResolvedValue(new Blob(['<svg></svg>'], { type: 'image/svg+xml' }));
+      vi.spyOn(canvas.imageExporter, 'exportPng').mockResolvedValue(new Blob(['png-bytes'], { type: 'image/png' }));
+      vi.spyOn(canvas.imageExporter, 'exportJpeg').mockResolvedValue(new Blob(['jpg-bytes'], { type: 'image/jpeg' }));
+
+      const svgBlob = await canvas.exportImage('svg', { download: false });
+      expect(svgBlob.type).toBe('image/svg+xml');
+      expect(exportSpy).toHaveBeenCalledWith(expect.objectContaining({ format: 'svg' }));
+
+      const pngBlob = await canvas.exportImage('png', { download: false });
+      expect(pngBlob.type).toBe('image/png');
+      expect(exportSpy).toHaveBeenCalledWith(expect.objectContaining({ format: 'png' }));
+
+      const jpegBlob = await canvas.exportImage('jpeg', { download: false });
+      expect(jpegBlob.type).toBe('image/jpeg');
+      expect(exportSpy).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpeg' }));
+    });
   });
 });
 
