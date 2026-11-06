@@ -155,7 +155,7 @@
 }
 
 .bpmn-node-subprocess {
-  border-top: 4px solid #818cf8 !important;
+  border-top: 4px solid var(--bpmn-subprocess-accent, #818cf8) !important;
   border-style: solid;
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
@@ -168,12 +168,13 @@
   justify-content: flex-start;
   flex-direction: column;
   padding: 0 !important;
-  background: rgba(18, 24, 38, 0.72) !important;
-  border: 1.5px dashed rgba(129, 140, 248, 0.45) !important;
-  border-top: 4px solid #818cf8 !important;
+  background: var(--bpmn-subprocess-bg, rgba(18, 24, 38, 0.72)) !important;
+  border: 1.5px dashed var(--bpmn-subprocess-border, rgba(129, 140, 248, 0.45)) !important;
+  border-top: 4px solid var(--bpmn-subprocess-accent, #818cf8) !important;
   border-radius: 12px;
   backdrop-filter: blur(16px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(129, 140, 248, 0.15);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--bpmn-subprocess-shadow, 0 12px 36px rgba(0, 0, 0, 0.4)) !important;
 }
 
 .bpmn-node-subprocess.expanded.selected {
@@ -188,8 +189,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(129, 140, 248, 0.08);
+  border-bottom: 1px solid var(--bpmn-subprocess-header-border, rgba(255, 255, 255, 0.08));
+  background: var(--bpmn-subprocess-header-bg, rgba(129, 140, 248, 0.08));
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
   cursor: grab;
@@ -278,8 +279,8 @@
   transform: none;
   width: 18px;
   height: 18px;
-  border: 1px solid rgba(129, 140, 248, 0.3);
-  background: rgba(129, 140, 248, 0.12);
+  border: 1px solid var(--bpmn-subprocess-marker-border, rgba(129, 140, 248, 0.3));
+  background: var(--bpmn-subprocess-marker-bg, rgba(129, 140, 248, 0.12));
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -299,12 +300,111 @@
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
-  color: var(--text-muted);
+  color: var(--bpmn-subprocess-marker-text, var(--text-muted));
 }
 
 .bpmn-subprocess-marker:hover .bpmn-subprocess-plus,
 .bpmn-subprocess-marker-header:hover .bpmn-subprocess-plus {
   color: #c7d2fe;
+}
+
+/* Light Mode Subprocess & Card Overrides */
+.theme-light .bpmn-node-subprocess.expanded,
+[data-bpmn-theme="light"] .bpmn-node-subprocess.expanded {
+  background: rgba(245, 247, 255, 0.94) !important;
+  border: 1.5px dashed rgba(99, 102, 241, 0.45) !important;
+  border-top: 4px solid #6366f1 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(99, 102, 241, 0.15) !important;
+}
+
+.theme-light .bpmn-subprocess-header,
+[data-bpmn-theme="light"] .bpmn-subprocess-header {
+  border-bottom: 1px solid rgba(99, 102, 241, 0.18) !important;
+  background: rgba(238, 242, 255, 0.95) !important;
+}
+
+.theme-light .bpmn-subprocess-header .bpmn-node-title,
+[data-bpmn-theme="light"] .bpmn-subprocess-header .bpmn-node-title {
+  color: #1e1b4b !important;
+}
+
+.theme-light .bpmn-subprocess-header .bpmn-node-type-label,
+[data-bpmn-theme="light"] .bpmn-subprocess-header .bpmn-node-type-label {
+  color: #4f46e5 !important;
+}
+
+.theme-light .bpmn-subprocess-header .bpmn-subprocess-marker-header,
+[data-bpmn-theme="light"] .bpmn-subprocess-header .bpmn-subprocess-marker-header {
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  background: #ffffff !important;
+}
+
+.theme-light .bpmn-subprocess-header .bpmn-subprocess-marker-header .bpmn-subprocess-plus,
+[data-bpmn-theme="light"] .bpmn-subprocess-header .bpmn-subprocess-marker-header .bpmn-subprocess-plus {
+  color: #4f46e5 !important;
+}
+
+.theme-light .bpmn-subprocess-header .bpmn-subprocess-marker-header:hover,
+[data-bpmn-theme="light"] .bpmn-subprocess-header .bpmn-subprocess-marker-header:hover {
+  background: #e0e7ff !important;
+  border-color: #6366f1 !important;
+}
+
+.theme-light .bpmn-subprocess-resize-handle::after,
+[data-bpmn-theme="light"] .bpmn-subprocess-resize-handle::after {
+  border-right: 2px solid rgba(99, 102, 241, 0.7) !important;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.7) !important;
+}
+
+.theme-light .bpmn-node-subprocess:not(.expanded),
+[data-bpmn-theme="light"] .bpmn-node-subprocess:not(.expanded) {
+  background: #ffffff !important;
+  border: 1.5px solid rgba(99, 102, 241, 0.35) !important;
+  border-top: 4px solid #6366f1 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.theme-light .bpmn-subprocess-marker,
+[data-bpmn-theme="light"] .bpmn-subprocess-marker {
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  background: #ffffff !important;
+}
+
+.theme-light .bpmn-subprocess-marker .bpmn-subprocess-plus,
+[data-bpmn-theme="light"] .bpmn-subprocess-marker .bpmn-subprocess-plus {
+  color: #4f46e5 !important;
+}
+
+.theme-light .bpmn-subprocess-marker:hover,
+[data-bpmn-theme="light"] .bpmn-subprocess-marker:hover {
+  background: #e0e7ff !important;
+  border-color: #6366f1 !important;
+}
+
+.theme-light .bpmn-node.bpmn-node-task,
+.theme-light .bpmn-node.bpmn-node-activity,
+.theme-light .bpmn-node.bpmn-node-manual-task,
+.theme-light .bpmn-node.bpmn-node-user-task,
+.theme-light .bpmn-node.bpmn-node-service-task,
+.theme-light .bpmn-node.bpmn-node-business-rule-task,
+.theme-light .bpmn-node.bpmn-node-script-task,
+.theme-light .bpmn-node.bpmn-node-send-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-activity,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-manual-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-user-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-service-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-business-rule-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-script-task,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-send-task {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+}
+
+.theme-light .bpmn-node.bpmn-node-text-annotation,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-text-annotation {
+  background: rgba(241, 245, 249, 0.85);
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 .bpmn-node-task,

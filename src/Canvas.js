@@ -208,7 +208,8 @@ export class BpmnCanvas {
           this.updateAttachedBoundaryPositions(node, oldW, oldH);
         }
       },
-      ensureSubprocessEnclosesChildren: (id) => this.ensureSubprocessEnclosesChildren(id)
+      ensureSubprocessEnclosesChildren: (id) => this.ensureSubprocessEnclosesChildren(id),
+      fitView: () => this.fitView()
     });
 
     const handleStructuralChange = () => {
@@ -1773,18 +1774,26 @@ export class BpmnCanvas {
 
     const padding = 80;
     const rect = this.container.getBoundingClientRect();
-    const width = maxX - minX;
-    const height = maxY - minY;
+    const containerWidth = rect.width > 0 ? rect.width : (this.container.clientWidth || 1000);
+    const containerHeight = rect.height > 0 ? rect.height : (this.container.clientHeight || 700);
 
-    const zoom = Math.min(
-      (rect.width - padding * 2) / width,
-      (rect.height - padding * 2) / height,
+    const width = Math.max(maxX - minX, 1);
+    const height = Math.max(maxY - minY, 1);
+
+    const availableWidth = Math.max(containerWidth - padding * 2, 100);
+    const availableHeight = Math.max(containerHeight - padding * 2, 100);
+
+    const targetZoom = Math.min(
+      availableWidth / width,
+      availableHeight / height,
       1.5
     );
 
-    this.zoom = Math.max(zoom, 0.4);
-    this.panX = (rect.width - width * this.zoom) / 2 - minX * this.zoom;
-    this.panY = (rect.height - height * this.zoom) / 2 - minY * this.zoom;
+    const zoomMin = this.options.zoomMin ?? 0.2;
+    const zoomMax = this.options.zoomMax ?? 3.0;
+    this.zoom = Math.min(Math.max(targetZoom, zoomMin), zoomMax);
+    this.panX = (containerWidth - width * this.zoom) / 2 - minX * this.zoom;
+    this.panY = (containerHeight - height * this.zoom) / 2 - minY * this.zoom;
 
     this.applyTransform();
     this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });

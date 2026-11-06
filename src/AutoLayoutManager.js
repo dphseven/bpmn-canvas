@@ -30,6 +30,7 @@ export class AutoLayoutManager {
    * @param {Function} [options.updateConnectedEdges] - Refresh edges connected to a node
    * @param {Function} [options.updateAttachedBoundaryPositions] - Re-dock boundary events to host
    * @param {Function} [options.ensureSubprocessEnclosesChildren] - Resize container to wrap children
+   * @param {Function} [options.fitView] - Optional canvas fitView callback
    */
   constructor({
     nodes,
@@ -37,7 +38,8 @@ export class AutoLayoutManager {
     getNode,
     updateConnectedEdges,
     updateAttachedBoundaryPositions,
-    ensureSubprocessEnclosesChildren
+    ensureSubprocessEnclosesChildren,
+    fitView
   }) {
     this.nodes = nodes;
     this.edges = edges;
@@ -45,6 +47,7 @@ export class AutoLayoutManager {
     this.updateConnectedEdges = updateConnectedEdges || (() => {});
     this.updateAttachedBoundaryPositions = updateAttachedBoundaryPositions || (() => {});
     this.ensureSubprocessEnclosesChildren = ensureSubprocessEnclosesChildren || (() => {});
+    this.fitView = fitView || (() => {});
   }
 
   /**
@@ -57,6 +60,7 @@ export class AutoLayoutManager {
    * @param {number} [options.startY=140] - Baseline center Y coordinate for primary flow
    * @param {number} [options.gridSize=20] - Grid snap size in px for column positions
    * @param {boolean} [options.optimizePorts=true] - Whether to reassign edge ports to natural flow
+   * @param {boolean} [options.fitView=true] - Whether to fit viewport to graph after arrangement
    * @returns {boolean} Whether any layout modifications were made
    */
   autoArrange(options = {}) {
@@ -67,7 +71,8 @@ export class AutoLayoutManager {
       startX: 100,
       startY: 140,
       gridSize: 20,
-      optimizePorts: true
+      optimizePorts: true,
+      fitView: true
     }, options);
 
     if (this.nodes.size === 0) return false;
@@ -227,6 +232,10 @@ export class AutoLayoutManager {
     allNodesList.forEach(node => {
       this.updateConnectedEdges(node.id);
     });
+
+    if (config.fitView && typeof this.fitView === 'function') {
+      this.fitView();
+    }
 
     return true;
   }

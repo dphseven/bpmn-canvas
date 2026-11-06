@@ -368,5 +368,37 @@ describe('AutoLayoutManager', () => {
 
     expect(manager.autoArrange()).toBe(true);
   });
+
+  it('invokes fitView callback at the end of auto-arrange by default', () => {
+    const fitViewSpy = vi.fn();
+    const testNodes = new Map();
+    const testEdges = new Map();
+    testNodes.set('n1', createMockNode({ id: 'n1', type: 'task' }));
+
+    const autoManager = new AutoLayoutManager({
+      nodes: testNodes,
+      edges: testEdges,
+      fitView: fitViewSpy
+    });
+
+    expect(autoManager.autoArrange()).toBe(true);
+    expect(fitViewSpy).toHaveBeenCalled();
+  });
+
+  it('respects fitView: false in options to skip fitView invocation', () => {
+    const fitViewSpy = vi.fn();
+    const testNodes = new Map();
+    const testEdges = new Map();
+    testNodes.set('n1', createMockNode({ id: 'n1', type: 'task' }));
+
+    const autoManager = new AutoLayoutManager({
+      nodes: testNodes,
+      edges: testEdges,
+      fitView: fitViewSpy
+    });
+
+    expect(autoManager.autoArrange({ fitView: false })).toBe(true);
+    expect(fitViewSpy).not.toHaveBeenCalled();
+  });
 });
 

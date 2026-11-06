@@ -40,6 +40,19 @@
   --shadow-card: var(--bpmn-shadow-card);
   --shadow-glow: var(--bpmn-shadow-glow);
   --transition-smooth: var(--bpmn-transition-smooth);
+
+  /* Subprocess tokens */
+  --bpmn-subprocess-bg: rgba(18, 24, 38, 0.72);
+  --bpmn-subprocess-border: rgba(129, 140, 248, 0.45);
+  --bpmn-subprocess-accent: #818cf8;
+  --bpmn-subprocess-header-bg: rgba(129, 140, 248, 0.08);
+  --bpmn-subprocess-header-border: rgba(255, 255, 255, 0.08);
+  --bpmn-subprocess-header-title: #f8fafc;
+  --bpmn-subprocess-header-sub: #94a3b8;
+  --bpmn-subprocess-marker-bg: rgba(129, 140, 248, 0.12);
+  --bpmn-subprocess-marker-border: rgba(129, 140, 248, 0.3);
+  --bpmn-subprocess-marker-text: #c7d2fe;
+  --bpmn-subprocess-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(129, 140, 248, 0.15);
 }
 
 .theme-light, [data-bpmn-theme="light"] {
@@ -69,6 +82,19 @@
   --grid-dot: rgba(0, 0, 0, 0.08);
   --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
   --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.25);
+
+  /* Light Subprocess Palette */
+  --bpmn-subprocess-bg: rgba(245, 247, 255, 0.92);
+  --bpmn-subprocess-border: rgba(99, 102, 241, 0.45);
+  --bpmn-subprocess-accent: #6366f1;
+  --bpmn-subprocess-header-bg: rgba(238, 242, 255, 0.95);
+  --bpmn-subprocess-header-border: rgba(99, 102, 241, 0.18);
+  --bpmn-subprocess-header-title: #1e1b4b;
+  --bpmn-subprocess-header-sub: #4f46e5;
+  --bpmn-subprocess-marker-bg: #ffffff;
+  --bpmn-subprocess-marker-border: rgba(99, 102, 241, 0.35);
+  --bpmn-subprocess-marker-text: #4f46e5;
+  --bpmn-subprocess-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(99, 102, 241, 0.15);
 }
 
 * {
@@ -129,10 +155,11 @@ body, html {
 }
 
 .brand-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--text-main);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
+  font-family: inherit;
 }
 
 .brand-subtitle {
@@ -144,7 +171,21 @@ body, html {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-color);
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .btn {
