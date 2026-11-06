@@ -76,6 +76,8 @@ export class BpmnXmlSerializer {
     const diagramId = options.diagramId || 'BPMNDiagram_1';
     const planeId = options.planeId || 'BPMNPlane_1';
 
+    const exporterVersion = options.exporterVersion || '1.1.0';
+
     // Index nodes by ID for fast lookup and subprocess containment hierarchy
     const nodeMap = new Map();
     nodes.forEach(n => nodeMap.set(n.id, n));
@@ -137,7 +139,7 @@ export class BpmnXmlSerializer {
       `id="${this.escapeXml(definitionsId)}" ` +
       `targetNamespace="${this.escapeXml(targetNamespace)}" ` +
       `exporter="bpmn-canvas" ` +
-      `exporterVersion="1.0.0">`
+      `exporterVersion="${this.escapeXml(exporterVersion)}">`
     );
 
     // Semantic Process Definition
