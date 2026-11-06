@@ -24,6 +24,7 @@ import { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
 import { AutoLayoutManager } from './AutoLayoutManager.js';
 import { SemanticAdapter } from './SemanticAdapter.js';
 import { ImageExporter } from './ImageExporter.js';
+import { BpmnXmlSerializer } from './BpmnXmlSerializer.js';
 import { calculateBoundaryDocking } from './geometry.js';
 
 /**
@@ -213,8 +214,9 @@ export class BpmnCanvas {
       fitView: () => this.fitView()
     });
 
-    // Image Exporter
+    // Image Exporter & BPMN XML Serializer
     this.imageExporter = new ImageExporter(this);
+    this.xmlSerializer = new BpmnXmlSerializer(this);
 
     const handleStructuralChange = () => {
       if (this.simulationActive) {
@@ -1896,6 +1898,44 @@ export class BpmnCanvas {
    */
   importFromJson(data) {
     return this.loadData(data);
+  }
+
+  /**
+   * Exports the canvas workflow diagram to a standard BPMN 2.0 XML string.
+   * @param {Object} [options={}]
+   * @returns {string} Standard BPMN 2.0 XML string
+   */
+  exportBpmnXml(options = {}) {
+    return this.xmlSerializer.toXml(this.exportData(), options);
+  }
+
+  /**
+   * Alias for exportBpmnXml()
+   */
+  exportToBpmnXml(options = {}) {
+    return this.exportBpmnXml(options);
+  }
+
+  /**
+   * Imports a standard BPMN 2.0 XML string and renders the diagram on the canvas.
+   * @param {string} xmlString
+   * @param {Object} [options={}]
+   * @returns {{ nodes: Array<Object>, edges: Array<Object> }}
+   */
+  importBpmnXml(xmlString, options = {}) {
+    const data = this.xmlSerializer.fromXml(xmlString, options);
+    if (options.autoFit !== undefined) {
+      data.autoFit = options.autoFit;
+    }
+    this.loadData(data);
+    return data;
+  }
+
+  /**
+   * Alias for importBpmnXml()
+   */
+  importFromBpmnXml(xmlString, options = {}) {
+    return this.importBpmnXml(xmlString, options);
   }
 
   /**

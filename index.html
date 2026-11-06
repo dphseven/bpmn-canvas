@@ -31,8 +31,14 @@
               <span>📁</span> Import/Export <span class="dropdown-arrow">▾</span>
             </button>
             <div class="dropdown-menu hidden" id="file-dropdown-menu" role="menu">
-              <!-- JSON section at top -->
+              <!-- Model Data section at top -->
               <div class="dropdown-section-title">Model Data</div>
+              <button class="dropdown-item" id="btn-import-bpmn" role="menuitem">
+                <span>📑</span> Import BPMN
+              </button>
+              <button class="dropdown-item" id="btn-export-bpmn" role="menuitem">
+                <span>💾</span> Export BPMN
+              </button>
               <button class="dropdown-item" id="btn-import-json" role="menuitem">
                 <span>📤</span> Import JSON
               </button>
@@ -56,6 +62,7 @@
             </div>
           </div>
           <input type="file" id="file-import-input" accept=".json,application/json" style="display: none;" />
+          <input type="file" id="file-import-bpmn-input" accept=".bpmn,.xml,application/xml,text/xml" style="display: none;" />
         </div>
 
         <div class="nav-divider"></div>
@@ -709,6 +716,24 @@
       }
     }
 
+    // Common BPMN 2.0 XML Loader with validation
+    function importWorkflowBpmn(xmlText) {
+      try {
+        const data = canvas.importBpmnXml(xmlText);
+        showToast(`BPMN 2.0 XML imported successfully (${data.nodes.length} nodes, ${(data.edges || []).length} sequence flows)`);
+
+        // Auto start simulation on successful import
+        setTimeout(() => {
+          canvas.startSimulation();
+          simLabel.textContent = 'Pause Flow';
+          simBtn.style.borderColor = 'var(--border-focus)';
+        }, 150);
+      } catch (err) {
+        console.error('Error importing BPMN 2.0 XML workflow:', err);
+        showToast(`Failed to load BPMN XML: ${err.message}`, 'error');
+      }
+    }
+
     // 8. File Dropdown & Export / Import Actions
     const fileDropdownWrapper = document.getElementById('file-dropdown-wrapper');
     const fileDropdownToggle = document.getElementById('btn-file-dropdown-toggle');
@@ -746,6 +771,25 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && fileDropdownMenu && !fileDropdownMenu.classList.contains('hidden')) {
         toggleFileDropdown(false);
+      }
+    });
+
+    // Export BPMN 2.0 XML
+    document.getElementById('btn-export-bpmn').addEventListener('click', () => {
+      toggleFileDropdown(false);
+      try {
+        const xml = canvas.exportBpmnXml();
+        const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'bpmn-workflow.bpmn';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('BPMN 2.0 XML downloaded (.bpmn)');
+      } catch (err) {
+        console.error('BPMN export error:', err);
+        showToast(`BPMN export failed: ${err.message}`, 'error');
       }
     });
 
@@ -800,17 +844,20 @@
       }
     });
 
+    // File Import Inputs and Handlers
     const fileImportInput = document.getElementById('file-import-input');
     const importBtn = document.getElementById('btn-import-json');
+    const fileImportBpmnInput = document.getElementById('file-import-bpmn-input');
+    const importBpmnBtn = document.getElementById('btn-import-bpmn');
 
-    // Trigger file chooser dialog
+    // Trigger JSON file chooser dialog
     importBtn.addEventListener('click', () => {
       toggleFileDropdown(false);
       fileImportInput.value = '';
       fileImportInput.click();
     });
 
-    // Handle file selection
+    // Handle JSON file selection
     fileImportInput.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -820,12 +867,34 @@
         importWorkflowJson(evt.target.result);
       };
       reader.onerror = () => {
-        showToast('Error reading the selected file', 'error');
+        showToast('Error reading the selected JSON file', 'error');
       };
       reader.readAsText(file);
     });
 
-    // Handle Drag and Drop JSON onto Canvas
+    // Trigger BPMN 2.0 XML file chooser dialog
+    importBpmnBtn.addEventListener('click', () => {
+      toggleFileDropdown(false);
+      fileImportBpmnInput.value = '';
+      fileImportBpmnInput.click();
+    });
+
+    // Handle BPMN file selection
+    fileImportBpmnInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        importWorkflowBpmn(evt.target.result);
+      };
+      reader.onerror = () => {
+        showToast('Error reading the selected BPMN file', 'error');
+      };
+      reader.readAsText(file);
+    });
+
+    // Handle Drag and Drop (.bpmn, .xml, .json) onto Canvas
     const dropOverlay = document.getElementById('canvas-drop-overlay');
     let dragCounter = 0;
 
@@ -860,14 +929,22 @@
       if (!files || files.length === 0) return;
 
       const file = files[0];
-      if (!file.name.endsWith('.json') && file.type !== 'application/json') {
-        showToast('Please drop a valid .json file', 'error');
+      const isJson = file.name.endsWith('.json') || file.type === 'application/json';
+      const isBpmn = file.name.endsWith('.bpmn') || file.name.endsWith('.xml') ||
+                     file.type === 'application/xml' || file.type === 'text/xml';
+
+      if (!isJson && !isBpmn) {
+        showToast('Please drop a valid .bpmn, .xml, or .json file', 'error');
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (evt) => {
-        importWorkflowJson(evt.target.result);
+        if (isBpmn) {
+          importWorkflowBpmn(evt.target.result);
+        } else {
+          importWorkflowJson(evt.target.result);
+        }
       };
       reader.onerror = () => {
         showToast('Error reading dropped file', 'error');
