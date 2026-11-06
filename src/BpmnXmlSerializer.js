@@ -602,7 +602,7 @@ export class BpmnXmlSerializer {
           // Parse children inside this subprocess
           Array.from(el.children).forEach(childEl => {
             const childName = this.getLocalName(childEl);
-            if (this.isFlowElement(childName)) {
+            if (this.isFlowElement(childName, childEl)) {
               parseFlowNode(childEl, id);
             } else if (childName === 'sequenceFlow' || childName === 'association') {
               parseEdgeElement(childEl);
@@ -718,7 +718,7 @@ export class BpmnXmlSerializer {
     processes.forEach(proc => {
       Array.from(proc.children).forEach(childEl => {
         const localName = this.getLocalName(childEl);
-        if (this.isFlowElement(localName)) {
+        if (this.isFlowElement(localName, childEl)) {
           parseFlowNode(childEl, null);
         } else if (childNameIsEdge(localName)) {
           parseEdgeElement(childEl);
@@ -731,7 +731,7 @@ export class BpmnXmlSerializer {
     additionalContainers.forEach(container => {
       Array.from(container.children).forEach(childEl => {
         const localName = this.getLocalName(childEl);
-        if (this.isFlowElement(localName) && !nodeById.has(childEl.getAttribute('id'))) {
+        if (this.isFlowElement(localName, childEl) && !nodeById.has(childEl.getAttribute('id'))) {
           parseFlowNode(childEl, null);
         } else if (childNameIsEdge(localName) && !edges.some(e => e.id === childEl.getAttribute('id'))) {
           parseEdgeElement(childEl);
@@ -773,15 +773,23 @@ export class BpmnXmlSerializer {
    * Helper & Utility Methods
    * ----------------------------------------------------------- */
 
-  isFlowElement(localName) {
+  isFlowElement(localName, el = null) {
     const flowElements = new Set([
       'startEvent', 'intermediateCatchEvent', 'intermediateThrowEvent',
       'boundaryEvent', 'endEvent', 'task', 'userTask', 'serviceTask',
       'manualTask', 'businessRuleTask', 'scriptTask', 'subProcess',
-      'exclusiveGateway', 'parallelGateway', 'textAnnotation',
-      'dataObjectReference', 'dataObject'
+      'callActivity', 'sendTask', 'receiveTask',
+      'exclusiveGateway', 'parallelGateway', 'inclusiveGateway', 'complexGateway', 'eventBasedGateway',
+      'textAnnotation', 'dataObjectReference', 'dataObject'
     ]);
-    return flowElements.has(localName);
+    if (flowElements.has(localName)) return true;
+    if (el && (
+      el.getAttribute('bpmncanvas:originalType') ||
+      el.getAttributeNS?.(BPMN_NAMESPACES.BPMNCANVAS, 'originalType')
+    )) {
+      return true;
+    }
+    return false;
   }
 
   calculatePortCoordinate(node, portName) {

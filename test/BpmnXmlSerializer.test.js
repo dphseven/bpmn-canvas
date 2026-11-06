@@ -455,5 +455,167 @@ describe('BpmnXmlSerializer', () => {
       expect(importedEdge.targetPort).toBe('left');
     });
   });
+
+  describe('Comprehensive Branch & Edge Case Coverage', () => {
+    it('serializes and deserializes generic intermediate-event, gateway-parallel, and custom node types', () => {
+      const model = {
+        nodes: [
+          { id: 'inter_1', type: 'intermediate-event', label: 'Mid Step', x: 100, y: 100, width: 52, height: 52 },
+          { id: 'gw_par', type: 'gateway-parallel', label: 'Fork', x: 200, y: 100, width: 50, height: 50 },
+          { id: 'custom_1', type: 'custom-ai-agent', label: 'AI Worker', x: 300, y: 100, width: 120, height: 80 }
+        ],
+        edges: [
+          { id: 'e_par1', sourceId: 'inter_1', targetId: 'gw_par', sourcePort: 'right', targetPort: 'left' },
+          { id: 'e_par2', sourceId: 'gw_par', targetId: 'custom_1', sourcePort: 'right', targetPort: 'left' }
+        ]
+      };
+
+      const xml = serializer.toXml(model, {
+        processId: 'CustomProc',
+        processName: 'Custom Workflow',
+        isExecutable: true,
+        definitionsId: 'Def_Custom',
+        diagramId: 'Diag_Custom',
+        planeId: 'Plane_Custom'
+      });
+
+      expect(xml).toContain('<bpmn:intermediateCatchEvent id="inter_1"');
+      expect(xml).toContain('<bpmn:parallelGateway id="gw_par"');
+      expect(xml).toContain('bpmncanvas:originalType="custom-ai-agent"');
+      expect(xml).toContain('isExecutable="true"');
+
+      const imported = serializer.fromXml(xml);
+      expect(imported.nodes.find(n => n.id === 'inter_1').type).toBe('intermediate-event');
+      expect(imported.nodes.find(n => n.id === 'gw_par').type).toBe('gateway-parallel');
+      expect(imported.nodes.find(n => n.id === 'custom_1').type).toBe('custom-ai-agent');
+    });
+
+    it('handles detectOrthogonalWaypoints option with both orthogonal and non-orthogonal waypoints', () => {
+      const xmlWithWaypoints = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="Def_Wp" targetNamespace="http://bpmn.io/schema/bpmn">
+  <process id="Proc_Wp">
+    <task id="t1" name="Task 1" />
+    <task id="t2" name="Task 2" />
+    <task id="t3" name="Task 3" />
+    <sequenceFlow id="f_ortho" sourceRef="t1" targetRef="t2" />
+    <sequenceFlow id="f_diag" sourceRef="t2" targetRef="t3" />
+  </process>
+  <bpmndi:BPMNDiagram id="Diag_Wp">
+    <bpmndi:BPMNPlane id="Plane_Wp" bpmnElement="Proc_Wp">
+      <bpmndi:BPMNShape id="t1_di" bpmnElement="t1"><dc:Bounds x="100" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t2_di" bpmnElement="t2"><dc:Bounds x="300" y="200" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t3_di" bpmnElement="t3"><dc:Bounds x="500" y="350" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="f_ortho_di" bpmnElement="f_ortho">
+        <di:waypoint x="200" y="140" />
+        <di:waypoint x="250" y="140" />
+        <di:waypoint x="250" y="240" />
+        <di:waypoint x="300" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f_diag_di" bpmnElement="f_diag">
+        <di:waypoint x="400" y="240" />
+        <di:waypoint x="450" y="290" />
+        <di:waypoint x="500" y="390" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+      const imported = serializer.fromXml(xmlWithWaypoints, { detectOrthogonalWaypoints: true });
+      const fOrtho = imported.edges.find(e => e.id === 'f_ortho');
+      const fDiag = imported.edges.find(e => e.id === 'f_diag');
+
+      expect(fOrtho.routing).toBe('orthogonal');
+      expect(fDiag.routing).toBe('bezier');
+    });
+
+    it('extracts flow nodes and sequence flows from collaboration containers', () => {
+      const xmlCollaboration = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="Def_Collab" targetNamespace="http://bpmn.io/schema/bpmn">
+  <collaboration id="Collab_1">
+    <textAnnotation id="ann_collab"><text>External Note</text></textAnnotation>
+    <sequenceFlow id="flow_collab" sourceRef="task_p" targetRef="ann_collab" />
+  </collaboration>
+  <process id="Proc_1">
+    <task id="task_p" name="Process Task" />
+  </process>
+  <bpmndi:BPMNDiagram id="Diag_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="task_p_di" bpmnElement="task_p"><dc:Bounds x="100" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ann_collab_di" bpmnElement="ann_collab"><dc:Bounds x="300" y="100" width="120" height="60"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow_collab_di" bpmnElement="flow_collab">
+        <di:waypoint x="200" y="140" />
+        <di:waypoint x="300" y="140" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+      const imported = serializer.fromXml(xmlCollaboration);
+      expect(imported.nodes.find(n => n.id === 'ann_collab')).toBeDefined();
+      expect(imported.nodes.find(n => n.id === 'task_p')).toBeDefined();
+      expect(imported.edges.find(e => e.id === 'flow_collab')).toBeDefined();
+    });
+
+    it('covers utility fallbacks for ports, empty inputs, and XML escaping', () => {
+      // calculatePortCoordinate fallbacks
+      expect(serializer.calculatePortCoordinate(null, 'right')).toEqual({ x: 0, y: 0 });
+      expect(serializer.calculatePortCoordinate({ x: 10, y: 20, width: 100, height: 60 }, 'unknown_port')).toEqual({ x: 60, y: 50 });
+
+      // deduceClosestPort fallbacks
+      expect(serializer.deduceClosestPort(null, { x: 0, y: 0 }, 'source')).toBe('right');
+      expect(serializer.deduceClosestPort({ x: 0, y: 0 }, null, 'target')).toBe('left');
+
+      // escapeXml null/empty
+      expect(serializer.escapeXml(null)).toBe('');
+      expect(serializer.escapeXml(undefined)).toBe('');
+      expect(serializer.escapeXml('&<>"\'')).toBe('&amp;&lt;&gt;&quot;&apos;');
+
+      // DOM traversal helpers with null / fallbacks
+      expect(serializer.getLocalName(null)).toBe('');
+      expect(serializer.getFirstChildByLocalName(null, 'child')).toBeNull();
+      expect(serializer.getChildrenByLocalName(null, 'child')).toEqual([]);
+
+      // toXml with empty defaults
+      const emptyXml = serializer.toXml();
+      expect(emptyXml).toContain('<bpmn:process');
+    });
+
+    it('falls back to default task type for unmapped BPMN XML elements', () => {
+      const xmlUnknown = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:bpmncanvas="http://bpmn-canvas.org/schema/1.0"
+             id="Def_Unknown" targetNamespace="http://bpmn.io/schema/bpmn">
+  <process id="Proc_1">
+    <callActivity id="call_act_1" name="Call Sub" />
+    <unknownElement id="custom_elem_1" bpmncanvas:originalType="script-task" name="Custom Script" />
+  </process>
+  <bpmndi:BPMNDiagram id="Diag_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Proc_1">
+      <bpmndi:BPMNShape id="call_act_1_di" bpmnElement="call_act_1"><dc:Bounds x="100" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="custom_elem_1_di" bpmnElement="custom_elem_1"><dc:Bounds x="250" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+      const imported = serializer.fromXml(xmlUnknown);
+      const callNode = imported.nodes.find(n => n.id === 'call_act_1');
+      expect(callNode).toBeDefined();
+      expect(callNode.type).toBe('task');
+
+      const customNode = imported.nodes.find(n => n.id === 'custom_elem_1');
+      expect(customNode).toBeDefined();
+      expect(customNode.type).toBe('script-task');
+    });
+  });
 });
 
