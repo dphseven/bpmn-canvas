@@ -23,6 +23,7 @@ import { SimulationEngine } from './SimulationEngine.js';
 import { SubprocessLayoutManager } from './SubprocessLayoutManager.js';
 import { AutoLayoutManager } from './AutoLayoutManager.js';
 import { SemanticAdapter } from './SemanticAdapter.js';
+import { ImageExporter } from './ImageExporter.js';
 import { calculateBoundaryDocking } from './geometry.js';
 
 /**
@@ -211,6 +212,9 @@ export class BpmnCanvas {
       ensureSubprocessEnclosesChildren: (id) => this.ensureSubprocessEnclosesChildren(id),
       fitView: () => this.fitView()
     });
+
+    // Image Exporter
+    this.imageExporter = new ImageExporter(this);
 
     const handleStructuralChange = () => {
       if (this.simulationActive) {
@@ -1818,6 +1822,26 @@ export class BpmnCanvas {
       this.emit('canvas:autoarrange', { options, changed });
       return changed;
     });
+  }
+
+  /**
+   * Export workflow diagram as SVG, PNG, or JPEG image.
+   * @param {'png'|'jpeg'|'jpg'|'svg'} [format='png']
+   * @param {Object} [options={}]
+   * @returns {Promise<Blob>}
+   */
+  async exportImage(format = 'png', options = {}) {
+    const fmt = (format || 'png').toLowerCase();
+    let blob;
+    if (fmt === 'svg') {
+      blob = await this.imageExporter.exportSvg(options);
+    } else if (fmt === 'jpeg' || fmt === 'jpg') {
+      blob = await this.imageExporter.exportJpeg(options);
+    } else {
+      blob = await this.imageExporter.exportPng(options);
+    }
+    this.emit('canvas:export', { format: fmt, size: blob?.size, options });
+    return blob;
   }
 
   exportData() {

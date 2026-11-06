@@ -258,6 +258,7 @@ export class BpmnEdge {
 
     const text = document.createElementNS(svgNS, 'text');
     text.classList.add('bpmn-edge-label-text');
+    text.style.fontFamily = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     text.setAttribute('x', pos.x);
     text.setAttribute('y', pos.y);
 
