@@ -407,6 +407,17 @@
   border-color: rgba(0, 0, 0, 0.1);
 }
 
+.theme-light .bpmn-node.bpmn-node-text-annotation:hover,
+[data-bpmn-theme="light"] .bpmn-node.bpmn-node-text-annotation:hover {
+  background: rgba(226, 232, 240, 0.95);
+  border-color: rgba(2, 132, 199, 0.4);
+}
+
+.theme-light .bpmn-annotation-text[contenteditable="true"],
+[data-bpmn-theme="light"] .bpmn-annotation-text[contenteditable="true"] {
+  background: #ffffff;
+}
+
 .bpmn-node-task,
 .bpmn-node-activity {
   border-top: 4px solid var(--accent-cyan) !important;
