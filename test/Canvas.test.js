@@ -268,6 +268,11 @@ describe('BpmnCanvas', () => {
     expect(canvas.options.themeClass).toBe('theme-ocean');
     expect(container.classList.contains('theme-ocean')).toBe(true);
 
+    canvas.setTheme('theme-light');
+    expect(canvas.options.themeClass).toBe('theme-light');
+    expect(container.classList.contains('theme-light')).toBe(true);
+    expect(container.classList.contains('theme-ocean')).toBe(false);
+
     canvas.setPulsing(false);
     expect(canvas.isPulsing()).toBe(false);
     expect(container.getAttribute('data-bpmn-pulsing')).toBe('false');

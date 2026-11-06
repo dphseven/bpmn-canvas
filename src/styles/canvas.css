@@ -7,7 +7,7 @@
   left: 0;
   overflow: hidden;
   background-color: var(--bg-primary);
-  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-image: radial-gradient(var(--grid-dot) 1.25px, transparent 1.25px);
   background-size: 24px 24px;
   background-position: 0 0;
   cursor: default;

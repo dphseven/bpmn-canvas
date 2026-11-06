@@ -65,7 +65,7 @@
   --bpmn-text-main: #0f172a;
   --bpmn-text-muted: #64748b;
   --bpmn-text-subtle: #94a3b8;
-  --bpmn-grid-dot: rgba(0, 0, 0, 0.08);
+  --bpmn-grid-dot: rgba(15, 23, 42, 0.22);
   --bpmn-shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
   --bpmn-shadow-glow: 0 0 20px rgba(2, 132, 199, 0.25);
 
@@ -79,7 +79,7 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-subtle: #94a3b8;
-  --grid-dot: rgba(0, 0, 0, 0.08);
+  --grid-dot: var(--bpmn-grid-dot);
   --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
   --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.25);
 
