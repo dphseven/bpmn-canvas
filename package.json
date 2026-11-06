@@ -1,6 +1,6 @@
 {
   "name": "bpmn-canvas",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A lightweight, zero-dependency workflow canvas and diagram modeler inspired by BPMN 2.0, built with native DOM + SVG architecture.",
   "type": "module",
   "main": "./src/index.js",
@@ -49,4 +49,3 @@
     "vitest": "^5.0.5"
   }
 }
-
