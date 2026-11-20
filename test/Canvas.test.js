@@ -860,6 +860,149 @@ describe('BpmnCanvas', () => {
       expect(child.domElement.style.display).not.toBe('none');
     });
   });
+
+  describe('Lifecycle & Remounting (destroy)', () => {
+    it('removes all created DOM layers, classes, attributes, and listeners on destroy()', () => {
+      const themedContainer = document.createElement('div');
+      document.body.appendChild(themedContainer);
+
+      const c = new BpmnCanvas(themedContainer, {
+        themeClass: 'theme-light',
+        capabilities: { allowDrag: false }
+      });
+      const n1 = c.addNode({ type: 'start-event', x: 100, y: 100 });
+      const n2 = c.addNode({ type: 'task', x: 300, y: 100 });
+      c.addEdge({ sourceId: n1.id, targetId: n2.id });
+      c.selectNode(n1);
+
+      const destroyListener = vi.fn();
+      c.on('canvas:destroy', destroyListener);
+
+      expect(themedContainer.querySelector('.bpmn-canvas-surface')).toBeTruthy();
+      expect(themedContainer.querySelector('.bpmn-marquee-selection')).toBeTruthy();
+      expect(themedContainer.classList.contains('bpmn-canvas-viewport')).toBe(true);
+      expect(themedContainer.classList.contains('theme-light')).toBe(true);
+      expect(themedContainer.classList.contains('no-drag')).toBe(true);
+      expect(themedContainer.getAttribute('data-bpmn-pulsing')).toBe('true');
+
+      c.destroy();
+
+      expect(destroyListener).toHaveBeenCalledTimes(1);
+      expect(themedContainer.querySelector('.bpmn-canvas-surface')).toBeNull();
+      expect(themedContainer.querySelector('.bpmn-marquee-selection')).toBeNull();
+      expect(themedContainer.classList.contains('bpmn-canvas-viewport')).toBe(false);
+      expect(themedContainer.classList.contains('theme-light')).toBe(false);
+      expect(themedContainer.classList.contains('no-drag')).toBe(false);
+      expect(themedContainer.hasAttribute('data-bpmn-pulsing')).toBe(false);
+      expect(themedContainer.hasAttribute('data-bpmn-grid')).toBe(false);
+      expect(themedContainer.style.backgroundPosition).toBe('');
+      expect(themedContainer.style.backgroundSize).toBe('');
+      expect(c.nodes.size).toBe(0);
+      expect(c.edges.size).toBe(0);
+
+      // Verify window listeners (e.g. Ctrl+A, Delete) no longer fire on destroyed canvas
+      const selectAllSpy = vi.spyOn(c, 'selectAll');
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      expect(selectAllSpy).not.toHaveBeenCalled();
+
+      // Idempotent second call
+      expect(() => c.destroy()).not.toThrow();
+
+      document.body.removeChild(themedContainer);
+    });
+
+    it('cleanly tears down previous mount when instantiating BpmnCanvas twice on the same container', () => {
+      const mountContainer = document.createElement('div');
+      document.body.appendChild(mountContainer);
+
+      const first = new BpmnCanvas(mountContainer);
+      first.addNode({ id: 'stale_node', type: 'task', x: 50, y: 50 });
+      const firstDestroySpy = vi.spyOn(first, 'destroy');
+
+      // Simulate React StrictMode remount without manual container.innerHTML = ''
+      const second = new BpmnCanvas(mountContainer);
+
+      expect(firstDestroySpy).toHaveBeenCalledTimes(1);
+      expect(mountContainer.querySelectorAll('.bpmn-canvas-surface').length).toBe(1);
+      expect(mountContainer.querySelectorAll('.bpmn-marquee-selection').length).toBe(1);
+      expect(second.nodes.size).toBe(0);
+
+      second.destroy();
+      document.body.removeChild(mountContainer);
+    });
+  });
+
+  describe('dropNodeAtClientPoint', () => {
+    it('creates and centers a node from a string type with snapToGrid', () => {
+      const node = canvas.dropNodeAtClientPoint('task', 103, 197);
+      const dims = canvas.registry.getDefaultDimensions('task');
+
+      // gridSize = 24: 103 -> 96, 197 -> 192
+      expect(node).toBeTruthy();
+      expect(node.type).toBe('task');
+      expect(node.x).toBe(96 - dims.width / 2);
+      expect(node.y).toBe(192 - dims.height / 2);
+      expect(canvas.selectedNode).toBe(node);
+    });
+
+    it('accepts a nodeSpec object with custom label and data and accounts for pan/zoom', () => {
+      canvas.panX = 50;
+      canvas.panY = 20;
+      canvas.zoom = 2;
+
+      // clientX = 250 -> canvasX = (250 - 50) / 2 = 100 -> snaps to 96
+      // clientY = 220 -> canvasY = (220 - 20) / 2 = 100 -> snaps to 96
+      const node = canvas.dropNodeAtClientPoint(
+        { type: 'task', label: 'Action Node', data: { actionId: 'send-email' } },
+        250,
+        220
+      );
+      const dims = canvas.registry.getDefaultDimensions('task');
+
+      expect(node.label).toBe('Action Node');
+      expect(node.data.actionId).toBe('send-email');
+      expect(node.x).toBe(96 - dims.width / 2);
+      expect(node.y).toBe(96 - dims.height / 2);
+    });
+
+    it('respects snapToGrid: false', () => {
+      canvas.setSnapToGrid(false);
+      const node = canvas.dropNodeAtClientPoint('task', 103, 197);
+      const dims = canvas.registry.getDefaultDimensions('task');
+
+      expect(node.x).toBe(103 - dims.width / 2);
+      expect(node.y).toBe(197 - dims.height / 2);
+    });
+
+    it('returns null when readOnly capability is enabled', () => {
+      canvas.setCapabilities({ readOnly: true });
+      const node = canvas.dropNodeAtClientPoint('task', 100, 100);
+      expect(node).toBeNull();
+      expect(canvas.nodes.size).toBe(0);
+    });
+
+    it('throws when nodeSpec is missing a type', () => {
+      expect(() => canvas.dropNodeAtClientPoint({}, 100, 100)).toThrow();
+    });
+
+    it('docks boundary-compatible events onto nearby activities and nests inside expanded subprocesses', () => {
+      const task = canvas.addNode({ type: 'task', x: 100, y: 100, width: 140, height: 64 });
+      const boundary = canvas.dropNodeAtClientPoint('intermediate-timer-event', 170, 160);
+      expect(boundary.type).toBe('boundary-timer-event');
+      expect(boundary.data.hostNodeId).toBe(task.id);
+
+      const sub = canvas.addNode({
+        type: 'subprocess',
+        x: 400,
+        y: 100,
+        width: 360,
+        height: 220,
+        data: { expanded: true }
+      });
+      const nested = canvas.dropNodeAtClientPoint({ type: 'task', label: 'Nested' }, 580, 210);
+      expect(nested.data.parentId).toBe(sub.id);
+    });
+  });
 });
 
 

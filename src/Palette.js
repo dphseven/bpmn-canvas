@@ -283,112 +283,18 @@ export class Palette {
         // Fallback for plain string
       }
 
-      const coords = this.canvas.clientToCanvas(e.clientX, e.clientY);
-      const dims = this.registry.getDefaultDimensions(nodeType);
-      const dummyWidth = dims.width;
-      const dummyHeight = dims.height;
-
-      let finalCenterX = coords.x;
-      let finalCenterY = coords.y;
-
-      if (this.canvas.options.snapToGrid) {
-        finalCenterX = Math.round(finalCenterX / this.canvas.options.gridSize) * this.canvas.options.gridSize;
-        finalCenterY = Math.round(finalCenterY / this.canvas.options.gridSize) * this.canvas.options.gridSize;
-      }
-
-      // Helper: Map an event type to a boundary event type if valid in BPMN 2.0
-      const getBoundaryTypeFor = (type) => {
-        if (type.startsWith('boundary-')) return type;
-        if (type.includes('timer')) return 'boundary-timer-event';
-        if (type.includes('message')) return 'boundary-message-event';
-        if (type.includes('signal')) return 'boundary-signal-event';
-        if (type.includes('error')) return 'boundary-error-event';
-        return null; // Not a boundary-compatible event type
-      };
-
-      // Check if dropped near or on an activity with a boundary-compatible event
-      const nearbyActivity = this.canvas.findActivityNear(coords.x, coords.y, 50);
-      const boundaryType = nearbyActivity ? getBoundaryTypeFor(nodeType) : null;
-
-      if (nearbyActivity && boundaryType) {
-        const boundaryDim = 36;
-        const docking = this.canvas.calculateBoundaryDocking(nearbyActivity, coords.x, coords.y, boundaryDim, boundaryDim);
-        const node = this.canvas.addNode({
-          type: boundaryType,
-          x: docking.x,
-          y: docking.y,
-          data: {
-            hostNodeId: nearbyActivity.id,
-            dockEdge: docking.dockEdge,
-            relativeOffsetX: docking.relativeOffsetX,
-            relativeOffsetY: docking.relativeOffsetY,
-            interrupting: true
-          }
-        });
-        this.canvas.selectNode(node);
-        this.emit('palette:drop', {
-          type: boundaryType,
-          node,
-          position: { x: docking.x, y: docking.y },
-          isBoundary: true,
-          hostNodeId: nearbyActivity.id,
-          event: e
-        });
-        return;
-      }
-
-      // Check if dropped inside an expanded subprocess
-      let nodeData = {};
-      if (nodeType !== 'subprocess') {
-        const targetSubprocess = this.canvas.findSubprocessAt(finalCenterX, finalCenterY);
-        if (targetSubprocess) {
-          nodeData.parentId = targetSubprocess.id;
-        }
-      }
-
-      // Center dropped node on cursor / snap point
-      let node;
-      const nearbyEdge = this.canvas.canSplitEdgeWithNode({ type: nodeType })
-        ? this.canvas.findEdgeNear(finalCenterX, finalCenterY, 35)
+      const result = this.canvas._dropNodeAtClientPoint
+        ? this.canvas._dropNodeAtClientPoint(nodeType, e.clientX, e.clientY, { registry: this.registry })
         : null;
 
-      if (nearbyEdge) {
-        this.canvas.batchOperation(() => {
-          node = this.canvas.addNode({
-            type: nodeType,
-            x: finalCenterX - dummyWidth / 2,
-            y: finalCenterY - dummyHeight / 2,
-            data: nodeData
-          });
-
-          if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
-            this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
-          }
-
-          this.canvas.splitEdgeWithNode(nearbyEdge.id, node.id);
-        });
-      } else {
-        node = this.canvas.addNode({
-          type: nodeType,
-          x: finalCenterX - dummyWidth / 2,
-          y: finalCenterY - dummyHeight / 2,
-          data: nodeData
-        });
-
-        if (nodeData.parentId && this.canvas.ensureSubprocessEnclosesChildren) {
-          this.canvas.ensureSubprocessEnclosesChildren(nodeData.parentId);
-        }
-      }
-
-      if (node) {
-        this.canvas.selectNode(node);
+      if (result && result.node) {
+        const { node, isBoundary, hostNodeId, splitEdgeId, parentId } = result;
         this.emit('palette:drop', {
-          type: nodeType,
+          type: node.type,
           node,
           position: { x: node.x, y: node.y },
-          isBoundary: false,
-          splitEdgeId: nearbyEdge ? nearbyEdge.id : null,
-          parentId: nodeData.parentId || null,
+          isBoundary,
+          ...(isBoundary ? { hostNodeId } : { splitEdgeId, parentId }),
           event: e
         });
       }

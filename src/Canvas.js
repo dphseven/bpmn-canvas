@@ -380,6 +380,18 @@ export class BpmnCanvas {
   }
 
   initDOM() {
+    if (this.container._bpmnCanvasInstance && this.container._bpmnCanvasInstance !== this) {
+      this.container._bpmnCanvasInstance.destroy();
+    }
+
+    // Remove any orphaned canvas DOM layers from an un-destroyed mount
+    Array.from(this.container.children).forEach(child => {
+      if (child.classList.contains('bpmn-canvas-surface') || child.classList.contains('bpmn-marquee-selection')) {
+        child.remove();
+      }
+    });
+
+    this.container._bpmnCanvasInstance = this;
     this.container.classList.add('bpmn-canvas-viewport');
     this.container.setAttribute('data-bpmn-pulsing', this.options.pulsing !== false ? 'true' : 'false');
     this.container.setAttribute('data-bpmn-grid', this.options.grid !== false ? 'true' : 'false');
@@ -441,6 +453,12 @@ export class BpmnCanvas {
   }
 
   bindEvents() {
+    if (this._abortController) {
+      this._abortController.abort();
+    }
+    this._abortController = new AbortController();
+    const { signal } = this._abortController;
+
     // Wheel zoom & trackpad swipe pan
     this.container.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -475,7 +493,7 @@ export class BpmnCanvas {
         this.applyTransform();
         this.emit('viewport:change', { zoom: this.zoom, panX: this.panX, panY: this.panY });
       }
-    }, { passive: false });
+    }, { passive: false, signal });
 
     // Spacebar Hand/Pan Tool Toggle
     window.addEventListener('keydown', (e) => {
@@ -485,19 +503,19 @@ export class BpmnCanvas {
         this.isSpacePressed = true;
         this.container.classList.add('space-pressed');
       }
-    });
+    }, { signal });
 
     window.addEventListener('keyup', (e) => {
       if (e.code === 'Space') {
         this.isSpacePressed = false;
         this.container.classList.remove('space-pressed');
       }
-    });
+    }, { signal });
 
     // Prevent context menu when right-clicking on canvas to allow right-click dragging
     this.container.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-    });
+    }, { signal });
 
     // Pointer down on canvas background
     this.container.addEventListener('pointerdown', (e) => {
@@ -545,7 +563,7 @@ export class BpmnCanvas {
         this.marqueeEl.style.height = '0px';
         this.marqueeEl.style.display = 'block';
       }
-    });
+    }, { signal });
 
     window.addEventListener('pointermove', (e) => {
       // 1. Panning canvas
@@ -955,7 +973,7 @@ export class BpmnCanvas {
 
         this.reconnectingEdge = null;
       }
-    });
+    }, { signal });
 
     // Keyboard delete & Select All
     window.addEventListener('keydown', (e) => {
@@ -996,10 +1014,11 @@ export class BpmnCanvas {
         e.preventDefault();
         this.autoArrange();
       }
-    });
+    }, { signal });
   }
 
   applyTransform() {
+    if (!this.surface || !this.container) return;
     this.surface.style.transform = `translate3d(${this.panX}px, ${this.panY}px, 0) scale(${this.zoom})`;
     this.container.style.backgroundPosition = `${this.panX}px ${this.panY}px`;
     this.container.style.backgroundSize = `${this.options.gridSize * this.zoom}px ${this.options.gridSize * this.zoom}px`;
@@ -1286,6 +1305,143 @@ export class BpmnCanvas {
     this._syncSubprocessExpandedOnAdd(node);
     this.emit('node:add', node);
     return node;
+  }
+
+  /**
+   * Drop a node onto the canvas at a viewport client coordinate (e.g. from a custom drag-and-drop palette).
+   * Handles viewport-to-canvas coordinate conversion, default dimensions centering, grid snapping,
+   * boundary event docking, subprocess nesting, and sequence flow edge splitting.
+   *
+   * @param {string|Object} nodeSpec - Node type string or node config object (must include `type`)
+   * @param {number} clientX - Viewport X coordinate (e.g. `event.clientX`)
+   * @param {number} clientY - Viewport Y coordinate (e.g. `event.clientY`)
+   * @param {Object} [options={}] - Optional drop behavior overrides
+   * @returns {import('./Node.js').BpmnNode|null} The created node, or null if blocked by readOnly
+   */
+  dropNodeAtClientPoint(nodeSpec, clientX, clientY, options = {}) {
+    const result = this._dropNodeAtClientPoint(nodeSpec, clientX, clientY, options);
+    return result ? result.node : null;
+  }
+
+  /**
+   * Internal drop helper returning full drop metadata for Palette event emission.
+   * @private
+   */
+  _dropNodeAtClientPoint(nodeSpec, clientX, clientY, options = {}) {
+    if (this.options?.capabilities?.readOnly) {
+      return null;
+    }
+
+    const spec = typeof nodeSpec === 'string' ? { type: nodeSpec } : { ...(nodeSpec || {}) };
+    if (!spec.type) {
+      throw new Error('dropNodeAtClientPoint requires a node type.');
+    }
+
+    const registry = options.registry || this.registry;
+    const coords = this.clientToCanvas(clientX, clientY);
+    const dims = registry.getDefaultDimensions(spec.type);
+    const width = spec.width ?? dims.width;
+    const height = spec.height ?? dims.height;
+
+    let finalCenterX = coords.x;
+    let finalCenterY = coords.y;
+
+    const shouldSnap = options.snapToGrid !== undefined ? options.snapToGrid : this.options.snapToGrid;
+    if (shouldSnap) {
+      finalCenterX = Math.round(finalCenterX / this.options.gridSize) * this.options.gridSize;
+      finalCenterY = Math.round(finalCenterY / this.options.gridSize) * this.options.gridSize;
+    }
+
+    const getBoundaryTypeFor = (type) => {
+      if (type.startsWith('boundary-')) return type;
+      if (type.includes('timer')) return 'boundary-timer-event';
+      if (type.includes('message')) return 'boundary-message-event';
+      if (type.includes('signal')) return 'boundary-signal-event';
+      if (type.includes('error')) return 'boundary-error-event';
+      return null;
+    };
+
+    const allowBoundaryDocking = options.allowBoundaryDocking !== false;
+    const nearbyActivity = allowBoundaryDocking ? this.findActivityNear(coords.x, coords.y, 50) : null;
+    const boundaryType = nearbyActivity ? getBoundaryTypeFor(spec.type) : null;
+
+    if (nearbyActivity && boundaryType) {
+      const boundaryDim = 36;
+      const docking = this.calculateBoundaryDocking(nearbyActivity, coords.x, coords.y, boundaryDim, boundaryDim);
+      const node = this.addNode({
+        ...spec,
+        type: boundaryType,
+        x: docking.x,
+        y: docking.y,
+        data: {
+          ...(spec.data || {}),
+          hostNodeId: nearbyActivity.id,
+          dockEdge: docking.dockEdge,
+          relativeOffsetX: docking.relativeOffsetX,
+          relativeOffsetY: docking.relativeOffsetY,
+          interrupting: spec.data?.interrupting ?? true
+        }
+      });
+      if (options.select !== false) {
+        this.selectNode(node);
+      }
+      return {
+        node,
+        isBoundary: true,
+        hostNodeId: nearbyActivity.id,
+        splitEdgeId: null,
+        parentId: null
+      };
+    }
+
+    const nodeData = { ...(spec.data || {}) };
+    const allowSubprocessNesting = options.allowSubprocessNesting !== false;
+    if (allowSubprocessNesting && spec.type !== 'subprocess' && nodeData.parentId === undefined) {
+      const targetSubprocess = this.findSubprocessAt(finalCenterX, finalCenterY);
+      if (targetSubprocess) {
+        nodeData.parentId = targetSubprocess.id;
+      }
+    }
+
+    const allowEdgeSplit = options.allowEdgeSplit !== false;
+    const nearbyEdge = (allowEdgeSplit && this.canSplitEdgeWithNode({ type: spec.type }))
+      ? this.findEdgeNear(finalCenterX, finalCenterY, 35)
+      : null;
+
+    let node;
+    const nodeConfig = {
+      ...spec,
+      x: finalCenterX - width / 2,
+      y: finalCenterY - height / 2,
+      data: nodeData
+    };
+
+    if (nearbyEdge) {
+      this.batchOperation(() => {
+        node = this.addNode(nodeConfig);
+        if (nodeData.parentId && this.ensureSubprocessEnclosesChildren) {
+          this.ensureSubprocessEnclosesChildren(nodeData.parentId);
+        }
+        this.splitEdgeWithNode(nearbyEdge.id, node.id);
+      });
+    } else {
+      node = this.addNode(nodeConfig);
+      if (nodeData.parentId && this.ensureSubprocessEnclosesChildren) {
+        this.ensureSubprocessEnclosesChildren(nodeData.parentId);
+      }
+    }
+
+    if (node && options.select !== false) {
+      this.selectNode(node);
+    }
+
+    return {
+      node,
+      isBoundary: false,
+      hostNodeId: null,
+      splitEdgeId: nearbyEdge ? nearbyEdge.id : null,
+      parentId: nodeData.parentId || null
+    };
   }
 
   /**
@@ -2258,5 +2414,85 @@ export class BpmnCanvas {
       const handlers = [...this.listeners.get(event)];
       handlers.forEach(handler => handler(data));
     }
+  }
+
+  /**
+   * Cleanly tears down the canvas instance, removing all created DOM layers,
+   * container classes/attributes, event listeners, timers, and child nodes/edges.
+   * Safe to call multiple times (idempotent).
+   */
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
+    }
+
+    if (this.simulationActive) {
+      this.stopSimulation();
+    }
+
+    if (this.clearEditDebounce) {
+      this.clearEditDebounce();
+    }
+
+    if (this.semanticAdapter && typeof this.semanticAdapter.destroy === 'function') {
+      this.semanticAdapter.destroy();
+    }
+
+    this.edges.forEach(e => e.destroy());
+    this.nodes.forEach(n => n.destroy());
+    this.edges.clear();
+    this.nodes.clear();
+    this._selectedNodes.clear();
+    this._selectedEdge = null;
+    if (this.selectionManager) {
+      this.selectionManager.selectedNodes.clear();
+      this.selectionManager.selectedEdge = null;
+    }
+
+    if (this.surface && this.surface.parentNode) {
+      this.surface.parentNode.removeChild(this.surface);
+    }
+    if (this.marqueeEl && this.marqueeEl.parentNode) {
+      this.marqueeEl.parentNode.removeChild(this.marqueeEl);
+    }
+    this.surface = null;
+    this.svg = null;
+    this.handlesSvg = null;
+    this.edgesContainer = null;
+    this.connectionDraft = null;
+    this.marqueeEl = null;
+
+    if (this.container) {
+      const classesToRemove = [
+        'bpmn-canvas-viewport',
+        'space-pressed',
+        'panning',
+        'readonly',
+        'no-drag',
+        'no-connect',
+        'no-reconnect',
+        'no-label-edit',
+        'no-zoom',
+        'no-pan'
+      ];
+      if (this.options.themeClass) {
+        classesToRemove.push(this.options.themeClass);
+      }
+      this.container.classList.remove(...classesToRemove);
+      this.container.removeAttribute('data-bpmn-pulsing');
+      this.container.removeAttribute('data-bpmn-grid');
+      this.container.style.backgroundPosition = '';
+      this.container.style.backgroundSize = '';
+      if (this.container._bpmnCanvasInstance === this) {
+        delete this.container._bpmnCanvasInstance;
+      }
+    }
+
+    this.emit('canvas:destroy', { canvas: this });
+    this.listeners.clear();
   }
 }
