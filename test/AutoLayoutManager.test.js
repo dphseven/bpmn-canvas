@@ -436,5 +436,50 @@ describe('AutoLayoutManager', () => {
     expect(eHappy.updateConnection).toHaveBeenCalledWith({ sourcePort: 'bottom', targetPort: 'left' });
     expect(eFinish.updateConnection).toHaveBeenCalledWith({ sourcePort: 'right', targetPort: 'bottom' });
   });
+
+  it('keeps main spine centered and downstream boundary branch aligned in LR layout', () => {
+    const start = createMockNode({ id: 'start', type: 'start-event', width: 40, height: 40 });
+    const triage = createMockNode({ id: 'triage', type: 'task', width: 120, height: 80 });
+    const sla = createMockNode({
+      id: 'sla',
+      type: 'boundary-timer-event',
+      width: 36,
+      height: 36,
+      data: { hostNodeId: 'triage', dockEdge: 'bottom' }
+    });
+    const gateway = createMockNode({ id: 'gw', type: 'gateway-exclusive', width: 50, height: 50 });
+    const notify = createMockNode({ id: 'notify', type: 'task', width: 120, height: 80 });
+    const resolve = createMockNode({ id: 'resolve', type: 'task', width: 120, height: 80 });
+    const escalate = createMockNode({ id: 'escalate', type: 'task', width: 120, height: 80 });
+    const log = createMockNode({ id: 'log', type: 'task', width: 120, height: 80 });
+
+    [start, triage, sla, gateway, notify, resolve, escalate, log].forEach(n => nodes.set(n.id, n));
+
+    edges.set('e1', createMockEdge({ id: 'e1', sourceId: 'start', targetId: 'triage' }));
+    edges.set('e2', createMockEdge({ id: 'e2', sourceId: 'triage', targetId: 'gw' }));
+    edges.set('e3', createMockEdge({ id: 'e3', sourceId: 'sla', targetId: 'notify' }));
+    edges.set('e4', createMockEdge({ id: 'e4', sourceId: 'gw', targetId: 'resolve' }));
+    edges.set('e5', createMockEdge({ id: 'e5', sourceId: 'gw', targetId: 'escalate' }));
+    edges.set('e6', createMockEdge({ id: 'e6', sourceId: 'notify', targetId: 'log' }));
+
+    manager.autoArrange({ direction: 'LR' });
+
+    const centerY = (n) => n.y + n.height / 2;
+
+    // Main horizontal spine stays straight through start -> triage -> gateway
+    expect(Math.abs(centerY(start) - centerY(triage))).toBeLessThanOrEqual(1);
+    expect(Math.abs(centerY(triage) - centerY(gateway))).toBeLessThanOrEqual(1);
+
+    // Boundary target is placed below the main spine and clears downstream gateway branches
+    expect(centerY(notify)).toBeGreaterThan(centerY(gateway));
+    expect(notify.y).toBeGreaterThanOrEqual(escalate.y + escalate.height);
+
+    // Downstream boundary continuation stays horizontally aligned with notify despite gateway split in same column
+    expect(Math.abs(centerY(notify) - centerY(log))).toBeLessThanOrEqual(1);
+
+    // Gateway branches remain symmetrically centered around gateway
+    const branchMid = (centerY(resolve) + centerY(escalate)) / 2;
+    expect(Math.abs(branchMid - centerY(gateway))).toBeLessThanOrEqual(1);
+  });
 });
 
