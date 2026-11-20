@@ -14,7 +14,7 @@
 }
 
 .bpmn-canvas-viewport[data-bpmn-grid="false"] {
-  background-image: none !important;
+  background-image: none;
 }
 
 .bpmn-canvas-viewport.space-pressed {
@@ -22,7 +22,7 @@
 }
 
 .bpmn-canvas-viewport.panning {
-  cursor: grabbing !important;
+  cursor: grabbing;
 }
 
 /* Rubberband Marquee Selection Box */
@@ -255,81 +255,82 @@
 }
 
 /* Active node pulse when visited by token (ports stay completely stationary for easy connection dropping) */
-.bpmn-node.sim-active {
-  box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.65) !important;
+.bpmn-canvas-surface .bpmn-node.sim-active {
+  box-shadow: var(--bpmn-sim-active-shadow, 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.65));
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
-  z-index: 28 !important;
+  z-index: 28;
 }
 
-[data-bpmn-pulsing="false"] .bpmn-node.sim-active,
-.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node.sim-active {
-  box-shadow: none !important;
-  filter: none !important;
+[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node.sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node.sim-active {
+  box-shadow: none;
+  filter: none;
 }
 
 /* Event Nodes (Circle) Active Pulse - Glowing outline without shifting port positions */
-.bpmn-node[class*="bpmn-node-start-"].sim-active,
-.bpmn-node[class*="bpmn-node-end-"].sim-active,
-.bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
-  box-shadow: 0 0 0 3px var(--border-focus), 0 0 22px rgba(56, 189, 248, 0.8) !important;
+.bpmn-canvas-surface .bpmn-node[class*="bpmn-node-start-"].sim-active,
+.bpmn-canvas-surface .bpmn-node[class*="bpmn-node-end-"].sim-active,
+.bpmn-canvas-surface .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
+  box-shadow: var(--bpmn-sim-event-shadow, 0 0 0 3px var(--border-focus), 0 0 22px rgba(56, 189, 248, 0.8));
   filter: brightness(1.2);
 }
 
-[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
-[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
-[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active,
-.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-start-"].sim-active,
-.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-end-"].sim-active,
-.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
-  box-shadow: none !important;
-  filter: none !important;
+[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-start-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-end-"].sim-active,
+[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-intermediate-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-start-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-end-"].sim-active,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-canvas-surface .bpmn-node[class*="bpmn-node-intermediate-"].sim-active {
+  box-shadow: none;
+  filter: none;
 }
 
 /* For Gateways: Highlight the rotated diamond element directly without resizing */
-.bpmn-node.bpmn-node-gateway.sim-active,
-.bpmn-node.bpmn-node-gateway-exclusive.sim-active,
-.bpmn-node.bpmn-node-gateway-parallel.sim-active {
-  box-shadow: none !important;
-  transform: none !important;
+.bpmn-canvas-surface .bpmn-node.bpmn-node-gateway.sim-active,
+.bpmn-canvas-surface .bpmn-node.bpmn-node-gateway-exclusive.sim-active,
+.bpmn-canvas-surface .bpmn-node.bpmn-node-gateway-parallel.sim-active {
+  box-shadow: none;
+  transform: none;
 }
 
-.bpmn-node.sim-active .bpmn-gateway-diamond {
-  box-shadow: 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.8) !important;
-  transform: rotate(45deg) !important;
+.bpmn-canvas-surface .bpmn-node.sim-active .bpmn-gateway-diamond {
+  box-shadow: var(--bpmn-sim-event-shadow, 0 0 0 2.5px var(--border-focus), 0 0 20px rgba(56, 189, 248, 0.8));
+  transform: rotate(45deg);
   transition: box-shadow 0.2s ease;
 }
 
 /* For Expanded Subprocesses: Glow the container border */
-.bpmn-node.bpmn-node-subprocess.expanded.sim-active {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 2px var(--border-focus), 0 0 24px rgba(129, 140, 248, 0.55), inset 0 0 16px rgba(129, 140, 248, 0.2) !important;
-  transform: none !important;
-  z-index: 6 !important;
+.bpmn-canvas-surface .bpmn-node.bpmn-node-subprocess.expanded.sim-active {
+  border-color: var(--accent-primary);
+  box-shadow: var(--bpmn-sim-subprocess-shadow, 0 0 0 2px var(--border-focus), 0 0 24px rgba(129, 140, 248, 0.55), inset 0 0 16px rgba(129, 140, 248, 0.2));
+  transform: none;
+  z-index: 6;
 }
 
 /* -------------------------------------------------------------
  * Capabilities & Permission Modifier Classes
  * ----------------------------------------------------------- */
-.bpmn-canvas-viewport.readonly,
+.bpmn-canvas-viewport.readonly .bpmn-node,
 .bpmn-canvas-viewport.no-drag .bpmn-node {
-  cursor: default !important;
+  cursor: default;
 }
 
 .bpmn-canvas-viewport.readonly .bpmn-subprocess-resize-handle {
-  display: none !important;
+  display: none;
 }
 
 .bpmn-canvas-viewport.readonly .bpmn-port,
 .bpmn-canvas-viewport.no-connect .bpmn-port {
-  display: none !important;
+  display: none;
 }
 
 .bpmn-canvas-viewport.readonly .bpmn-handles-layer,
 .bpmn-canvas-viewport.no-reconnect .bpmn-handles-layer {
+  /* Overrides inline style.display toggled by Edge selection */
   display: none !important;
 }
 
 .bpmn-canvas-viewport.readonly .bpmn-edge-label-group,
 .bpmn-canvas-viewport.no-label-edit .bpmn-edge-label-group {
-  cursor: default !important;
+  cursor: default;
 }
