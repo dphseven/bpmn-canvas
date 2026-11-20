@@ -20,12 +20,15 @@ export declare class SemanticAdapter {
         direction: string;
         fitView: boolean;
         defaultNodeSpacing: number;
+        lenient: boolean;
     } & {
         debounceMs?: number;
         direction?: 'LR' | 'TB';
         fitView?: boolean;
         defaultNodeSpacing?: number;
+        lenient?: boolean;
     };
+    _activeLenient: any;
     telemetryListeners: Set<any>;
     intentListeners: Set<any>;
     unsubscribers: any[];
@@ -42,13 +45,33 @@ export declare class SemanticAdapter {
      * @param {'LR'|'TB'} [options.direction='LR'] - Default flow direction for auto-layout
      * @param {boolean} [options.fitView=true] - Whether to zoom-to-fit after graph ingestion
      * @param {number} [options.defaultNodeSpacing=80] - Default spacing for incremental placement
+     * @param {boolean} [options.lenient=false] - Enable node type alias normalization and fuzzy ID/label resolution
      */
     constructor(canvas: import('./Canvas.js').BpmnCanvas, options?: {
         debounceMs?: number;
         direction?: 'LR' | 'TB';
         fitView?: boolean;
         defaultNodeSpacing?: number;
+        lenient?: boolean;
     });
+    /**
+     * Returns whether lenient normalization/resolution is currently active.
+     * @returns {boolean}
+     */
+    isLenient(): boolean;
+    /**
+     * Normalizes a BPMN node type string when lenient mode is enabled.
+     * @param {string} type
+     * @returns {string}
+     */
+    normalizeNodeType(type: string): string;
+    /**
+     * Resolves a node reference to an existing node ID on the canvas.
+     * When lenient mode is enabled, falls back to case-insensitive ID, label, and slug matching.
+     * @param {string} ref
+     * @returns {string}
+     */
+    resolveNodeId(ref: string): string;
     /**
      * Applies a complete or partial declarative workflow graph to the canvas without manual coordinates.
      * Wraps all additions and layout into a single atomic undo batch.
@@ -61,6 +84,7 @@ export declare class SemanticAdapter {
      * @param {boolean} [options.fitView] - Whether to fit-view after layout
      * @param {boolean} [options.clearExisting=false] - Whether to wipe canvas before applying
      * @param {boolean} [options.autoLayout=true] - Whether to run topological auto-layout
+     * @param {boolean} [options.lenient] - Override adapter lenient mode for this call
      * @returns {{ nodes: Array<Object>, edges: Array<Object> }}
      */
     applyGraph(graph: {
@@ -71,6 +95,7 @@ export declare class SemanticAdapter {
         fitView?: boolean;
         clearExisting?: boolean;
         autoLayout?: boolean;
+        lenient?: boolean;
     }): {
         nodes: Array<Object>;
         edges: Array<Object>;
@@ -83,12 +108,14 @@ export declare class SemanticAdapter {
      * @param {boolean} [options.autoLayout=false] - Whether to execute autoArrange at the end
      * @param {'LR'|'TB'} [options.direction]
      * @param {boolean} [options.fitView]
+     * @param {boolean} [options.lenient] - Override adapter lenient mode for this call
      * @returns {Array<*>} Results of each command
      */
     executeCommands(commands: Array<Object>, options?: {
         autoLayout?: boolean;
         direction?: 'LR' | 'TB';
         fitView?: boolean;
+        lenient?: boolean;
     }): Array<any>;
     /**
      * Resolves layout options including spacing presets and explicit gap overrides.

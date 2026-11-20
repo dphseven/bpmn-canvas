@@ -76,7 +76,7 @@ export class BpmnXmlSerializer {
     const diagramId = options.diagramId || 'BPMNDiagram_1';
     const planeId = options.planeId || 'BPMNPlane_1';
 
-    const exporterVersion = options.exporterVersion || '1.1.0';
+    const exporterVersion = options.exporterVersion || '1.2.0';
 
     // Index nodes by ID for fast lookup and subprocess containment hierarchy
     const nodeMap = new Map();
@@ -294,7 +294,7 @@ export class BpmnXmlSerializer {
       const sourceNode = nodeMap.get(edge.sourceId);
       const targetNode = nodeMap.get(edge.targetId);
       const isAssociation = sourceNode?.type === 'text-annotation' || targetNode?.type === 'text-annotation' ||
-                            sourceNode?.type === 'data-object' || targetNode?.type === 'data-object';
+        sourceNode?.type === 'data-object' || targetNode?.type === 'data-object';
 
       const labelAttr = edge.label ? ` name="${this.escapeXml(edge.label)}"` : '';
 
@@ -359,7 +359,7 @@ export class BpmnXmlSerializer {
       let bezierAttrs = '';
       if (routing === 'bezier') {
         bezierAttrs = ` bpmncanvas:cp1X="${Math.round(cp1.x)}" bpmncanvas:cp1Y="${Math.round(cp1.y)}" ` +
-                      `bpmncanvas:cp2X="${Math.round(cp2.x)}" bpmncanvas:cp2Y="${Math.round(cp2.y)}"`;
+          `bpmncanvas:cp2X="${Math.round(cp2.x)}" bpmncanvas:cp2Y="${Math.round(cp2.y)}"`;
       }
 
       xmlLines.push(
@@ -474,14 +474,14 @@ export class BpmnXmlSerializer {
       });
 
       const routing = edgeEl.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'routing') ||
-                      edgeEl.getAttribute('bpmncanvas:routing') ||
-                      edgeEl.getAttribute('routing');
+        edgeEl.getAttribute('bpmncanvas:routing') ||
+        edgeEl.getAttribute('routing');
       const sourcePort = edgeEl.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'sourcePort') ||
-                         edgeEl.getAttribute('bpmncanvas:sourcePort') ||
-                         edgeEl.getAttribute('sourcePort');
+        edgeEl.getAttribute('bpmncanvas:sourcePort') ||
+        edgeEl.getAttribute('sourcePort');
       const targetPort = edgeEl.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'targetPort') ||
-                         edgeEl.getAttribute('bpmncanvas:targetPort') ||
-                         edgeEl.getAttribute('targetPort');
+        edgeEl.getAttribute('bpmncanvas:targetPort') ||
+        edgeEl.getAttribute('targetPort');
 
       // Bezier control points from attributes (standard) or legacy child element
       const cp1X = edgeEl.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'cp1X') || edgeEl.getAttribute('bpmncanvas:cp1X');
@@ -640,14 +640,14 @@ export class BpmnXmlSerializer {
 
         default:
           type = el.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'originalType') ||
-                 el.getAttribute('bpmncanvas:originalType') ||
-                 'task';
+            el.getAttribute('bpmncanvas:originalType') ||
+            'task';
           break;
       }
 
       // Check if original type was preserved in attribute
       const originalType = el.getAttributeNS(BPMN_NAMESPACES.BPMNCANVAS, 'originalType') ||
-                           el.getAttribute('bpmncanvas:originalType');
+        el.getAttribute('bpmncanvas:originalType');
       if (originalType) {
         type = originalType;
       }
