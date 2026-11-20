@@ -304,11 +304,12 @@ body, html {
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn:disabled:hover {
   opacity: 0.35;
   cursor: not-allowed;
   pointer-events: none;
-  transform: none !important;
+  transform: none;
 }
 
 .btn-icon {
