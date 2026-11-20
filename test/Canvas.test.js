@@ -1002,6 +1002,180 @@ describe('BpmnCanvas', () => {
       const nested = canvas.dropNodeAtClientPoint({ type: 'task', label: 'Nested' }, 580, 210);
       expect(nested.data.parentId).toBe(sub.id);
     });
+
+    it('splits an existing edge when dropped near it and maps message/signal/error boundary events', () => {
+      const n1 = canvas.addNode({ id: 'n1', type: 'task', x: 0, y: 100, width: 120, height: 60 });
+      const n2 = canvas.addNode({ id: 'n2', type: 'task', x: 300, y: 100, width: 120, height: 60 });
+      const edge = canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+      vi.spyOn(canvas, 'findEdgeNear').mockReturnValueOnce(edge);
+
+      const inserted = canvas.dropNodeAtClientPoint('task', 216, 120);
+      expect(inserted).toBeTruthy();
+      expect(canvas.edges.has(edge.id)).toBe(false);
+      expect(canvas.edges.size).toBe(2);
+
+      // Boundary mapping variants
+      const bMsg = canvas.dropNodeAtClientPoint('intermediate-message-event', 60, 155);
+      expect(bMsg.type).toBe('boundary-message-event');
+      const bSig = canvas.dropNodeAtClientPoint('intermediate-signal-event', 360, 155);
+      expect(bSig.type).toBe('boundary-signal-event');
+      const bErr = canvas.dropNodeAtClientPoint('error-end-event', 320, 155);
+      expect(bErr.type).toBe('boundary-error-event');
+      const bDirect = canvas.dropNodeAtClientPoint('boundary-timer-event', 40, 155);
+      expect(bDirect.type).toBe('boundary-timer-event');
+    });
+  });
+
+  describe('Additional Canvas API, Events, and Interactions Coverage', () => {
+    it('removes orphaned DOM layers in initDOM() even without _bpmnCanvasInstance', () => {
+      const ctn = document.createElement('div');
+      const orphanSurface = document.createElement('div');
+      orphanSurface.className = 'bpmn-canvas-surface';
+      const orphanMarquee = document.createElement('div');
+      orphanMarquee.className = 'bpmn-marquee-selection';
+      ctn.appendChild(orphanSurface);
+      ctn.appendChild(orphanMarquee);
+      document.body.appendChild(ctn);
+
+      const c = new BpmnCanvas(ctn);
+      expect(ctn.querySelectorAll('.bpmn-canvas-surface').length).toBe(1);
+      expect(ctn.querySelectorAll('.bpmn-marquee-selection').length).toBe(1);
+      expect(ctn.contains(orphanSurface)).toBe(false);
+      expect(ctn.contains(orphanMarquee)).toBe(false);
+
+      c.destroy();
+      document.body.removeChild(ctn);
+    });
+
+    it('stops active simulation during destroy()', () => {
+      const n1 = canvas.addNode({ type: 'start-event', x: 50, y: 50 });
+      const n2 = canvas.addNode({ type: 'end-event', x: 250, y: 50 });
+      canvas.addEdge({ sourceId: n1.id, targetId: n2.id });
+      canvas.startSimulation();
+      expect(canvas.simulationActive).toBe(true);
+
+      const stopSpy = vi.spyOn(canvas, 'stopSimulation');
+      canvas.destroy();
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+      expect(canvas.simulationActive).toBe(false);
+    });
+
+    it('supports theme, pulsing, and grid toggles', () => {
+      canvas.setTheme('theme-light');
+      expect(container.classList.contains('theme-light')).toBe(true);
+      canvas.setTheme('theme-ocean');
+      expect(container.classList.contains('theme-light')).toBe(false);
+      expect(container.classList.contains('theme-ocean')).toBe(true);
+      canvas.setTheme(null);
+      expect(container.classList.contains('theme-ocean')).toBe(false);
+
+      canvas.setPulsing(false);
+      expect(canvas.isPulsing()).toBe(false);
+      expect(container.getAttribute('data-bpmn-pulsing')).toBe('false');
+
+      canvas.setGrid(false);
+      expect(canvas.isGridVisible()).toBe(false);
+      expect(container.getAttribute('data-bpmn-grid')).toBe('false');
+    });
+
+    it('supports event bus once() and off() with or without handler', () => {
+      const onceHandler = vi.fn();
+      const multiHandler = vi.fn();
+      canvas.once('custom:ev', onceHandler);
+      canvas.on('custom:ev', multiHandler);
+
+      canvas.emit('custom:ev', { v: 1 });
+      canvas.emit('custom:ev', { v: 2 });
+      expect(onceHandler).toHaveBeenCalledTimes(1);
+      expect(multiHandler).toHaveBeenCalledTimes(2);
+
+      canvas.off('custom:ev', multiHandler);
+      canvas.emit('custom:ev', { v: 3 });
+      expect(multiHandler).toHaveBeenCalledTimes(2);
+
+      canvas.on('custom:ev', multiHandler);
+      canvas.off('custom:ev');
+      canvas.emit('custom:ev', { v: 4 });
+      expect(multiHandler).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles wheel zoom, panning, spacebar toggle, and marquee selection', () => {
+      const n1 = canvas.addNode({ type: 'task', x: 40, y: 40, width: 100, height: 60 });
+
+      // Standard wheel & ctrl+wheel zoom
+      container.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, clientX: 100, clientY: 100, cancelable: true }));
+      expect(canvas.zoom).toBeGreaterThan(1);
+      const prevZoom = canvas.zoom;
+      container.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, ctrlKey: true, clientX: 100, clientY: 100, cancelable: true }));
+      expect(canvas.zoom).toBeLessThan(prevZoom);
+
+      // Spacebar pan toggle
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+      expect(canvas.isSpacePressed).toBe(true);
+      expect(container.classList.contains('space-pressed')).toBe(true);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true }));
+      expect(canvas.isSpacePressed).toBe(false);
+
+      // Right-click pan
+      const panBefore = canvas.panX;
+      container.dispatchEvent(new PointerEvent('pointerdown', { button: 2, clientX: 10, clientY: 10, bubbles: true }));
+      expect(canvas.isPanning).toBe(true);
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 60, clientY: 30, bubbles: true }));
+      expect(canvas.panX).toBe(panBefore + 50);
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      expect(canvas.isPanning).toBe(false);
+
+      // Marquee selection
+      canvas.zoom = 1;
+      canvas.panX = 0;
+      canvas.panY = 0;
+      container.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+      expect(canvas.isSelecting).toBe(true);
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 200, bubbles: true }));
+      expect(canvas.selectedNodes.has(n1)).toBe(true);
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      expect(canvas.isSelecting).toBe(false);
+    });
+
+    it('handles keyboard shortcuts for Escape, Ctrl+A, Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, and Delete', () => {
+      const n1 = canvas.addNode({ type: 'task', x: 100, y: 100 });
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      expect(canvas.selectedNodes.has(n1)).toBe(true);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(canvas.selectedNodes.size).toBe(0);
+
+      canvas.selectNode(n1);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      expect(canvas.nodes.size).toBe(0);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      expect(canvas.nodes.size).toBe(1);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, bubbles: true }));
+      expect(canvas.nodes.size).toBe(0);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      expect(canvas.nodes.size).toBe(1);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }));
+      expect(canvas.nodes.size).toBe(0);
+    });
+
+    it('captures debounced history snapshot on node:labelChange', () => {
+      vi.useFakeTimers();
+      const n1 = canvas.addNode({ type: 'task', label: 'Initial', x: 100, y: 100 });
+      canvas.undoStack = [];
+
+      // First edit event captures pre-edit baseline; subsequent change within 500ms commits it
+      canvas.emit('node:labelChange', n1);
+      n1.label = 'Updated';
+      canvas.emit('node:labelChange', n1);
+      vi.advanceTimersByTime(550);
+
+      expect(canvas.undoStack.length).toBe(1);
+      vi.useRealTimers();
+    });
   });
 });
 
