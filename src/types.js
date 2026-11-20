@@ -25,7 +25,7 @@
  * @typedef {Object} Selectable
  * @property {string} id - Unique item identifier
  * @property {boolean} selected - Current selection state
- * @property {function(boolean): void} setSelected - Updates selection state and visual indicators
+ * @property {(selected: boolean) => void} setSelected - Updates selection state and visual indicators
  */
 
 /**
@@ -44,29 +44,29 @@
  * @property {string} id - Unique item identifier
  * @property {number} x - Horizontal coordinate in canvas space
  * @property {number} y - Vertical coordinate in canvas space
- * @property {function(number, number): void} setPosition - Updates element coordinates and triggers notifications
- * @property {function(): void} updatePosition - Refreshes visual DOM coordinates
+ * @property {(x: number, y: number) => void} setPosition - Updates element coordinates and triggers notifications
+ * @property {() => void} updatePosition - Refreshes visual DOM coordinates
  */
 
 /**
  * Role contract for elements that sequence flows or associations can connect to.
  * @typedef {Object} Connectable
  * @property {string} id - Unique element identifier
- * @property {function(string): { x: number, y: number }} getPortPosition - Computes absolute canvas coordinates for a named port
+ * @property {(port: string) => { x: number, y: number }} getPortPosition - Computes absolute canvas coordinates for a named port
  */
 
 /**
  * Role contract for elements that can serialize themselves to JSON-ready objects.
  * @typedef {Object} Serializable
- * @property {function(): Object} serialize - Returns serializable snapshot of element state
- * @property {function(): Object} [toJSON] - Alias for JSON.stringify interoperability
+ * @property {() => Object} serialize - Returns serializable snapshot of element state
+ * @property {() => Object} [toJSON] - Alias for JSON.stringify interoperability
  */
 
 /**
  * Role contract for elements with editable text labels.
  * @typedef {Object} Labelable
  * @property {string} label - Current label text
- * @property {function(string): void} setLabel - Updates label text and refreshes visual presentation
+ * @property {(label: string) => void} setLabel - Updates label text and refreshes visual presentation
  */
 
 /**
@@ -74,8 +74,8 @@
  * @typedef {Object} Renderable
  * @property {HTMLElement|SVGElement} [domElement] - Root HTML element for DOM-based nodes
  * @property {SVGElement} [groupElement] - Root SVG group for vector-based edges
- * @property {function(): void} [render] - Renders or refreshes visual element state
- * @property {function(): void} destroy - Cleans up event listeners and removes DOM/SVG nodes
+ * @property {() => void} [render] - Renders or refreshes visual element state
+ * @property {() => void} destroy - Cleans up event listeners and removes DOM/SVG nodes
  */
 
 /**
@@ -86,7 +86,7 @@
  * @property {string} targetId - Identifier of target node
  * @property {string} sourcePort - Source attachment port name ('top', 'right', 'bottom', 'left')
  * @property {string} targetPort - Target attachment port name ('top', 'right', 'bottom', 'left')
- * @property {function(Object): void} updateConnection - Reconfigures edge source/target endpoints
+ * @property {(config: Object) => void} updateConnection - Reconfigures edge source/target endpoints
  */
 
 /**
@@ -109,50 +109,50 @@
 
 /**
  * Connection rule validator callback.
- * @typedef {function(Object, Object, Object=): ConnectionValidationResult} ConnectionRule
+ * @typedef {(source: Object, target: Object, context?: Object) => ConnectionValidationResult} ConnectionRule
  */
 
 /**
  * Node instantiation factory function.
- * @typedef {function(Object, Object): Object} NodeFactory
+ * @typedef {(config: Object, canvas: Object) => Object} NodeFactory
  */
 
 /**
  * Edge instantiation factory function.
- * @typedef {function(Object, Object): Object} EdgeFactory
+ * @typedef {(config: Object, canvas: Object) => Object} EdgeFactory
  */
 
 /**
  * Custom node HTML/SVG renderer function.
- * @typedef {function(Object, Object=): string} CustomRenderer
+ * @typedef {(node: Object, options?: Object) => string} CustomRenderer
  */
 
 /**
  * Event bus capabilities required by canvas tools and panels.
  * @typedef {Object} CanvasEventSource
- * @property {function(string, function): function} on - Subscribes event listener, returning unsubscribe callback
- * @property {function(string, function=): void} off - Unsubscribes event listener
- * @property {function(string, *=): void} emit - Emits event to subscribers
+ * @property {(event: string, listener: (...args: any[]) => void) => () => void} on - Subscribes event listener, returning unsubscribe callback
+ * @property {(event: string, listener?: (...args: any[]) => void) => void} off - Unsubscribes event listener
+ * @property {(event: string, payload?: any) => void} emit - Emits event to subscribers
  */
 
 /**
  * Selection provider interface for inspecting or updating selected elements.
  * @typedef {Object} CanvasSelectionSource
- * @property {function(): void} [clearSelection] - Clears all current element selections
- * @property {function(Object, Object=): void} [selectNode] - Selects a specific node
- * @property {function(Object): void} [selectEdge] - Selects a specific edge
+ * @property {() => void} [clearSelection] - Clears all current element selections
+ * @property {(node: Object, options?: Object) => void} [selectNode] - Selects a specific node
+ * @property {(edge: Object) => void} [selectEdge] - Selects a specific edge
  */
 
 /**
  * Command mutation target for canvas modifications.
  * @typedef {Object} CanvasCommandTarget
- * @property {function(Object): Object} [addNode] - Instantiates and mounts a node
- * @property {function(string): boolean} [removeNode] - Deletes a node by identifier
- * @property {function(string, Object): Object} [updateNode] - Modifies node properties
- * @property {function(string): boolean} [removeEdge] - Deletes an edge by identifier
- * @property {function(string, Object): Object} [updateEdge] - Modifies edge properties
- * @property {function(string, Object): Object} [updateEdgeEndpoints] - Reconnects edge source or target
- * @property {function(function): *} [batchOperation] - Executes batch mutations atomically with consolidated undo/redo
+ * @property {(config: Object) => Object} [addNode] - Instantiates and mounts a node
+ * @property {(id: string) => boolean} [removeNode] - Deletes a node by identifier
+ * @property {(id: string, updates: Object) => Object} [updateNode] - Modifies node properties
+ * @property {(id: string) => boolean} [removeEdge] - Deletes an edge by identifier
+ * @property {(id: string, updates: Object) => Object} [updateEdge] - Modifies edge properties
+ * @property {(id: string, endpoints: Object) => Object} [updateEdgeEndpoints] - Reconnects edge source or target
+ * @property {(fn: () => any) => any} [batchOperation] - Executes batch mutations atomically with consolidated undo/redo
  */
 
 /**
@@ -161,11 +161,11 @@
  * @typedef {CanvasEventSource & CanvasSelectionSource & CanvasCommandTarget & Object} CanvasContext
  * @property {HTMLElement} [container] - Canvas root container element
  * @property {import('./NodeTypeRegistry.js').NodeTypeRegistry} [registry] - Metadata and capability registry
- * @property {function(string): Object} [getNode] - Lookup node by identifier
- * @property {function(): Object[]} [getNodes] - Retrieve all nodes
- * @property {function(string): Object} [getEdge] - Lookup edge by identifier
- * @property {function(): Object[]} [getEdges] - Retrieve all edges
- * @property {function(number, number): { x: number, y: number }} [clientToCanvas] - Viewport to canvas coordinate transform
+ * @property {(id: string) => Object} [getNode] - Lookup node by identifier
+ * @property {() => Object[]} [getNodes] - Retrieve all nodes
+ * @property {(id: string) => Object} [getEdge] - Lookup edge by identifier
+ * @property {() => Object[]} [getEdges] - Retrieve all edges
+ * @property {(x: number, y: number) => { x: number, y: number }} [clientToCanvas] - Viewport to canvas coordinate transform
  */
 
 export {};
