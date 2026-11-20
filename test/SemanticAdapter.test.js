@@ -1228,5 +1228,27 @@ describe('SemanticAdapter', () => {
       ad.destroy();
       expect(ad.unsubscribers.length).toBe(0);
     });
+
+    it('initializes subprocess with undefined data.expanded as expanded during applyGraph when children exist', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      ad.applyGraph({
+        nodes: [
+          { id: 'sub1', type: 'subprocess', label: 'Embedded Flow' },
+          { id: 'c1', type: 'start-event', label: 'Begin', parentId: 'sub1' },
+          { id: 'c2', type: 'task', label: 'Work', parentId: 'sub1' }
+        ],
+        edges: [
+          { source: 'c1', target: 'c2' }
+        ]
+      });
+
+      const sub = c.getNode('sub1');
+      expect(sub.data.expanded).toBe(true);
+      expect(sub.domElement.classList.contains('expanded')).toBe(true);
+      expect(sub.domElement.querySelector('.bpmn-subprocess-header')).toBeTruthy();
+      expect(sub.domElement.querySelector('.bpmn-subprocess-marker')).toBeNull();
+    });
   });
 });
