@@ -482,47 +482,89 @@ export class AutoLayoutManager {
 
     sortedLayerKeys.forEach(layerIdx => {
       const bucket = layerBuckets.get(layerIdx);
+      const realNodes = bucket.filter(n => !n.isDummy);
+      const maxMainAxisSize = Math.max(
+        0,
+        ...realNodes.map(n => isLR ? (n.width || 100) : (n.height || 80))
+      );
+      const maxNodeCrossSize = Math.max(
+        0,
+        ...realNodes.map(n => isLR ? (n.height || 80) : (n.width || 100))
+      ) || 80;
+      const crossGap = isLR ? config.verticalGap : config.horizontalGap;
+      const rowPitch = maxNodeCrossSize + crossGap;
+      const crossBaseline = isLR ? config.startY : config.startX;
+
+      const getNodeCenter = (n) => isLR
+        ? (n.y + (n.height || 0) / 2)
+        : (n.x + (n.width || 0) / 2);
 
       // Compute barycenters from already-positioned lower-layer predecessors
       bucket.forEach(node => {
-        const incomingNodes = [];
+        const incomingEntries = [];
         if (node.isDummy) {
           const sLayer = layers.get(node.sourceId);
           const prev = (layerIdx - 1 === sLayer)
             ? nodeMap.get(node.sourceId)
             : nodeMap.get(`__dummy_${node.edge.id}_${layerIdx - 1}`);
-          if (prev) incomingNodes.push(prev);
+          if (prev) incomingEntries.push({ node: prev, isBoundary: false, dockEdge: null });
         } else {
           this.edges.forEach(edge => {
             let sId = edge.sourceId;
-            let tId = edge.targetId;
+            const tId = edge.targetId;
             const sNode = this.getNode(sId);
-            if (sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId) sId = sNode.data.hostNodeId;
+            const isBoundaryEdge = Boolean(sNode && this.isBoundary(sNode) && sNode.data?.hostNodeId);
+            const dockEdge = isBoundaryEdge ? (sNode.data.dockEdge || 'bottom') : null;
+            if (isBoundaryEdge) sId = sNode.data.hostNodeId;
 
             if (tId === node.id && nodeMap.has(sId)) {
               const sLayer = layers.get(sId);
               if (sLayer === layerIdx - 1) {
-                incomingNodes.push(nodeMap.get(sId));
+                incomingEntries.push({ node: nodeMap.get(sId), isBoundary: isBoundaryEdge, dockEdge });
               } else if (sLayer !== undefined && sLayer < layerIdx - 1) {
                 const dummy = nodeMap.get(`__dummy_${edge.id}_${layerIdx - 1}`);
-                if (dummy) incomingNodes.push(dummy);
+                if (dummy) incomingEntries.push({ node: dummy, isBoundary: isBoundaryEdge, dockEdge });
               }
             }
           });
         }
 
-        if (incomingNodes.length > 0) {
-          const dummyPred = incomingNodes.find(p => p.isDummy);
-          if (dummyPred && incomingNodes.length > 1) {
-            node._barycenter = isLR
-              ? (dummyPred.y + (dummyPred.height || 0) / 2)
-              : (dummyPred.x + (dummyPred.width || 0) / 2);
+        if (incomingEntries.length > 0) {
+          const dummyEntry = incomingEntries.find(e => e.node.isDummy);
+          if (dummyEntry && incomingEntries.length > 1) {
+            node._barycenter = getNodeCenter(dummyEntry.node);
+            node._primaryPredId = dummyEntry.node.id;
           } else {
-            const sumPos = incomingNodes.reduce((acc, p) => acc + (isLR ? (p.y + (p.height || 0) / 2) : (p.x + (p.width || 0) / 2)), 0);
-            node._barycenter = sumPos / incomingNodes.length;
+            const normalEntries = incomingEntries.filter(e => !e.isBoundary);
+            const effectiveEntries = normalEntries.length > 0 ? normalEntries : incomingEntries;
+            const sumPos = effectiveEntries.reduce((acc, e) => acc + getNodeCenter(e.node), 0);
+            let barycenter = sumPos / effectiveEntries.length;
+
+            if (normalEntries.length === 0) {
+              // Boundary-only target: offset from host centerline so normal sequence flow stays on spine
+              const first = incomingEntries[0];
+              const dock = first.dockEdge || 'bottom';
+              const sign = isLR ? (dock === 'top' ? -1 : 1) : (dock === 'left' ? -1 : 1);
+
+              // Check if host also has a normal outgoing target in this layer with downstream branches
+              let normalSiblingMaxOut = 1;
+              this.edges.forEach(e => {
+                if (e.sourceId === first.node.id && e.targetId !== node.id && layers.get(e.targetId) === layerIdx) {
+                  const outCount = (forwardOut.get(e.targetId) || []).length;
+                  normalSiblingMaxOut = Math.max(normalSiblingMaxOut, outCount);
+                }
+              });
+              const clearanceRows = normalSiblingMaxOut > 1 ? ((normalSiblingMaxOut - 1) / 2 + 1) : 1;
+              barycenter += sign * clearanceRows * rowPitch;
+              node._primaryPredId = `${first.node.id}:boundary:${dock}`;
+            } else {
+              node._primaryPredId = effectiveEntries.length === 1 ? effectiveEntries[0].node.id : null;
+            }
+            node._barycenter = barycenter;
           }
         } else {
           node._barycenter = null;
+          node._primaryPredId = null;
         }
       });
 
@@ -542,15 +584,6 @@ export class AutoLayoutManager {
           return 0;
         });
       }
-
-      // Authoritative width/height directly from model (only real nodes)
-      const realNodes = bucket.filter(n => !n.isDummy);
-      const maxMainAxisSize = Math.max(
-        0,
-        ...realNodes.map(n => isLR ? (n.width || 100) : (n.height || 80))
-      );
-
-      const crossBaseline = isLR ? config.startY : config.startX;
 
       if (bucket.length === 1) {
         const node = bucket[0];
@@ -581,39 +614,57 @@ export class AutoLayoutManager {
           node.y = posY;
         }
       } else {
-        // Multi-node column (gateway branches, bypass tracks, etc.)
-        const maxNodeCrossSize = Math.max(
-          0,
-          ...realNodes.map(n => isLR ? (n.height || 80) : (n.width || 100))
-        ) || 80;
-        const rowPitch = maxNodeCrossSize + (isLR ? config.verticalGap : config.horizontalGap);
-        const totalSpan = (bucket.length - 1) * rowPitch;
-        const startCenter = crossBaseline - totalSpan / 2;
+        // Multi-node column: per-node barycenter placement with local sibling centering + 1D overlap resolution
+        const targetCenters = new Array(bucket.length);
+        let idx = 0;
+        while (idx < bucket.length) {
+          const anchor = bucket[idx];
+          const anchorCenter = (anchor._barycenter !== null && anchor._barycenter !== undefined)
+            ? anchor._barycenter
+            : crossBaseline;
 
-        // Check if all nodes in bucket have distinct, non-overlapping predecessor barycenters
-        const allHaveBary = bucket.every(n => n._barycenter !== null && n._barycenter !== undefined);
-        let canUseBarycenters = allHaveBary;
-        if (allHaveBary && bucket.length > 1) {
-          for (let i = 0; i < bucket.length - 1; i++) {
-            if (bucket[i + 1]._barycenter - bucket[i]._barycenter < maxNodeCrossSize + 20) {
-              canUseBarycenters = false;
-              break;
+          // Group consecutive siblings sharing the same predecessor (or root layer 0 nodes)
+          let end = idx + 1;
+          while (end < bucket.length) {
+            const next = bucket[end];
+            const sameRootLayer = layerIdx === 0;
+            const samePred = Boolean(
+              anchor._primaryPredId &&
+              next._primaryPredId === anchor._primaryPredId &&
+              Math.abs((next._barycenter ?? crossBaseline) - anchorCenter) <= 1
+            );
+            if (!sameRootLayer && !samePred) break;
+            end++;
+          }
+
+          const groupSize = end - idx;
+          if (groupSize === 1) {
+            targetCenters[idx] = anchorCenter;
+          } else if (anchor.isDummy) {
+            // Keep dummy corridor anchored straight; push siblings below
+            for (let k = 0; k < groupSize; k++) {
+              targetCenters[idx + k] = anchorCenter + k * rowPitch;
+            }
+          } else {
+            const groupStart = anchorCenter - ((groupSize - 1) * rowPitch) / 2;
+            for (let k = 0; k < groupSize; k++) {
+              targetCenters[idx + k] = groupStart + k * rowPitch;
             }
           }
+          idx = end;
         }
 
-        const hasDummy = bucket.some(n => n.isDummy);
-        const anchorCenter = (hasDummy && bucket[0]._barycenter !== null)
-          ? bucket[0]._barycenter
-          : startCenter;
+        // 1D forward collision/overlap-resolution pass
+        for (let i = 1; i < targetCenters.length; i++) {
+          if (targetCenters[i] < targetCenters[i - 1] + rowPitch) {
+            targetCenters[i] = targetCenters[i - 1] + rowPitch;
+          }
+        }
 
         bucket.forEach((node, i) => {
           const nodeW = node.isDummy ? 0 : (node.width || 100);
           const nodeH = node.isDummy ? 0 : (node.height || 80);
-
-          let targetCenter = canUseBarycenters
-            ? node._barycenter
-            : (hasDummy ? (anchorCenter + i * rowPitch) : (startCenter + i * rowPitch));
+          const targetCenter = targetCenters[i];
 
           let posX = isLR ? currentMainAxisPos : (targetCenter - nodeW / 2);
           let posY = isLR ? (targetCenter - nodeH / 2) : currentMainAxisPos;
@@ -636,7 +687,10 @@ export class AutoLayoutManager {
         });
       }
 
-      bucket.forEach(n => delete n._barycenter);
+      bucket.forEach(n => {
+        delete n._barycenter;
+        delete n._primaryPredId;
+      });
 
       // Ample clearance after subprocess containers to guarantee edges don't double back
       const isSubproc = bucket.some(n => n.type === 'subprocess' || n.data?.expanded);
