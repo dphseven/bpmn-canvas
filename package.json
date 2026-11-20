@@ -5,20 +5,28 @@
   "type": "module",
   "main": "./src/index.js",
   "module": "./src/index.js",
+  "types": "./types/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
     "./styles/*": "./src/styles/*",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
+    "types",
     "LICENSE",
     "README.md"
   ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck:types": "tsc --noEmit --ignoreConfig --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler types/index.d.ts",
+    "prepublishOnly": "npm run build:types"
   },
   "repository": {
     "type": "git",
@@ -46,6 +54,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.5",
     "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
 }
