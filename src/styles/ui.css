@@ -344,6 +344,19 @@ body, html {
   gap: 16px;
 }
 
+.palette-panel.palette-docked {
+  position: static;
+  top: auto;
+  left: auto;
+  width: 100%;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .palette-heading {
   font-size: 11px;
   font-weight: 700;
@@ -568,6 +581,19 @@ body, html {
 
 .palette-has-sub:hover > .palette-sub-menu {
   display: flex;
+}
+
+.palette-sub-menu.palette-sub-menu-portal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+}
+
+.palette-sub-menu.palette-sub-menu-portal.palette-sub-menu-left::before {
+  left: auto;
+  right: -12px;
 }
 
 .palette-sub-item {

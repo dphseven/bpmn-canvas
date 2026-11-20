@@ -204,5 +204,113 @@ describe('Palette', () => {
     palette.emit('cleared:test');
     expect(recurring).not.toHaveBeenCalled();
   });
+
+  it('adds palette-docked class when docked: true and omits it by default', () => {
+    expect(container.classList.contains('palette-docked')).toBe(false);
+
+    const dockedContainer = document.createElement('div');
+    document.body.appendChild(dockedContainer);
+    const dockedPalette = new Palette(dockedContainer, canvas, { docked: true });
+
+    expect(dockedContainer.classList.contains('palette-panel')).toBe(true);
+    expect(dockedContainer.classList.contains('palette-docked')).toBe(true);
+
+    dockedPalette.destroy();
+    document.body.removeChild(dockedContainer);
+  });
+
+  it('renders flyout submenus in a viewport-anchored portal and binds dragstart on sub-items', () => {
+    vi.useFakeTimers();
+    const portalTarget = document.createElement('div');
+    document.body.appendChild(portalTarget);
+
+    const dockedContainer = document.createElement('div');
+    document.body.appendChild(dockedContainer);
+    const dockedPalette = new Palette(dockedContainer, canvas, {
+      docked: true,
+      portalTarget
+    });
+
+    const subTrigger = dockedContainer.querySelector('.palette-has-sub');
+    expect(subTrigger).toBeTruthy();
+    expect(subTrigger.querySelector('.palette-sub-menu')).toBeNull();
+
+    vi.spyOn(subTrigger, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      right: 210,
+      top: 120,
+      bottom: 160,
+      width: 200,
+      height: 40
+    });
+
+    subTrigger.dispatchEvent(new MouseEvent('mouseenter'));
+
+    const portal = portalTarget.querySelector('.palette-sub-menu-portal');
+    expect(portal).toBeTruthy();
+    expect(portal.style.display).toBe('flex');
+    expect(portal.style.left).toBe('218px');
+    expect(portal.style.top).toBe('116px');
+
+    const subItem = portal.querySelector('.palette-sub-item');
+    expect(subItem).toBeTruthy();
+
+    const dragSpy = vi.fn();
+    dockedPalette.on('palette:dragstart', dragSpy);
+    const dragEvent = new Event('dragstart');
+    dragEvent.dataTransfer = {
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+      effectAllowed: ''
+    };
+    subItem.dispatchEvent(dragEvent);
+    expect(dragSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: subItem.dataset.type
+    }));
+
+    // Grace period: mouseleave on trigger, mouseenter on portal keeps it open
+    subTrigger.dispatchEvent(new MouseEvent('mouseleave'));
+    portal.dispatchEvent(new MouseEvent('mouseenter'));
+    vi.advanceTimersByTime(150);
+    expect(portal.style.display).toBe('flex');
+
+    // Leaving portal closes it after grace period
+    portal.dispatchEvent(new MouseEvent('mouseleave'));
+    vi.advanceTimersByTime(150);
+    expect(portal.style.display).toBe('none');
+
+    dockedPalette.destroy();
+    expect(portalTarget.querySelector('.palette-sub-menu-portal')).toBeNull();
+    document.body.removeChild(dockedContainer);
+    document.body.removeChild(portalTarget);
+    vi.useRealTimers();
+  });
+
+  it('closes open portal submenu on scroll and flips left when near right viewport edge', () => {
+    const dockedContainer = document.createElement('div');
+    document.body.appendChild(dockedContainer);
+    const dockedPalette = new Palette(dockedContainer, canvas, { docked: true });
+
+    const subTrigger = dockedContainer.querySelector('.palette-has-sub');
+    vi.spyOn(subTrigger, 'getBoundingClientRect').mockReturnValue({
+      left: window.innerWidth - 100,
+      right: window.innerWidth - 10,
+      top: 100,
+      bottom: 140,
+      width: 90,
+      height: 40
+    });
+
+    subTrigger.dispatchEvent(new MouseEvent('mouseenter'));
+    const portal = document.body.querySelector('.palette-sub-menu-portal');
+    expect(portal).toBeTruthy();
+    expect(portal.classList.contains('palette-sub-menu-left')).toBe(true);
+
+    window.dispatchEvent(new Event('scroll'));
+    expect(portal.style.display).toBe('none');
+
+    dockedPalette.destroy();
+    document.body.removeChild(dockedContainer);
+  });
 });
 

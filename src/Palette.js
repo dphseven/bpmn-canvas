@@ -27,6 +27,8 @@ export class Palette {
    * @param {Object} [options={}] - Palette configuration options
    * @param {NodeTypeRegistry} [options.registry] - Optional custom or shared NodeTypeRegistry
    * @param {Object|null} [options.filter=null] - Category, type, and subtype filter rules
+   * @param {boolean} [options.docked=false] - Render in static docked sidebar mode instead of floating overlay
+   * @param {HTMLElement} [options.portalTarget] - Target element for flyout submenu portals (defaults to document.body)
    */
   constructor(containerElement, canvas, options = {}) {
     this.container = containerElement;
@@ -34,14 +36,30 @@ export class Palette {
     this.options = options || {};
     this.registry = this.options.registry || (canvas && canvas.registry) || new NodeTypeRegistry();
     this.filter = this.options.filter || null;
+    this.docked = Boolean(this.options.docked);
+    this.portalTarget = this.options.portalTarget || (typeof document !== 'undefined' ? document.body : null);
 
     this.listeners = new Map();
+    this.subItemsByType = new Map();
+    this.portalElement = null;
+    this.subMenuCloseTimer = null;
+    this.activeSubMenuType = null;
+    this._onScroll = () => this.closeSubMenu();
+
     this.container.classList.add('palette-panel');
+    if (this.docked) {
+      this.container.classList.add('palette-docked');
+    }
+
     this.render();
     this.bindCanvasDropEvents();
 
+    if (typeof window !== 'undefined') {
+      window.addEventListener('scroll', this._onScroll, true);
+    }
+
     if (this.canvas && typeof this.canvas.on === 'function') {
-      this.canvas.on('registry:registerNodeType', () => {
+      this._unsubRegistry = this.canvas.on('registry:registerNodeType', () => {
         this.render();
       });
     }
@@ -134,9 +152,12 @@ export class Palette {
    * Re-renders palette categories and items based on registry and active filter
    */
   render() {
+    this.closeSubMenu();
+    this.subItemsByType.clear();
     const tree = this.registry.getPaletteTree(this.filter || {});
     this.container.innerHTML = this.buildPaletteHtml(tree);
-    this.bindItemDragEvents();
+    this.bindItemDragEvents(this.container);
+    this.bindSubMenuEvents();
   }
 
   /**
@@ -161,34 +182,15 @@ export class Palette {
   }
 
   /**
-   * Renders single palette item HTML (with sub-menu flyout if activeSubtypes exist)
+   * Renders single palette item HTML (storing subtype metadata for portal flyouts)
    */
   renderItemHtml(item) {
     const hasSubtypes = Array.isArray(item.activeSubtypes) && item.activeSubtypes.length > 0;
     const subClass = hasSubtypes ? ' palette-has-sub' : '';
     const arrowHtml = hasSubtypes ? '<span class="palette-expand-arrow">▶</span>' : '';
 
-    let subMenuHtml = '';
     if (hasSubtypes) {
-      const subHeading = item.subHeading ? `<div class="palette-sub-heading">${item.subHeading}</div>` : '';
-      const subItemsHtml = item.activeSubtypes.map(subItem => {
-        const subIconInner = subItem.iconSvg || subItem.symbolHtml || subItem.icon || '';
-        return `
-          <div class="palette-sub-item" draggable="true" data-type="${subItem.type}">
-            <div class="palette-item-icon ${subItem.iconClass || ''}">
-              ${subIconInner}
-            </div>
-            <span class="palette-item-label">${subItem.label}</span>
-          </div>
-        `;
-      }).join('');
-
-      subMenuHtml = `
-        <div class="palette-sub-menu">
-          ${subHeading}
-          ${subItemsHtml}
-        </div>
-      `;
+      this.subItemsByType.set(item.type, item);
     }
 
     const iconInner = item.iconSvg || item.symbolHtml || item.icon || '';
@@ -200,16 +202,146 @@ export class Palette {
         </div>
         <span class="palette-item-label">${item.label}</span>
         ${arrowHtml}
-        ${subMenuHtml}
       </div>
     `;
   }
 
   /**
-   * Binds dragstart listeners for all rendered palette items and flyout sub-items
+   * Binds hover events on palette items with subtypes to open viewport-anchored portal flyouts
    */
-  bindItemDragEvents() {
-    const items = this.container.querySelectorAll('.palette-item, .palette-sub-item');
+  bindSubMenuEvents() {
+    const subTriggers = this.container.querySelectorAll('.palette-has-sub');
+    subTriggers.forEach(triggerEl => {
+      triggerEl.addEventListener('mouseenter', () => {
+        this.cancelSubMenuClose();
+        this.openSubMenu(triggerEl);
+      });
+      triggerEl.addEventListener('mouseleave', () => {
+        this.scheduleSubMenuClose();
+      });
+    });
+  }
+
+  /**
+   * Opens a flyout submenu in the top-level portal anchored to the trigger element's viewport rect
+   * @param {HTMLElement} triggerEl
+   */
+  openSubMenu(triggerEl) {
+    const type = triggerEl?.dataset?.type;
+    const item = type ? this.subItemsByType.get(type) : null;
+    if (!item || !Array.isArray(item.activeSubtypes) || item.activeSubtypes.length === 0 || !this.portalTarget) {
+      return;
+    }
+
+    if (!this.portalElement) {
+      this.portalElement = document.createElement('div');
+      this.portalElement.className = 'palette-sub-menu palette-sub-menu-portal';
+      this.portalElement.addEventListener('mouseenter', () => this.cancelSubMenuClose());
+      this.portalElement.addEventListener('mouseleave', () => this.scheduleSubMenuClose());
+      this.portalTarget.appendChild(this.portalElement);
+    }
+
+    const subHeading = item.subHeading ? `<div class="palette-sub-heading">${item.subHeading}</div>` : '';
+    const subItemsHtml = item.activeSubtypes.map(subItem => {
+      const subIconInner = subItem.iconSvg || subItem.symbolHtml || subItem.icon || '';
+      return `
+        <div class="palette-sub-item" draggable="true" data-type="${subItem.type}">
+          <div class="palette-item-icon ${subItem.iconClass || ''}">
+            ${subIconInner}
+          </div>
+          <span class="palette-item-label">${subItem.label}</span>
+        </div>
+      `;
+    }).join('');
+
+    this.portalElement.innerHTML = `${subHeading}${subItemsHtml}`;
+    this.portalElement.classList.remove('palette-sub-menu-left');
+    this.portalElement.style.display = 'flex';
+    this.activeSubMenuType = type;
+
+    this.bindItemDragEvents(this.portalElement);
+    this.positionSubMenu(triggerEl);
+  }
+
+  /**
+   * Positions the portal submenu relative to the trigger's viewport coordinates and clamps to viewport
+   * @param {HTMLElement} triggerEl
+   */
+  positionSubMenu(triggerEl) {
+    if (!this.portalElement) return;
+    const rect = triggerEl.getBoundingClientRect();
+    const gap = 8;
+    const menuRect = this.portalElement.getBoundingClientRect();
+    const menuWidth = menuRect.width || 195;
+    const menuHeight = menuRect.height || 0;
+
+    let left = rect.right + gap;
+    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0;
+
+    if (viewportW > 0 && left + menuWidth > viewportW - gap) {
+      left = Math.max(gap, rect.left - menuWidth - gap);
+      this.portalElement.classList.add('palette-sub-menu-left');
+    }
+
+    let top = rect.top - 4;
+    if (viewportH > 0 && menuHeight > 0) {
+      top = Math.max(gap, Math.min(top, viewportH - menuHeight - gap));
+    } else {
+      top = Math.max(gap, top);
+    }
+
+    this.portalElement.style.left = `${Math.round(left)}px`;
+    this.portalElement.style.top = `${Math.round(top)}px`;
+  }
+
+  scheduleSubMenuClose() {
+    this.cancelSubMenuClose();
+    this.subMenuCloseTimer = setTimeout(() => {
+      this.closeSubMenu();
+    }, 120);
+  }
+
+  cancelSubMenuClose() {
+    if (this.subMenuCloseTimer) {
+      clearTimeout(this.subMenuCloseTimer);
+      this.subMenuCloseTimer = null;
+    }
+  }
+
+  closeSubMenu() {
+    this.cancelSubMenuClose();
+    if (this.portalElement) {
+      this.portalElement.style.display = 'none';
+      this.portalElement.innerHTML = '';
+    }
+    this.activeSubMenuType = null;
+  }
+
+  /**
+   * Cleans up portal DOM nodes and global event listeners
+   */
+  destroy() {
+    this.closeSubMenu();
+    if (this.portalElement && this.portalElement.parentNode) {
+      this.portalElement.parentNode.removeChild(this.portalElement);
+    }
+    this.portalElement = null;
+    if (typeof window !== 'undefined' && this._onScroll) {
+      window.removeEventListener('scroll', this._onScroll, true);
+    }
+    if (typeof this._unsubRegistry === 'function') {
+      this._unsubRegistry();
+      this._unsubRegistry = null;
+    }
+  }
+
+  /**
+   * Binds dragstart listeners for all rendered palette items and flyout sub-items
+   * @param {HTMLElement} [root=this.container]
+   */
+  bindItemDragEvents(root = this.container) {
+    const items = root.querySelectorAll('.palette-item, .palette-sub-item');
     items.forEach(item => {
       item.addEventListener('dragstart', (e) => {
         e.stopPropagation();
