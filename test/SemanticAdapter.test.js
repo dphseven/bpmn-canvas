@@ -1397,4 +1397,136 @@ describe('SemanticAdapter', () => {
       expect(canvas.getNode('u2')).toBeDefined();
     });
   });
+
+  describe('Field Aliases & Lenient Resolution', () => {
+    it('accepts snake_case and camelCase field aliases natively in applyGraph', () => {
+      const result = adapter.applyGraph({
+        nodes: [
+          { node_id: 'sub1', node_type: 'subprocess', label: 'Subprocess' },
+          { nodeId: 'n1', nodeType: 'user-task', label: 'Task 1', parent_id: 'sub1' },
+          { id: 'n2', type: 'service-task', label: 'Task 2', parent_id: 'sub1' }
+        ],
+        edges: [
+          { edge_id: 'e1', source_id: 'n1', target_id: 'n2', label: 'Next' }
+        ]
+      });
+
+      expect(result.nodes).toHaveLength(3);
+      expect(result.edges).toHaveLength(1);
+      expect(canvas.getNode('sub1').data.expanded).toBe(true);
+      expect(canvas.getNode('n1').type).toBe('user-task');
+      expect(canvas.getNode('n1').data.parentId).toBe('sub1');
+      expect(canvas.getEdge('e1').sourceId).toBe('n1');
+      expect(canvas.getEdge('e1').targetId).toBe('n2');
+    });
+
+    it('accepts snake_case and camelCase field aliases natively in executeCommands', () => {
+      const results = adapter.executeCommands([
+        { type: 'add_node', node_id: 'a1', node_type: 'user-task', label: 'First' },
+        { action: 'add_node', nodeId: 'a2', nodeType: 'service-task', label: 'Second', placement: { relative_to: 'a1', position: 'right' } },
+        { action: 'add_edge', edge_id: 'e12', source_id: 'a1', target_id: 'a2' },
+        { type: 'update_node', node_id: 'a1', label: 'First Updated' },
+        { action: 'morph_node', node_id: 'a2', new_type: 'script-task' },
+        { action: 'attach_boundary_event', host_id: 'a1', node_type: 'boundary-timer-event', outgoing_flow: { target_id: 'a2' } },
+        { action: 'add_annotation', target_id: 'a1', text: 'Note' },
+        { action: 'wrap_in_subprocess', id: 'sub_wrap', node_ids: ['a1', 'a2'] },
+        { action: 'set_subprocess_expanded', subprocess_id: 'sub_wrap', expanded: false },
+        { action: 'select_nodes', node_ids: ['a1'] },
+        { action: 'focus_node', node_id: 'a1' }
+      ]);
+
+      expect(results[0].id).toBe('a1');
+      expect(results[1].x).toBeGreaterThan(results[0].x);
+      expect(canvas.getEdge('e12')).toBeDefined();
+      expect(canvas.getNode('a1').label).toBe('First Updated');
+      expect(canvas.getNode('a1').type).toBe('user-task');
+      expect(canvas.getNode('a2').type).toBe('script-task');
+      expect(results[5].boundaryNode.type).toBe('boundary-timer-event');
+      expect(results[5].edge.targetId).toBe('a2');
+      expect(results[6].annotationNode.type).toBe('text-annotation');
+      expect(canvas.getNode('sub_wrap').data.expanded).toBe(false);
+      expect(canvas.selectionManager.selectedNodes.has(canvas.getNode('a1'))).toBe(true);
+      expect(canvas.selectionManager.selectedNodes.size).toBe(1);
+
+      const [extracted, edgeRemoved, nodeRemoved] = adapter.executeCommands([
+        { action: 'extract_from_subprocess', subprocess_id: 'sub_wrap' },
+        { action: 'remove_edge', source_id: 'a1', target_id: 'a2' },
+        { action: 'remove_node', node_id: 'a2' }
+      ]);
+      expect(extracted).toBe(true);
+      expect(edgeRemoved).toBe(true);
+      expect(nodeRemoved).toBe(true);
+    });
+
+    it('keeps type aliases and fuzzy ID resolution disabled when lenient is false', () => {
+      adapter.applyGraph({
+        nodes: [{ id: 'node_1', type: 'userTask', label: 'Review Order' }],
+        edges: []
+      });
+
+      expect(canvas.getNode('node_1').type).toBe('userTask');
+      expect(() => {
+        adapter.executeCommands([
+          { action: 'add_node', id: 'node_2', type: 'end' },
+          { action: 'add_edge', source_id: 'Review Order', target_id: 'node_2' }
+        ]);
+      }).toThrow(/does not exist/);
+    });
+
+    it('normalizes node type aliases and resolves fuzzy IDs/labels when lenient is true', () => {
+      const result = adapter.applyGraph({
+        nodes: [
+          { id: 'start_1', type: 'start', label: 'Order Received' },
+          { id: 'task_1', type: 'userTask', label: 'Review Order' },
+          { id: 'gw_1', type: 'xor', label: 'Approved?' },
+          { id: 'svc_1', type: 'service', label: 'Charge Card' },
+          { id: 'end_1', type: 'end', label: 'Done' }
+        ],
+        edges: [
+          { source_id: 'START_1', target_id: 'Review Order' },
+          { source: 'review-order', target: 'Approved?' },
+          { source: 'gw_1', target: 'charge-card', label: 'Yes' },
+          { source: 'Charge Card', target: 'Done' }
+        ]
+      }, { lenient: true });
+
+      expect(result.nodes.map(n => n.type)).toEqual([
+        'start-event',
+        'user-task',
+        'gateway-exclusive',
+        'service-task',
+        'end-event'
+      ]);
+      expect(result.edges).toHaveLength(4);
+      expect(result.edges[0].sourceId).toBe('start_1');
+      expect(result.edges[0].targetId).toBe('task_1');
+      expect(result.edges[1].sourceId).toBe('task_1');
+      expect(result.edges[1].targetId).toBe('gw_1');
+      expect(result.edges[2].targetId).toBe('svc_1');
+      expect(result.edges[3].sourceId).toBe('svc_1');
+      expect(result.edges[3].targetId).toBe('end_1');
+
+      const lenientAdapter = new SemanticAdapter(canvas, { lenient: true });
+      const cmdResults = lenientAdapter.executeCommands([
+        { action: 'morph_node', id: 'Review Order', new_type: 'manual' },
+        { action: 'attach_boundary_event', host_id: 'charge-card', type: 'timeout', outgoing_flow: { target_id: 'Done' } },
+        { action: 'select_nodes', node_ids: ['order-received'] }
+      ]);
+
+      expect(cmdResults[0].type).toBe('manual-task');
+      expect(cmdResults[1].boundaryNode.type).toBe('boundary-timer-event');
+      expect(cmdResults[1].edge.targetId).toBe('end_1');
+      expect(canvas.selectionManager.selectedNodes.has(canvas.getNode('start_1'))).toBe(true);
+      expect(canvas.selectionManager.selectedNodes.size).toBe(1);
+
+      // Per-call override can disable lenient mode
+      expect(() => {
+        lenientAdapter.executeCommands([
+          { action: 'add_edge', source_id: 'Review Order', target_id: 'Done' }
+        ], { lenient: false });
+      }).toThrow(/does not exist/);
+
+      lenientAdapter.destroy();
+    });
+  });
 });

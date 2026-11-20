@@ -37,6 +37,118 @@ const LAYOUT_SPACING_PRESETS = {
   spacious: { horizontalGap: 200, verticalGap: 160 }
 };
 
+const NODE_TYPE_ALIASES = {
+  // Start events
+  start: 'start-event',
+  startevent: 'start-event',
+  'start-none': 'start-event',
+  begin: 'start-event',
+  'start-timer': 'start-timer-event',
+  'timer-start': 'start-timer-event',
+  'timer-start-event': 'start-timer-event',
+  'start-message': 'start-message-event',
+  'message-start': 'start-message-event',
+  'message-start-event': 'start-message-event',
+  'start-signal': 'start-signal-event',
+  'signal-start': 'start-signal-event',
+  'signal-start-event': 'start-signal-event',
+  // Intermediate events
+  intermediate: 'intermediate-event',
+  'intermediate-throw': 'intermediate-event',
+  'intermediate-catch': 'intermediate-event',
+  event: 'intermediate-event',
+  'intermediate-timer': 'intermediate-timer-event',
+  timer: 'intermediate-timer-event',
+  'timer-event': 'intermediate-timer-event',
+  delay: 'intermediate-timer-event',
+  wait: 'intermediate-timer-event',
+  'intermediate-message': 'intermediate-message-event',
+  'message-event': 'intermediate-message-event',
+  'intermediate-signal': 'intermediate-signal-event',
+  'signal-event': 'intermediate-signal-event',
+  // Boundary events
+  'boundary-error': 'boundary-error-event',
+  'error-boundary': 'boundary-error-event',
+  'catch-error': 'boundary-error-event',
+  'boundary-timer': 'boundary-timer-event',
+  'timer-boundary': 'boundary-timer-event',
+  timeout: 'boundary-timer-event',
+  'boundary-message': 'boundary-message-event',
+  'message-boundary': 'boundary-message-event',
+  'boundary-signal': 'boundary-signal-event',
+  'signal-boundary': 'boundary-signal-event',
+  // End events
+  end: 'end-event',
+  endevent: 'end-event',
+  'end-none': 'end-event',
+  finish: 'end-event',
+  stop: 'end-event',
+  'end-error': 'end-error-event',
+  'error-end': 'end-error-event',
+  error: 'end-error-event',
+  'throw-error': 'end-error-event',
+  'end-terminate': 'end-terminate-event',
+  terminate: 'end-terminate-event',
+  'terminate-end': 'end-terminate-event',
+  'terminate-event': 'end-terminate-event',
+  'end-message': 'end-message-event',
+  'message-end': 'end-message-event',
+  // Tasks
+  user: 'user-task',
+  human: 'user-task',
+  'human-task': 'user-task',
+  'manual-review': 'user-task',
+  service: 'service-task',
+  'automated-task': 'service-task',
+  'api-task': 'service-task',
+  'system-task': 'service-task',
+  'bot-task': 'service-task',
+  manual: 'manual-task',
+  'business-rule': 'business-rule-task',
+  rule: 'business-rule-task',
+  'rule-task': 'business-rule-task',
+  'decision-task': 'business-rule-task',
+  dmn: 'business-rule-task',
+  script: 'script-task',
+  'code-task': 'script-task',
+  // Subprocess
+  'sub-process': 'subprocess',
+  sub: 'subprocess',
+  'embedded-subprocess': 'subprocess',
+  group: 'subprocess',
+  // Gateways
+  xor: 'gateway-exclusive',
+  exclusive: 'gateway-exclusive',
+  'exclusive-gateway': 'gateway-exclusive',
+  'xor-gateway': 'gateway-exclusive',
+  decision: 'gateway-exclusive',
+  branch: 'gateway-exclusive',
+  if: 'gateway-exclusive',
+  gateway: 'gateway-exclusive',
+  and: 'gateway-parallel',
+  parallel: 'gateway-parallel',
+  'parallel-gateway': 'gateway-parallel',
+  'and-gateway': 'gateway-parallel',
+  fork: 'gateway-parallel',
+  join: 'gateway-parallel',
+  // Artifacts
+  annotation: 'text-annotation',
+  note: 'text-annotation',
+  comment: 'text-annotation',
+  text: 'text-annotation',
+  data: 'data-object',
+  document: 'data-object',
+  artifact: 'data-object'
+};
+
+function toSlug(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export class SemanticAdapter {
   /**
    * @param {import('./Canvas.js').BpmnCanvas} canvas
@@ -45,6 +157,7 @@ export class SemanticAdapter {
    * @param {'LR'|'TB'} [options.direction='LR'] - Default flow direction for auto-layout
    * @param {boolean} [options.fitView=true] - Whether to zoom-to-fit after graph ingestion
    * @param {number} [options.defaultNodeSpacing=80] - Default spacing for incremental placement
+   * @param {boolean} [options.lenient=false] - Enable node type alias normalization and fuzzy ID/label resolution
    */
   constructor(canvas, options = {}) {
     this.canvas = canvas;
@@ -52,8 +165,11 @@ export class SemanticAdapter {
       debounceMs: 250,
       direction: 'LR',
       fitView: true,
-      defaultNodeSpacing: 80
+      defaultNodeSpacing: 80,
+      lenient: false
     }, options);
+
+    this._activeLenient = undefined;
 
     this.telemetryListeners = new Set();
     this.intentListeners = new Set();
@@ -78,6 +194,79 @@ export class SemanticAdapter {
   // ==========================================
 
   /**
+   * Returns whether lenient normalization/resolution is currently active.
+   * @returns {boolean}
+   */
+  isLenient() {
+    return this._activeLenient !== undefined
+      ? this._activeLenient
+      : Boolean(this.options.lenient);
+  }
+
+  /**
+   * Normalizes a BPMN node type string when lenient mode is enabled.
+   * @param {string} type
+   * @returns {string}
+   */
+  normalizeNodeType(type) {
+    if (!type || typeof type !== 'string' || !this.isLenient()) {
+      return type;
+    }
+
+    const trimmed = type.trim();
+    if (!trimmed) return type;
+    if (this.canvas.registry?.has(trimmed)) {
+      return trimmed;
+    }
+
+    const kebab = trimmed
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/[_\s]+/g, '-')
+      .toLowerCase();
+
+    if (this.canvas.registry?.has(kebab)) {
+      return kebab;
+    }
+
+    return NODE_TYPE_ALIASES[kebab] || trimmed;
+  }
+
+  /**
+   * Resolves a node reference to an existing node ID on the canvas.
+   * When lenient mode is enabled, falls back to case-insensitive ID, label, and slug matching.
+   * @param {string} ref
+   * @returns {string}
+   */
+  resolveNodeId(ref) {
+    if (!ref || typeof ref !== 'string') return ref;
+    if (this.canvas.getNode(ref)) return ref;
+    if (!this.isLenient()) return ref;
+
+    const lowerRef = ref.trim().toLowerCase();
+    const slugRef = toSlug(ref);
+    const nodes = Array.from(this.canvas.nodes.values());
+
+    // 1. Case-insensitive ID match
+    const byId = nodes.find(n => n.id.toLowerCase() === lowerRef);
+    if (byId) return byId.id;
+
+    // 2. Case-insensitive exact label match
+    const byLabel = nodes.find(n => (n.label || '').trim().toLowerCase() === lowerRef);
+    if (byLabel) return byLabel.id;
+
+    // 3. Slug match against ID or label
+    if (slugRef) {
+      const byIdSlug = nodes.find(n => toSlug(n.id) === slugRef);
+      if (byIdSlug) return byIdSlug.id;
+
+      const byLabelSlug = nodes.find(n => toSlug(n.label || '') === slugRef);
+      if (byLabelSlug) return byLabelSlug.id;
+    }
+
+    return ref;
+  }
+
+  /**
    * Applies a complete or partial declarative workflow graph to the canvas without manual coordinates.
    * Wraps all additions and layout into a single atomic undo batch.
    *
@@ -89,6 +278,7 @@ export class SemanticAdapter {
    * @param {boolean} [options.fitView] - Whether to fit-view after layout
    * @param {boolean} [options.clearExisting=false] - Whether to wipe canvas before applying
    * @param {boolean} [options.autoLayout=true] - Whether to run topological auto-layout
+   * @param {boolean} [options.lenient] - Override adapter lenient mode for this call
    * @returns {{ nodes: Array<Object>, edges: Array<Object> }}
    */
   applyGraph(graph, options = {}) {
@@ -101,95 +291,108 @@ export class SemanticAdapter {
 
     let createdNodes = [];
     let createdEdges = [];
+    const prevLenient = this._activeLenient;
+    if (options.lenient !== undefined) {
+      this._activeLenient = Boolean(options.lenient);
+    }
 
-    this.canvas.batchOperation(() => {
-      this.isApplyingBatch = true;
-      try {
-        if (config.clearExisting) {
-          const existingIds = Array.from(this.canvas.nodes.keys());
-          existingIds.forEach(id => this.canvas.removeNode(id));
-        }
+    try {
+      this.canvas.batchOperation(() => {
+        this.isApplyingBatch = true;
+        try {
+          if (config.clearExisting) {
+            const existingIds = Array.from(this.canvas.nodes.keys());
+            existingIds.forEach(id => this.canvas.removeNode(id));
+          }
 
-        const nodeIdMap = new Map();
+          const nodeIdMap = new Map();
 
-        // 1. Ingest Nodes
-        if (Array.isArray(graph.nodes)) {
-          const referencedParentIds = new Set();
-          graph.nodes.forEach((nodeSpec) => {
-            const pid = nodeSpec.parentId || nodeSpec.data?.parentId;
-            if (pid) referencedParentIds.add(pid);
-          });
-
-          graph.nodes.forEach((nodeSpec, idx) => {
-            const rawId = nodeSpec.id || `node_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`;
-            const type = nodeSpec.type || 'task';
-            const label = nodeSpec.label !== undefined ? nodeSpec.label : '';
-            const data = Object.assign({}, nodeSpec.data || {});
-
-            if (nodeSpec.parentId) {
-              data.parentId = nodeSpec.parentId;
-            }
-            if (nodeSpec.properties) {
-              data.properties = Object.assign({}, data.properties || {}, nodeSpec.properties);
-            }
-            if (this.canvas.registry.hasCapability(type, 'isContainer') && data.expanded === undefined && referencedParentIds.has(rawId)) {
-              data.expanded = true;
-            }
-
-            const initialX = Number.isFinite(nodeSpec.x) ? nodeSpec.x : 0;
-            const initialY = Number.isFinite(nodeSpec.y) ? nodeSpec.y : 0;
-
-            const node = this.canvas.addNode({
-              id: rawId,
-              type,
-              label,
-              x: initialX,
-              y: initialY,
-              data
+          // 1. Ingest Nodes
+          if (Array.isArray(graph.nodes)) {
+            const referencedParentIds = new Set();
+            graph.nodes.forEach((nodeSpec) => {
+              const pid = nodeSpec.parentId ?? nodeSpec.parent_id ?? nodeSpec.data?.parentId ?? nodeSpec.data?.parent_id;
+              if (pid) referencedParentIds.add(pid);
             });
 
-            nodeIdMap.set(rawId, node);
-            createdNodes.push(node);
-            this.lastAddedNodeId = node.id;
-          });
+            graph.nodes.forEach((nodeSpec, idx) => {
+              const rawId = nodeSpec.id ?? nodeSpec.nodeId ?? nodeSpec.node_id ?? `node_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`;
+              const rawType = nodeSpec.nodeType ?? nodeSpec.node_type ?? nodeSpec.type ?? 'task';
+              const type = this.normalizeNodeType(rawType);
+              const label = nodeSpec.label !== undefined ? nodeSpec.label : '';
+              const data = Object.assign({}, nodeSpec.data || {});
+
+              const rawParentId = nodeSpec.parentId ?? nodeSpec.parent_id ?? data.parentId ?? data.parent_id;
+              if (rawParentId) {
+                data.parentId = this.resolveNodeId(rawParentId);
+                delete data.parent_id;
+              }
+              if (nodeSpec.properties) {
+                data.properties = Object.assign({}, data.properties || {}, nodeSpec.properties);
+              }
+              if (this.canvas.registry.hasCapability(type, 'isContainer') && data.expanded === undefined && referencedParentIds.has(rawId)) {
+                data.expanded = true;
+              }
+
+              const initialX = Number.isFinite(nodeSpec.x) ? nodeSpec.x : 0;
+              const initialY = Number.isFinite(nodeSpec.y) ? nodeSpec.y : 0;
+
+              const node = this.canvas.addNode({
+                id: rawId,
+                type,
+                label,
+                x: initialX,
+                y: initialY,
+                data
+              });
+
+              nodeIdMap.set(rawId, node);
+              createdNodes.push(node);
+              this.lastAddedNodeId = node.id;
+            });
+          }
+
+          // 2. Ingest Edges
+          if (Array.isArray(graph.edges)) {
+            graph.edges.forEach((edgeSpec) => {
+              const rawSource = edgeSpec.sourceId ?? edgeSpec.source_id ?? edgeSpec.source;
+              const rawTarget = edgeSpec.targetId ?? edgeSpec.target_id ?? edgeSpec.target;
+              const sourceId = this.resolveNodeId(rawSource);
+              const targetId = this.resolveNodeId(rawTarget);
+
+              if (!sourceId || !targetId) {
+                console.warn(`[SemanticAdapter] Edge skipped: missing source or target`, edgeSpec);
+                return;
+              }
+
+              const edgeConfig = {
+                id: edgeSpec.id ?? edgeSpec.edgeId ?? edgeSpec.edge_id,
+                sourceId,
+                targetId,
+                label: edgeSpec.label || '',
+                condition: edgeSpec.condition || '',
+                routing: edgeSpec.routing || this.canvas.options.defaultRouting || 'bezier',
+                animated: Boolean(edgeSpec.animated)
+              };
+
+              const edge = this.canvas.addEdge(edgeConfig);
+              if (edge) {
+                createdEdges.push(edge);
+              }
+            });
+          }
+
+          // 3. Delegate positioning to AutoLayoutManager
+          if (config.autoLayout) {
+            this.canvas.autoArrange(this.resolveLayoutOptions(config));
+          }
+        } finally {
+          this.isApplyingBatch = false;
         }
-
-        // 2. Ingest Edges
-        if (Array.isArray(graph.edges)) {
-          graph.edges.forEach((edgeSpec) => {
-            const sourceId = edgeSpec.sourceId || edgeSpec.source;
-            const targetId = edgeSpec.targetId || edgeSpec.target;
-
-            if (!sourceId || !targetId) {
-              console.warn(`[SemanticAdapter] Edge skipped: missing source or target`, edgeSpec);
-              return;
-            }
-
-            const edgeConfig = {
-              id: edgeSpec.id,
-              sourceId,
-              targetId,
-              label: edgeSpec.label || '',
-              condition: edgeSpec.condition || '',
-              routing: edgeSpec.routing || this.canvas.options.defaultRouting || 'bezier',
-              animated: Boolean(edgeSpec.animated)
-            };
-
-            const edge = this.canvas.addEdge(edgeConfig);
-            if (edge) {
-              createdEdges.push(edge);
-            }
-          });
-        }
-
-        // 3. Delegate positioning to AutoLayoutManager
-        if (config.autoLayout) {
-          this.canvas.autoArrange(this.resolveLayoutOptions(config));
-        }
-      } finally {
-        this.isApplyingBatch = false;
-      }
-    });
+      });
+    } finally {
+      this._activeLenient = prevLenient;
+    }
 
     return { nodes: createdNodes, edges: createdEdges };
   }
@@ -202,6 +405,7 @@ export class SemanticAdapter {
    * @param {boolean} [options.autoLayout=false] - Whether to execute autoArrange at the end
    * @param {'LR'|'TB'} [options.direction]
    * @param {boolean} [options.fitView]
+   * @param {boolean} [options.lenient] - Override adapter lenient mode for this call
    * @returns {Array<*>} Results of each command
    */
   executeCommands(commands, options = {}) {
@@ -218,6 +422,11 @@ export class SemanticAdapter {
       const action = cmd?.action || cmd?.type;
       return action === 'undo' || action === 'redo';
     });
+
+    const prevLenient = this._activeLenient;
+    if (options.lenient !== undefined) {
+      this._activeLenient = Boolean(options.lenient);
+    }
 
     this.isApplyingBatch = true;
     try {
@@ -264,6 +473,7 @@ export class SemanticAdapter {
       }
     } finally {
       this.isApplyingBatch = false;
+      this._activeLenient = prevLenient;
     }
 
     return results;
@@ -274,20 +484,23 @@ export class SemanticAdapter {
    * @private
    */
   resolveLayoutOptions(options = {}) {
+    const fitView = options.fitView ?? options.fit_view ?? this.options.fitView;
+    const horizontalGap = options.horizontalGap ?? options.horizontal_gap;
+    const verticalGap = options.verticalGap ?? options.vertical_gap;
     const layoutOpts = {
       direction: options.direction ?? this.options.direction,
-      fitView: options.fitView ?? this.options.fitView
+      fitView
     };
     const preset = options.spacing && LAYOUT_SPACING_PRESETS[options.spacing];
     if (preset) {
       layoutOpts.horizontalGap = preset.horizontalGap;
       layoutOpts.verticalGap = preset.verticalGap;
     }
-    if (Number.isFinite(options.horizontalGap)) {
-      layoutOpts.horizontalGap = options.horizontalGap;
+    if (Number.isFinite(horizontalGap)) {
+      layoutOpts.horizontalGap = horizontalGap;
     }
-    if (Number.isFinite(options.verticalGap)) {
-      layoutOpts.verticalGap = options.verticalGap;
+    if (Number.isFinite(verticalGap)) {
+      layoutOpts.verticalGap = verticalGap;
     }
     return layoutOpts;
   }
@@ -301,17 +514,17 @@ export class SemanticAdapter {
       case 'add_node':
         return this.addNode(cmd);
       case 'update_node':
-        return this.updateNode(cmd.id, cmd);
+        return this.updateNode(cmd.id ?? cmd.nodeId ?? cmd.node_id, cmd);
       case 'remove_node':
-        return this.removeNode(cmd.id);
+        return this.removeNode(cmd.id ?? cmd.nodeId ?? cmd.node_id);
       case 'add_edge':
         return this.addEdge(cmd);
       case 'update_edge':
-        return this.updateEdge(cmd.id, cmd);
+        return this.updateEdge(cmd.id ?? cmd.edgeId ?? cmd.edge_id, cmd);
       case 'remove_edge':
-        return this.removeEdge(cmd.id || cmd);
+        return this.removeEdge(cmd.id ?? cmd.edgeId ?? cmd.edge_id ?? cmd);
       case 'split_edge':
-        return this.splitEdge(cmd.edgeId, cmd.node);
+        return this.splitEdge(cmd.edgeId ?? cmd.edge_id ?? cmd.id, cmd.node ?? cmd.nodeSpec ?? cmd.node_spec);
       case 'create_branch':
         return this.createBranch(cmd);
       case 'attach_boundary_event':
@@ -319,13 +532,19 @@ export class SemanticAdapter {
       case 'add_annotation':
         return this.addAnnotation(cmd);
       case 'morph_node':
-        return this.morphNode(cmd.id, cmd.newType || cmd.toType);
+        return this.morphNode(
+          cmd.id ?? cmd.nodeId ?? cmd.node_id,
+          cmd.newType ?? cmd.new_type ?? cmd.toType ?? cmd.to_type ?? cmd.nodeType ?? cmd.node_type
+        );
       case 'wrap_in_subprocess':
         return this.wrapInSubprocess(cmd);
       case 'extract_from_subprocess':
-        return this.extractFromSubprocess(cmd.subprocessId || cmd.id);
+        return this.extractFromSubprocess(cmd.subprocessId ?? cmd.subprocess_id ?? cmd.id ?? cmd.nodeId ?? cmd.node_id);
       case 'set_subprocess_expanded':
-        return this.setSubprocessExpanded(cmd.id || cmd.subprocessId, cmd.expanded);
+        return this.setSubprocessExpanded(
+          cmd.id ?? cmd.subprocessId ?? cmd.subprocess_id ?? cmd.nodeId ?? cmd.node_id,
+          cmd.expanded
+        );
       case 'auto_arrange':
         return this.autoArrange(cmd);
       case 'fit_view':
@@ -337,13 +556,17 @@ export class SemanticAdapter {
       case 'redo':
         return this.redo();
       case 'focus_node':
-        return this.focusNode(cmd.id || cmd.nodeId, cmd);
-      case 'highlight_nodes':
-        return this.highlightNodes(cmd.nodeIds || [cmd.id], cmd);
+        return this.focusNode(cmd.id ?? cmd.nodeId ?? cmd.node_id, cmd);
+      case 'highlight_nodes': {
+        const singleId = cmd.id ?? cmd.nodeId ?? cmd.node_id;
+        return this.highlightNodes(cmd.nodeIds ?? cmd.node_ids ?? (singleId ? [singleId] : undefined), cmd);
+      }
       case 'clear_highlights':
         return this.clearHighlights();
-      case 'select_nodes':
-        return this.selectNodes(cmd.nodeIds || [cmd.id]);
+      case 'select_nodes': {
+        const singleId = cmd.id ?? cmd.nodeId ?? cmd.node_id;
+        return this.selectNodes(cmd.nodeIds ?? cmd.node_ids ?? (singleId ? [singleId] : undefined));
+      }
       default:
         console.warn(`[SemanticAdapter] Unknown command action: ${action}`);
         return null;
@@ -356,13 +579,16 @@ export class SemanticAdapter {
    * @returns {import('./Node.js').BpmnNode}
    */
   addNode(cmd) {
-    const rawId = cmd.id || `node_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const type = cmd.nodeType || cmd.type || 'task';
+    const rawId = cmd.id ?? cmd.nodeId ?? cmd.node_id ?? `node_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const rawType = cmd.nodeType ?? cmd.node_type ?? (cmd.type && cmd.type !== 'add_node' ? cmd.type : undefined) ?? 'task';
+    const type = this.normalizeNodeType(rawType);
     const label = cmd.label !== undefined ? cmd.label : '';
     const data = Object.assign({}, cmd.data || {});
 
-    if (cmd.parentId) {
-      data.parentId = cmd.parentId;
+    const rawParentId = cmd.parentId ?? cmd.parent_id ?? data.parentId ?? data.parent_id;
+    if (rawParentId) {
+      data.parentId = this.resolveNodeId(rawParentId);
+      delete data.parent_id;
     }
     if (cmd.properties) {
       data.properties = Object.assign({}, data.properties || {}, cmd.properties);
@@ -392,14 +618,17 @@ export class SemanticAdapter {
    * @returns {import('./Node.js').BpmnNode|null}
    */
   updateNode(id, updates = {}) {
-    const node = this.canvas.getNode(id);
+    const resolvedId = this.resolveNodeId(id);
+    const node = this.canvas.getNode(resolvedId);
     if (!node) return null;
 
     if (updates.label !== undefined) {
       node.setLabel(updates.label);
     }
-    if (updates.type && updates.type !== node.type) {
-      node.setType(updates.type);
+    const rawType = updates.nodeType ?? updates.node_type ?? (updates.type && updates.type !== 'update_node' ? updates.type : undefined);
+    const nextType = rawType ? this.normalizeNodeType(rawType) : undefined;
+    if (nextType && nextType !== node.type) {
+      node.setType(nextType);
     }
     if (updates.properties) {
       if (!node.data) node.data = {};
@@ -415,11 +644,12 @@ export class SemanticAdapter {
    * @returns {boolean}
    */
   removeNode(id) {
-    if (!id) return false;
-    if (this.lastAddedNodeId === id) {
+    const resolvedId = this.resolveNodeId(id);
+    if (!resolvedId) return false;
+    if (this.lastAddedNodeId === resolvedId) {
       this.lastAddedNodeId = null;
     }
-    return this.canvas.removeNode(id);
+    return this.canvas.removeNode(resolvedId);
   }
 
   /**
@@ -428,8 +658,10 @@ export class SemanticAdapter {
    * @returns {import('./Edge.js').BpmnEdge|null}
    */
   addEdge(cmd) {
-    const sourceId = cmd.sourceId || cmd.source;
-    const targetId = cmd.targetId || cmd.target;
+    const rawSource = cmd.sourceId ?? cmd.source_id ?? cmd.source;
+    const rawTarget = cmd.targetId ?? cmd.target_id ?? cmd.target;
+    const sourceId = this.resolveNodeId(rawSource);
+    const targetId = this.resolveNodeId(rawTarget);
 
     if (!sourceId || !targetId) {
       throw new Error(`[SemanticAdapter] add_edge requires valid source and target node IDs.`);
@@ -439,14 +671,14 @@ export class SemanticAdapter {
     const targetNode = this.canvas.getNode(targetId);
 
     if (!sourceNode) {
-      throw new Error(`[SemanticAdapter] add_edge failed: Source node "${sourceId}" does not exist.`);
+      throw new Error(`[SemanticAdapter] add_edge failed: Source node "${rawSource}" does not exist.`);
     }
     if (!targetNode) {
-      throw new Error(`[SemanticAdapter] add_edge failed: Target node "${targetId}" does not exist.`);
+      throw new Error(`[SemanticAdapter] add_edge failed: Target node "${rawTarget}" does not exist.`);
     }
 
     const edgeConfig = {
-      id: cmd.id,
+      id: cmd.id ?? cmd.edgeId ?? cmd.edge_id,
       sourceId,
       targetId,
       label: cmd.label || '',
@@ -465,7 +697,12 @@ export class SemanticAdapter {
    * @returns {import('./Edge.js').BpmnEdge|null}
    */
   updateEdge(id, updates = {}) {
-    return this.canvas.updateEdge(id, updates);
+    const normalized = Object.assign({}, updates);
+    const rawSource = updates.sourceId ?? updates.source_id ?? updates.source;
+    const rawTarget = updates.targetId ?? updates.target_id ?? updates.target;
+    if (rawSource !== undefined) normalized.sourceId = this.resolveNodeId(rawSource);
+    if (rawTarget !== undefined) normalized.targetId = this.resolveNodeId(rawTarget);
+    return this.canvas.updateEdge(id, normalized);
   }
 
   /**
@@ -480,12 +717,13 @@ export class SemanticAdapter {
       return this.canvas.removeEdge(identifier);
     }
 
-    if (identifier.id) {
-      return this.canvas.removeEdge(identifier.id);
+    const edgeId = identifier.id ?? identifier.edgeId ?? identifier.edge_id;
+    if (edgeId) {
+      return this.canvas.removeEdge(edgeId);
     }
 
-    const sourceId = identifier.sourceId || identifier.source;
-    const targetId = identifier.targetId || identifier.target;
+    const sourceId = this.resolveNodeId(identifier.sourceId ?? identifier.source_id ?? identifier.source);
+    const targetId = this.resolveNodeId(identifier.targetId ?? identifier.target_id ?? identifier.target);
 
     if (sourceId && targetId) {
       for (const edge of this.canvas.edges.values()) {
@@ -522,15 +760,17 @@ export class SemanticAdapter {
    * @returns {Array<Object>}
    */
   createBranch(cmd) {
-    const { sourceId, branches } = cmd;
+    const sourceId = this.resolveNodeId(cmd.sourceId ?? cmd.source_id ?? cmd.source);
+    const branches = cmd.branches;
     if (!sourceId || !Array.isArray(branches)) return [];
 
     const created = [];
     this.canvas.batchOperation(() => {
       for (const branch of branches) {
-        let targetId = branch.targetId || branch.target;
-        if (!targetId && branch.targetNode) {
-          const targetNode = this.addNode(branch.targetNode);
+        let targetId = this.resolveNodeId(branch.targetId ?? branch.target_id ?? branch.target);
+        const targetNodeSpec = branch.targetNode ?? branch.target_node;
+        if (!targetId && targetNodeSpec) {
+          const targetNode = this.addNode(targetNodeSpec);
           targetId = targetNode.id;
         }
 
@@ -566,18 +806,18 @@ export class SemanticAdapter {
    * @returns {{ boundaryNode: import('./Node.js').BpmnNode, edge: import('./Edge.js').BpmnEdge|null }}
    */
   attachBoundaryEvent(cmd) {
-    const {
-      hostId,
-      type = 'boundary-timer-event',
-      label = '',
-      edge = 'bottom',
-      id,
-      outgoingFlow
-    } = cmd;
+    const rawHostId = cmd.hostId ?? cmd.host_id;
+    const hostId = this.resolveNodeId(rawHostId);
+    const rawType = cmd.nodeType ?? cmd.node_type ?? (cmd.type && cmd.type !== 'attach_boundary_event' ? cmd.type : undefined) ?? 'boundary-timer-event';
+    const type = this.normalizeNodeType(rawType);
+    const label = cmd.label !== undefined ? cmd.label : '';
+    const edge = cmd.edge || 'bottom';
+    const id = cmd.id ?? cmd.nodeId ?? cmd.node_id;
+    const outgoingFlow = cmd.outgoingFlow ?? cmd.outgoing_flow;
 
     const hostNode = this.canvas.getNode(hostId);
     if (!hostNode) {
-      throw new Error(`[SemanticAdapter] attach_boundary_event failed: Host node "${hostId}" does not exist.`);
+      throw new Error(`[SemanticAdapter] attach_boundary_event failed: Host node "${rawHostId}" does not exist.`);
     }
 
     if (!this.canvas.registry.hasCapability(hostNode.type, 'boundaryDockable')) {
@@ -612,10 +852,11 @@ export class SemanticAdapter {
       this.canvas.attachBoundaryEvent(boundaryNode, hostNode, centerX, centerY);
 
       let createdEdge = null;
-      if (outgoingFlow && (outgoingFlow.targetId || outgoingFlow.target)) {
+      const flowTarget = outgoingFlow && (outgoingFlow.targetId ?? outgoingFlow.target_id ?? outgoingFlow.target);
+      if (flowTarget) {
         createdEdge = this.addEdge({
           sourceId: boundaryNode.id,
-          targetId: outgoingFlow.targetId || outgoingFlow.target,
+          targetId: this.resolveNodeId(flowTarget),
           label: outgoingFlow.label || '',
           condition: outgoingFlow.condition || ''
         });
@@ -638,8 +879,8 @@ export class SemanticAdapter {
    * @returns {{ annotationNode: import('./Node.js').BpmnNode, edge: import('./Edge.js').BpmnEdge|null }}
    */
   addAnnotation(cmd) {
+    const targetId = this.resolveNodeId(cmd.targetId ?? cmd.target_id);
     const {
-      targetId,
       text = '',
       placement = {},
       id
@@ -745,12 +986,14 @@ export class SemanticAdapter {
    * @returns {import('./Node.js').BpmnNode|null}
    */
   morphNode(id, newType) {
-    const node = this.canvas.getNode(id);
-    if (!node || !newType) return null;
+    const resolvedId = this.resolveNodeId(id);
+    const node = this.canvas.getNode(resolvedId);
+    const normalizedType = this.normalizeNodeType(newType);
+    if (!node || !normalizedType) return null;
 
     this.canvas.batchOperation(() => {
-      node.setType(newType);
-      this.canvas.updateConnectedEdges(id);
+      node.setType(normalizedType);
+      this.canvas.updateConnectedEdges(resolvedId);
       this.canvas.emit('node:update', node);
     });
 
@@ -767,12 +1010,15 @@ export class SemanticAdapter {
    * @returns {import('./Node.js').BpmnNode|null}
    */
   wrapInSubprocess(cmd) {
-    const { nodeIds, label = 'Subprocess', id } = cmd;
-    if (!Array.isArray(nodeIds) || nodeIds.length === 0) return null;
+    const rawNodeIds = cmd.nodeIds ?? cmd.node_ids;
+    const { label = 'Subprocess', id } = cmd;
+    if (!Array.isArray(rawNodeIds) || rawNodeIds.length === 0) return null;
 
     let subprocessNode = null;
     this.canvas.batchOperation(() => {
-      const candidateNodes = nodeIds.map(nId => this.canvas.getNode(nId)).filter(Boolean);
+      const candidateNodes = rawNodeIds
+        .map(nId => this.canvas.getNode(this.resolveNodeId(nId)))
+        .filter(Boolean);
       if (candidateNodes.length === 0) return;
 
       // Compute bounding box
@@ -828,20 +1074,21 @@ export class SemanticAdapter {
    * @returns {boolean}
    */
   extractFromSubprocess(subprocessId) {
-    const subNode = this.canvas.getNode(subprocessId);
+    const resolvedId = this.resolveNodeId(subprocessId);
+    const subNode = this.canvas.getNode(resolvedId);
     if (!subNode) return false;
 
     return this.canvas.batchOperation(() => {
       // Detach children
       for (const node of this.canvas.nodes.values()) {
-        if (node.data && node.data.parentId === subprocessId) {
+        if (node.data && node.data.parentId === resolvedId) {
           delete node.data.parentId;
           this.canvas.emit('node:update', node);
         }
       }
 
       // Remove subprocess container (children are now safe)
-      return this.canvas.removeNode(subprocessId);
+      return this.canvas.removeNode(resolvedId);
     });
   }
 
@@ -853,11 +1100,12 @@ export class SemanticAdapter {
    */
   setSubprocessExpanded(subprocessId, expanded) {
     if (typeof expanded !== 'boolean') return false;
-    const node = this.canvas.getNode(subprocessId);
+    const resolvedId = this.resolveNodeId(subprocessId);
+    const node = this.canvas.getNode(resolvedId);
     if (!node || !this.canvas.registry.hasCapability(node.type, 'isContainer')) {
       return false;
     }
-    this.canvas.setSubprocessExpanded(subprocessId, expanded);
+    this.canvas.setSubprocessExpanded(resolvedId, expanded);
     return true;
   }
 
@@ -924,7 +1172,8 @@ export class SemanticAdapter {
    * @returns {boolean}
    */
   focusNode(nodeId, options = {}) {
-    const node = this.canvas.getNode(nodeId);
+    const resolvedId = this.resolveNodeId(nodeId);
+    const node = this.canvas.getNode(resolvedId);
     if (!node || !this.canvas.container) return false;
 
     const rect = this.canvas.container.getBoundingClientRect();
@@ -963,7 +1212,8 @@ export class SemanticAdapter {
     const pulse = options.pulse !== false;
     const message = options.message || '';
 
-    nodeIds.forEach(id => {
+    nodeIds.forEach(rawId => {
+      const id = this.resolveNodeId(rawId);
       const node = this.canvas.getNode(id);
       if (!node || !node.domElement) return;
 
@@ -1029,7 +1279,7 @@ export class SemanticAdapter {
            */
           selectNodes(nodeIds) {
             if (!Array.isArray(nodeIds) || !this.canvas.selectionManager) return;
-            const nodes = nodeIds.map(id => this.canvas.getNode(id)).filter(Boolean);
+            const nodes = nodeIds.map(id => this.canvas.getNode(this.resolveNodeId(id))).filter(Boolean);
             this.canvas.selectionManager.clearSelection(false);
             nodes.forEach((n, idx) => {
               this.canvas.selectionManager.selectNode(n, idx > 0 ? { shiftKey: true } : {});
@@ -1778,7 +2028,8 @@ export class SemanticAdapter {
    */
   calculateNodePlacement(placement) {
     const spacing = placement?.offset || this.options.defaultNodeSpacing;
-    const relativeId = placement?.relativeTo || this.lastAddedNodeId;
+    const rawRelativeId = placement?.relativeTo ?? placement?.relative_to;
+    const relativeId = (rawRelativeId ? this.resolveNodeId(rawRelativeId) : null) || this.lastAddedNodeId;
     const anchor = relativeId ? this.canvas.getNode(relativeId) : null;
 
     if (!anchor) {
