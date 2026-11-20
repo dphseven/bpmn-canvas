@@ -1271,4 +1271,130 @@ describe('SemanticAdapter', () => {
       expect(c.getNode('sub_empty').data.expanded).toBeUndefined();
     });
   });
+
+  // ==========================================
+  // Area 7: Layout, Viewport, Subprocess & History Commands
+  // ==========================================
+  describe('Layout, Viewport, Subprocess & History Commands', () => {
+    it('auto_arrange supports spacing presets and explicit gap overrides', () => {
+      adapter.applyGraph({
+        nodes: [
+          { id: 's', type: 'start-event', label: 'Start' },
+          { id: 'gw', type: 'exclusive-gateway', label: 'Check' },
+          { id: 't1', type: 'task', label: 'Path A' },
+          { id: 't2', type: 'task', label: 'Path B' }
+        ],
+        edges: [
+          { source: 's', target: 'gw' },
+          { source: 'gw', target: 't1', label: 'Yes' },
+          { source: 'gw', target: 't2', label: 'No' }
+        ]
+      }, { spacing: 'normal' });
+
+      const normalSpanX = canvas.getNode('t1').x - canvas.getNode('gw').x;
+      const normalSpanY = Math.abs(canvas.getNode('t2').y - canvas.getNode('t1').y);
+
+      const [relaxedOk] = adapter.executeCommands([
+        { action: 'auto_arrange', spacing: 'relaxed' }
+      ]);
+      expect(relaxedOk).toBe(true);
+      const relaxedSpanX = canvas.getNode('t1').x - canvas.getNode('gw').x;
+      const relaxedSpanY = Math.abs(canvas.getNode('t2').y - canvas.getNode('t1').y);
+      expect(relaxedSpanX).toBeGreaterThan(normalSpanX);
+      expect(relaxedSpanY).toBeGreaterThan(normalSpanY);
+
+      const spy = vi.spyOn(canvas, 'autoArrange');
+      adapter.executeCommands([
+        { action: 'auto_arrange', spacing: 'spacious', horizontalGap: 240, direction: 'TB', fitView: false }
+      ]);
+      expect(spy).toHaveBeenCalledWith({
+        direction: 'TB',
+        fitView: false,
+        horizontalGap: 240,
+        verticalGap: 160
+      });
+    });
+
+    it('fit_view and reset_viewport delegate to canvas viewport methods', () => {
+      adapter.applyGraph({
+        nodes: [{ id: 'n1', type: 'task', label: 'Work' }],
+        edges: []
+      });
+
+      const fitSpy = vi.spyOn(canvas, 'fitView');
+      const resetSpy = vi.spyOn(canvas, 'resetViewport');
+
+      const results = adapter.executeCommands([
+        { action: 'fit_view' },
+        { action: 'reset_viewport' }
+      ]);
+
+      expect(results).toEqual([true, true]);
+      expect(fitSpy).toHaveBeenCalledTimes(1);
+      expect(resetSpy).toHaveBeenCalledTimes(1);
+      expect(canvas.zoom).toBe(1);
+      expect(canvas.panX).toBe(0);
+      expect(canvas.panY).toBe(0);
+    });
+
+    it('set_subprocess_expanded controls container state and validates targets', () => {
+      adapter.applyGraph({
+        nodes: [
+          { id: 'sub', type: 'subprocess', label: 'Sub' },
+          { id: 'child', type: 'task', label: 'Child', parentId: 'sub' },
+          { id: 'plain', type: 'task', label: 'Plain Task' }
+        ],
+        edges: []
+      });
+
+      expect(canvas.getNode('sub').data.expanded).toBe(true);
+
+      const [collapseOk, invalidNode, nonContainer, missingExpanded] = adapter.executeCommands([
+        { action: 'set_subprocess_expanded', id: 'sub', expanded: false },
+        { action: 'set_subprocess_expanded', id: 'missing', expanded: true },
+        { action: 'set_subprocess_expanded', id: 'plain', expanded: false },
+        { action: 'set_subprocess_expanded', id: 'sub' }
+      ]);
+
+      expect(collapseOk).toBe(true);
+      expect(invalidNode).toBe(false);
+      expect(nonContainer).toBe(false);
+      expect(missingExpanded).toBe(false);
+      expect(canvas.getNode('sub').data.expanded).toBe(false);
+
+      const [expandOk] = adapter.executeCommands([
+        { action: 'set_subprocess_expanded', subprocessId: 'sub', expanded: true }
+      ]);
+      expect(expandOk).toBe(true);
+      expect(canvas.getNode('sub').data.expanded).toBe(true);
+    });
+
+    it('undo and redo work via executeCommands without corrupting redoStack', () => {
+      expect(adapter.executeCommands([{ action: 'undo' }])).toEqual([false]);
+
+      adapter.executeCommands([
+        { action: 'add_node', id: 'u1', type: 'task', label: 'Step 1' }
+      ]);
+      expect(canvas.getNode('u1')).toBeDefined();
+
+      const [undone] = adapter.executeCommands([{ action: 'undo' }]);
+      expect(undone).toBe(true);
+      expect(canvas.getNode('u1')).toBeUndefined();
+      expect(canvas.canRedo()).toBe(true);
+
+      const [redone] = adapter.executeCommands([{ action: 'redo' }]);
+      expect(redone).toBe(true);
+      expect(canvas.getNode('u1')).toBeDefined();
+
+      // Mixed sequence in a single executeCommands call
+      const mixed = adapter.executeCommands([
+        { action: 'add_node', id: 'u2', type: 'task', label: 'Step 2' },
+        { action: 'undo' },
+        { action: 'redo' }
+      ]);
+      expect(mixed[1]).toBe(true);
+      expect(mixed[2]).toBe(true);
+      expect(canvas.getNode('u2')).toBeDefined();
+    });
+  });
 });

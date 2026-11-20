@@ -30,6 +30,13 @@
  *    - Transmits human intent signals (user node selections, connection rejections).
  *    - Formats changes into token-efficient Markdown summaries and structured JSON.
  */
+const LAYOUT_SPACING_PRESETS = {
+  compact: { horizontalGap: 70, verticalGap: 50 },
+  normal: { horizontalGap: 100, verticalGap: 80 },
+  relaxed: { horizontalGap: 150, verticalGap: 120 },
+  spacious: { horizontalGap: 200, verticalGap: 160 }
+};
+
 export class SemanticAdapter {
   /**
    * @param {import('./Canvas.js').BpmnCanvas} canvas
@@ -177,10 +184,7 @@ export class SemanticAdapter {
 
         // 3. Delegate positioning to AutoLayoutManager
         if (config.autoLayout) {
-          this.canvas.autoArrange({
-            direction: config.direction,
-            fitView: config.fitView
-          });
+          this.canvas.autoArrange(this.resolveLayoutOptions(config));
         }
       } finally {
         this.isApplyingBatch = false;
@@ -210,27 +214,82 @@ export class SemanticAdapter {
     }, options);
 
     const results = [];
-
-    this.canvas.batchOperation(() => {
-      this.isApplyingBatch = true;
-      try {
-        for (const cmd of commands) {
-          const action = cmd.action || cmd.type;
-          results.push(this.executeSingleCommand(action, cmd));
-        }
-
-        if (config.autoLayout) {
-          this.canvas.autoArrange({
-            direction: config.direction,
-            fitView: config.fitView
-          });
-        }
-      } finally {
-        this.isApplyingBatch = false;
-      }
+    const hasHistoryCmd = commands.some(cmd => {
+      const action = cmd?.action || cmd?.type;
+      return action === 'undo' || action === 'redo';
     });
 
+    this.isApplyingBatch = true;
+    try {
+      if (!hasHistoryCmd) {
+        this.canvas.batchOperation(() => {
+          for (const cmd of commands) {
+            const action = cmd.action || cmd.type;
+            results.push(this.executeSingleCommand(action, cmd));
+          }
+
+          if (config.autoLayout) {
+            this.canvas.autoArrange(this.resolveLayoutOptions(config));
+          }
+        });
+      } else {
+        let pendingChunk = [];
+        const flushChunk = () => {
+          if (pendingChunk.length === 0) return;
+          const chunk = pendingChunk;
+          pendingChunk = [];
+          this.canvas.batchOperation(() => {
+            for (const cmd of chunk) {
+              const action = cmd.action || cmd.type;
+              results.push(this.executeSingleCommand(action, cmd));
+            }
+          });
+        };
+
+        for (const cmd of commands) {
+          const action = cmd?.action || cmd?.type;
+          if (action === 'undo' || action === 'redo') {
+            flushChunk();
+            // Run undo/redo outside batchOperation so HistoryManager.batch doesn't push a new entry and clear redoStack.
+            results.push(this.executeSingleCommand(action, cmd));
+          } else {
+            pendingChunk.push(cmd);
+          }
+        }
+        flushChunk();
+
+        if (config.autoLayout) {
+          this.canvas.autoArrange(this.resolveLayoutOptions(config));
+        }
+      }
+    } finally {
+      this.isApplyingBatch = false;
+    }
+
     return results;
+  }
+
+  /**
+   * Resolves layout options including spacing presets and explicit gap overrides.
+   * @private
+   */
+  resolveLayoutOptions(options = {}) {
+    const layoutOpts = {
+      direction: options.direction ?? this.options.direction,
+      fitView: options.fitView ?? this.options.fitView
+    };
+    const preset = options.spacing && LAYOUT_SPACING_PRESETS[options.spacing];
+    if (preset) {
+      layoutOpts.horizontalGap = preset.horizontalGap;
+      layoutOpts.verticalGap = preset.verticalGap;
+    }
+    if (Number.isFinite(options.horizontalGap)) {
+      layoutOpts.horizontalGap = options.horizontalGap;
+    }
+    if (Number.isFinite(options.verticalGap)) {
+      layoutOpts.verticalGap = options.verticalGap;
+    }
+    return layoutOpts;
   }
 
   /**
@@ -265,6 +324,18 @@ export class SemanticAdapter {
         return this.wrapInSubprocess(cmd);
       case 'extract_from_subprocess':
         return this.extractFromSubprocess(cmd.subprocessId || cmd.id);
+      case 'set_subprocess_expanded':
+        return this.setSubprocessExpanded(cmd.id || cmd.subprocessId, cmd.expanded);
+      case 'auto_arrange':
+        return this.autoArrange(cmd);
+      case 'fit_view':
+        return this.fitView();
+      case 'reset_viewport':
+        return this.resetViewport();
+      case 'undo':
+        return this.undo();
+      case 'redo':
+        return this.redo();
       case 'focus_node':
         return this.focusNode(cmd.id || cmd.nodeId, cmd);
       case 'highlight_nodes':
@@ -772,6 +843,72 @@ export class SemanticAdapter {
       // Remove subprocess container (children are now safe)
       return this.canvas.removeNode(subprocessId);
     });
+  }
+
+  /**
+   * Expands or collapses a subprocess container node.
+   * @param {string} subprocessId
+   * @param {boolean} expanded
+   * @returns {boolean}
+   */
+  setSubprocessExpanded(subprocessId, expanded) {
+    if (typeof expanded !== 'boolean') return false;
+    const node = this.canvas.getNode(subprocessId);
+    if (!node || !this.canvas.registry.hasCapability(node.type, 'isContainer')) {
+      return false;
+    }
+    this.canvas.setSubprocessExpanded(subprocessId, expanded);
+    return true;
+  }
+
+  /**
+   * Runs topological auto-arrangement on the canvas with optional spacing presets or gap overrides.
+   * @param {Object} [options={}]
+   * @param {'LR'|'TB'} [options.direction]
+   * @param {'compact'|'normal'|'relaxed'|'spacious'} [options.spacing]
+   * @param {number} [options.horizontalGap]
+   * @param {number} [options.verticalGap]
+   * @param {boolean} [options.fitView]
+   * @returns {boolean}
+   */
+  autoArrange(options = {}) {
+    return this.canvas.autoArrange(this.resolveLayoutOptions(options));
+  }
+
+  /**
+   * Fits all nodes into the current viewport.
+   * @returns {boolean}
+   */
+  fitView() {
+    if (!this.canvas.container) return false;
+    this.canvas.fitView();
+    return true;
+  }
+
+  /**
+   * Resets viewport zoom and pan to defaults.
+   * @returns {boolean}
+   */
+  resetViewport() {
+    if (!this.canvas.container) return false;
+    this.canvas.resetViewport();
+    return true;
+  }
+
+  /**
+   * Reverts the last undoable operation on the canvas.
+   * @returns {boolean}
+   */
+  undo() {
+    return this.canvas.undo();
+  }
+
+  /**
+   * Re-applies the last undone operation on the canvas.
+   * @returns {boolean}
+   */
+  redo() {
+    return this.canvas.redo();
   }
 
   // ==========================================
