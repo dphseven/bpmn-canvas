@@ -155,9 +155,15 @@
 }
 
 .bpmn-node-subprocess {
+  z-index: 5;
+  /* Container stays below SVG edges (z-index 15) and contained child nodes (z-index 20) */
   border-top: 4px solid var(--bpmn-subprocess-accent, #818cf8) !important;
   border-style: solid;
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.bpmn-node-subprocess.selected {
+  z-index: 7;
 }
 
 /* Expanded Subprocess Container Styling */

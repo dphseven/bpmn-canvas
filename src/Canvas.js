@@ -1283,8 +1283,34 @@ export class BpmnCanvas {
     const node = this.registry.createNode(config, this);
     this.nodes.set(node.id, node);
     this.surface.appendChild(node.domElement);
+    this._syncSubprocessExpandedOnAdd(node);
     this.emit('node:add', node);
     return node;
+  }
+
+  /**
+   * Ensures a container node with undefined `data.expanded` initializes as expanded
+   * when it has child nodes referencing it via `parentId`.
+   * @param {import('./Node.js').BpmnNode} node
+   */
+  _syncSubprocessExpandedOnAdd(node) {
+    if (node.data?.parentId) {
+      const parent = this.nodes.get(node.data.parentId);
+      if (parent && this.registry.hasCapability(parent.type, 'isContainer') && parent.data?.expanded === undefined) {
+        parent.data = Object.assign(parent.data || {}, { expanded: true });
+        parent.renderContent();
+        parent.createPorts();
+      }
+    }
+
+    if (this.registry.hasCapability(node.type, 'isContainer') && node.data?.expanded === undefined) {
+      const hasChildren = Array.from(this.nodes.values()).some(n => n.data?.parentId === node.id);
+      if (hasChildren) {
+        node.data = Object.assign(node.data || {}, { expanded: true });
+        node.renderContent();
+        node.createPorts();
+      }
+    }
   }
 
   removeNode(id) {

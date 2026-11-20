@@ -107,6 +107,12 @@ export class SemanticAdapter {
 
         // 1. Ingest Nodes
         if (Array.isArray(graph.nodes)) {
+          const referencedParentIds = new Set();
+          graph.nodes.forEach((nodeSpec) => {
+            const pid = nodeSpec.parentId || nodeSpec.data?.parentId;
+            if (pid) referencedParentIds.add(pid);
+          });
+
           graph.nodes.forEach((nodeSpec, idx) => {
             const rawId = nodeSpec.id || `node_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`;
             const type = nodeSpec.type || 'task';
@@ -118,6 +124,9 @@ export class SemanticAdapter {
             }
             if (nodeSpec.properties) {
               data.properties = Object.assign({}, data.properties || {}, nodeSpec.properties);
+            }
+            if (this.canvas.registry.hasCapability(type, 'isContainer') && data.expanded === undefined && referencedParentIds.has(rawId)) {
+              data.expanded = true;
             }
 
             const initialX = Number.isFinite(nodeSpec.x) ? nodeSpec.x : 0;

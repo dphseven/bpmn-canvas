@@ -1228,5 +1228,47 @@ describe('SemanticAdapter', () => {
       ad.destroy();
       expect(ad.unsubscribers.length).toBe(0);
     });
+
+    it('initializes subprocess with undefined data.expanded as expanded during applyGraph when children exist', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      ad.applyGraph({
+        nodes: [
+          { id: 'sub1', type: 'subprocess', label: 'Embedded Flow' },
+          { id: 'c1', type: 'start-event', label: 'Begin', parentId: 'sub1' },
+          { id: 'c2', type: 'task', label: 'Work', parentId: 'sub1' }
+        ],
+        edges: [
+          { source: 'c1', target: 'c2' }
+        ]
+      });
+
+      const sub = c.getNode('sub1');
+      expect(sub.data.expanded).toBe(true);
+      expect(sub.domElement.classList.contains('expanded')).toBe(true);
+      expect(sub.domElement.querySelector('.bpmn-subprocess-header')).toBeTruthy();
+      expect(sub.domElement.querySelector('.bpmn-subprocess-marker')).toBeNull();
+    });
+
+    it('handles data.parentId, explicit expanded: false, and standalone subprocesses in applyGraph', () => {
+      const c = new BpmnCanvas(document.createElement('div'));
+      const ad = c.semanticAdapter;
+
+      ad.applyGraph({
+        nodes: [
+          { id: 'sub_data_pid', type: 'subprocess', label: 'Expanded via data.parentId' },
+          { id: 'c_data_pid', type: 'task', label: 'Child', data: { parentId: 'sub_data_pid' } },
+          { id: 'sub_explicit_false', type: 'subprocess', label: 'Collapsed', data: { expanded: false } },
+          { id: 'c_collapsed', type: 'task', label: 'Hidden Child', parentId: 'sub_explicit_false' },
+          { id: 'sub_empty', type: 'subprocess', label: 'Empty Sub' }
+        ],
+        edges: []
+      });
+
+      expect(c.getNode('sub_data_pid').data.expanded).toBe(true);
+      expect(c.getNode('sub_explicit_false').data.expanded).toBe(false);
+      expect(c.getNode('sub_empty').data.expanded).toBeUndefined();
+    });
   });
 });
