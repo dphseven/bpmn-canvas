@@ -833,6 +833,32 @@ describe('BpmnCanvas', () => {
       expect(sub.domElement.classList.contains('expanded')).toBe(false);
       expect(sub.domElement.querySelector('.bpmn-subprocess-marker')).toBeTruthy();
     });
+
+    it('initializes subprocess as expanded even when child node is added before the subprocess', () => {
+      const child = canvas.addNode({ id: 'child_first', type: 'task', x: 130, y: 150, data: { parentId: 'sub_late' } });
+      const sub = canvas.addNode({ id: 'sub_late', type: 'subprocess', label: 'Late Sub', x: 100, y: 100 });
+
+      expect(child.data.parentId).toBe('sub_late');
+      expect(sub.data.expanded).toBe(true);
+      expect(sub.domElement.classList.contains('expanded')).toBe(true);
+      expect(sub.domElement.querySelector('.bpmn-subprocess-header')).toBeTruthy();
+    });
+
+    it('initializes subprocess with undefined data.expanded as expanded during loadData', () => {
+      canvas.loadData({
+        nodes: [
+          { id: 'c_load', type: 'task', x: 130, y: 150, data: { parentId: 'sub_load' } },
+          { id: 'sub_load', type: 'subprocess', label: 'Loaded Sub', x: 100, y: 100 }
+        ],
+        edges: []
+      });
+
+      const sub = canvas.getNode('sub_load');
+      const child = canvas.getNode('c_load');
+      expect(sub.data.expanded).toBe(true);
+      expect(sub.domElement.classList.contains('expanded')).toBe(true);
+      expect(child.domElement.style.display).not.toBe('none');
+    });
   });
 });
 
