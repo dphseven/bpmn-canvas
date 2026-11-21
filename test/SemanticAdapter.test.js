@@ -718,6 +718,88 @@ describe('SemanticAdapter', () => {
       const badge = gw.domElement.querySelector('.bpmn-agent-badge');
       expect(badge.textContent).toBe('Branching point');
     });
+
+    it('highlights and clears edges via edge IDs, { sourceId, targetId } descriptors, Canvas passthrough, and executeCommand', () => {
+      const n1 = canvas.addNode({ id: 'eh1', type: 'task', label: 'A' });
+      const n2 = canvas.addNode({ id: 'eh2', type: 'task', label: 'B' });
+      const n3 = canvas.addNode({ id: 'eh3', type: 'task', label: 'C' });
+      const e1 = canvas.addEdge({ id: 'edge_ab', sourceId: n1.id, targetId: n2.id });
+      const e2 = canvas.addEdge({ id: 'edge_bc', sourceId: n2.id, targetId: n3.id });
+
+      canvas.highlightEdges(['edge_ab'], { color: 'emerald', pulse: true });
+      expect(e1.groupElement.classList.contains('bpmn-agent-highlight')).toBe(true);
+      expect(e1.groupElement.classList.contains('bpmn-agent-highlight-emerald')).toBe(true);
+      expect(e1.groupElement.classList.contains('bpmn-agent-pulse')).toBe(true);
+
+      adapter.executeCommands([{
+        action: 'highlight_edges',
+        edges: [{ sourceId: 'eh2', targetId: 'eh3' }],
+        color: 'rose',
+        pulse: false
+      }]);
+      expect(e2.groupElement.classList.contains('bpmn-agent-highlight')).toBe(true);
+      expect(e2.groupElement.classList.contains('bpmn-agent-highlight-rose')).toBe(true);
+      expect(e2.groupElement.classList.contains('bpmn-agent-pulse')).toBe(false);
+
+      // Safely ignores invalid/non-array inputs
+      expect(() => adapter.highlightEdges(null)).not.toThrow();
+      expect(() => adapter.highlightEdges(['non_existent'])).not.toThrow();
+
+      canvas.clearHighlights();
+      expect(e1.groupElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+      expect(e1.groupElement.classList.contains('bpmn-agent-highlight-emerald')).toBe(false);
+      expect(e2.groupElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+      expect(e2.groupElement.classList.contains('bpmn-agent-highlight-rose')).toBe(false);
+    });
+
+    it('auto-clears node highlight on pointerdown on node or its badge', () => {
+      const n1 = canvas.addNode({ id: 'ac1', type: 'task', label: 'Click Node' });
+      const n2 = canvas.addNode({ id: 'ac2', type: 'task', label: 'Click Badge' });
+
+      adapter.highlightNodes(['ac1', 'ac2'], { message: 'Review' });
+      expect(adapter.highlightedNodes.size).toBe(2);
+
+      // Clicking/dragging node clears only that node's highlight
+      n1.domElement.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+      expect(n1.domElement.querySelector('.bpmn-agent-badge')).toBeNull();
+      expect(adapter.highlightedNodes.has('ac1')).toBe(false);
+      expect(adapter.highlightedNodes.has('ac2')).toBe(true);
+
+      // Clicking the badge dismisses the second node's highlight
+      const badge2 = n2.domElement.querySelector('.bpmn-agent-badge');
+      badge2.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(n2.domElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+      expect(n2.domElement.querySelector('.bpmn-agent-badge')).toBeNull();
+      expect(adapter.highlightedNodes.has('ac2')).toBe(false);
+    });
+
+    it('auto-clears node and edge highlights on updates or removals outside a batch', () => {
+      const n1 = canvas.addNode({ id: 'up1', type: 'task', label: 'Node 1' });
+      const n2 = canvas.addNode({ id: 'up2', type: 'task', label: 'Node 2' });
+      const e1 = canvas.addEdge({ id: 'e_up1', sourceId: n1.id, targetId: n2.id });
+
+      adapter.highlightNodes(['up1', 'up2'], { message: 'Check' });
+      adapter.highlightEdges(['e_up1'], { color: 'cyan' });
+
+      // Outside batch: updating node label clears node highlight
+      n1.setLabel('Edited 1');
+      expect(adapter.highlightedNodes.has('up1')).toBe(false);
+      expect(n1.domElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+
+      // Outside batch: updating edge via canvas clears edge highlight
+      canvas.updateEdge('e_up1', { label: 'Yes' });
+      expect(adapter.highlightedEdges.has('e_up1')).toBe(false);
+      expect(e1.groupElement.classList.contains('bpmn-agent-highlight')).toBe(false);
+
+      // Outside batch: removing highlighted node or edge cleans up tracking
+      adapter.highlightEdges(['e_up1']);
+      canvas.removeEdge('e_up1');
+      expect(adapter.highlightedEdges.has('e_up1')).toBe(false);
+
+      canvas.removeNode('up2');
+      expect(adapter.highlightedNodes.has('up2')).toBe(false);
+    });
   });
 
   // ==========================================
