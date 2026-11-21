@@ -178,8 +178,9 @@ export class SemanticAdapter {
     this.lastAddedNodeId = null;
     this.isApplyingBatch = false;
 
-    // Active visual highlight tracker: nodeId -> { color, badgeElement }
+    // Active visual highlight trackers
     this.highlightedNodes = new Map();
+    this.highlightedEdges = new Map();
 
     // Baseline semantic snapshots: id -> semantic object
     this.baselineNodes = new Map();
@@ -560,6 +561,16 @@ export class SemanticAdapter {
       case 'highlight_nodes': {
         const singleId = cmd.id ?? cmd.nodeId ?? cmd.node_id;
         return this.highlightNodes(cmd.nodeIds ?? cmd.node_ids ?? (singleId ? [singleId] : undefined), cmd);
+      }
+      case 'highlight_edges': {
+        const singleRef = cmd.id ?? cmd.edgeId ?? cmd.edge_id
+          ?? ((cmd.sourceId ?? cmd.source_id ?? cmd.source) && (cmd.targetId ?? cmd.target_id ?? cmd.target)
+            ? {
+                sourceId: cmd.sourceId ?? cmd.source_id ?? cmd.source,
+                targetId: cmd.targetId ?? cmd.target_id ?? cmd.target
+              }
+            : undefined);
+        return this.highlightEdges(cmd.edgeIds ?? cmd.edge_ids ?? cmd.edges ?? (singleRef ? [singleRef] : undefined), cmd);
       }
       case 'clear_highlights':
         return this.clearHighlights();
@@ -1236,7 +1247,86 @@ export class SemanticAdapter {
         node.domElement.appendChild(badgeEl);
       }
 
-      this.highlightedNodes.set(id, { color, badgeEl });
+      const onNodePointerDown = () => {
+        this.clearNodeHighlight(id);
+      };
+      node.domElement.addEventListener('pointerdown', onNodePointerDown);
+
+      const onBadgePointerDown = (e) => {
+        e.stopPropagation();
+        this.clearNodeHighlight(id);
+      };
+      if (badgeEl) {
+        badgeEl.addEventListener('pointerdown', onBadgePointerDown);
+      }
+
+      const cleanup = () => {
+        node.domElement.removeEventListener('pointerdown', onNodePointerDown);
+        if (badgeEl) {
+          badgeEl.removeEventListener('pointerdown', onBadgePointerDown);
+        }
+      };
+
+      this.highlightedNodes.set(id, { color, badgeEl, cleanup });
+    });
+  }
+
+  /**
+   * Resolves an edge reference (edge ID or { sourceId, targetId } descriptor) to an Edge instance.
+   * @private
+   */
+  resolveEdge(edgeRef) {
+    if (!edgeRef) return null;
+    if (typeof edgeRef === 'string') {
+      return this.canvas.getEdge?.(edgeRef) || this.canvas.edges?.get(edgeRef) || null;
+    }
+    if (typeof edgeRef === 'object') {
+      const edgeId = edgeRef.id ?? edgeRef.edgeId ?? edgeRef.edge_id;
+      if (edgeId) {
+        return this.canvas.getEdge?.(edgeId) || this.canvas.edges?.get(edgeId) || null;
+      }
+      const sourceId = this.resolveNodeId(edgeRef.sourceId ?? edgeRef.source_id ?? edgeRef.source);
+      const targetId = this.resolveNodeId(edgeRef.targetId ?? edgeRef.target_id ?? edgeRef.target);
+      if (sourceId && targetId && this.canvas.edges) {
+        for (const edge of this.canvas.edges.values()) {
+          if (edge.sourceId === sourceId && edge.targetId === targetId) {
+            return edge;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Applies visual highlight effects to a set of edges.
+   *
+   * @param {Array<string|{id?: string, edgeId?: string, sourceId?: string, targetId?: string}>} edgeRefs
+   * @param {Object} [options={}]
+   * @param {'amber'|'cyan'|'emerald'|'rose'} [options.color='amber'] - Highlight color theme
+   * @param {boolean} [options.pulse=true] - Whether to apply pulsing animation
+   */
+  highlightEdges(edgeRefs, options = {}) {
+    if (!Array.isArray(edgeRefs)) return;
+
+    const color = options.color || 'amber';
+    const pulse = options.pulse !== false;
+
+    edgeRefs.forEach(ref => {
+      const edge = this.resolveEdge(ref);
+      if (!edge || !edge.groupElement) return;
+
+      this.clearEdgeHighlight(edge.id);
+
+      edge.groupElement.classList.add('bpmn-agent-highlight');
+      if (color !== 'amber') {
+        edge.groupElement.classList.add(`bpmn-agent-highlight-${color}`);
+      }
+      if (pulse) {
+        edge.groupElement.classList.add('bpmn-agent-pulse');
+      }
+
+      this.highlightedEdges.set(edge.id, { color });
     });
   }
 
@@ -1244,33 +1334,58 @@ export class SemanticAdapter {
    * Clears highlights from a single node.
    * @private
    */
-    clearNodeHighlight(nodeId) {
-      const node = this.canvas.getNode(nodeId);
-      if (!node || !node.domElement) return;
+  clearNodeHighlight(nodeId) {
+    const node = this.canvas.getNode(nodeId);
+    if (node && node.domElement) {
+      node.domElement.classList.remove(
+        'bpmn-agent-highlight',
+        'bpmn-agent-highlight-cyan',
+        'bpmn-agent-highlight-emerald',
+        'bpmn-agent-highlight-rose',
+        'bpmn-agent-pulse'
+      );
+    }
 
-        node.domElement.classList.remove(
-          'bpmn-agent-highlight',
-          'bpmn-agent-highlight-cyan',
-          'bpmn-agent-highlight-emerald',
-          'bpmn-agent-highlight-rose',
-          'bpmn-agent-pulse'
-        );
-
-        const data = this.highlightedNodes.get(nodeId);
-        if (data && data.badgeEl && data.badgeEl.parentNode) {
-          data.badgeEl.parentNode.removeChild(data.badgeEl);
-        }
-
-        this.highlightedNodes.delete(nodeId);
+    const data = this.highlightedNodes.get(nodeId);
+    if (data) {
+      if (data.cleanup) data.cleanup();
+      if (data.badgeEl && data.badgeEl.parentNode) {
+        data.badgeEl.parentNode.removeChild(data.badgeEl);
       }
+    }
 
-          /**
-           * Clears all visual agent highlights and badges from canvas nodes.
-           */
-          clearHighlights() {
-            const ids = Array.from(this.highlightedNodes.keys());
-            ids.forEach(id => this.clearNodeHighlight(id));
-          }
+    this.highlightedNodes.delete(nodeId);
+  }
+
+  /**
+   * Clears highlights from a single edge.
+   * @private
+   */
+  clearEdgeHighlight(edgeId) {
+    const edge = this.canvas.getEdge?.(edgeId) || this.canvas.edges?.get(edgeId);
+    if (edge && edge.groupElement) {
+      edge.groupElement.classList.remove(
+        'bpmn-agent-highlight',
+        'bpmn-agent-highlight-cyan',
+        'bpmn-agent-highlight-emerald',
+        'bpmn-agent-highlight-rose',
+        'bpmn-agent-pulse'
+      );
+    }
+
+    this.highlightedEdges.delete(edgeId);
+  }
+
+  /**
+   * Clears all visual agent highlights and badges from canvas nodes and edges.
+   */
+  clearHighlights() {
+    const nodeIds = Array.from(this.highlightedNodes.keys());
+    nodeIds.forEach(id => this.clearNodeHighlight(id));
+
+    const edgeIds = Array.from(this.highlightedEdges.keys());
+    edgeIds.forEach(id => this.clearEdgeHighlight(id));
+  }
 
           /**
            * Programmatically selects nodes on canvas, opening the Inspector sidebar.
@@ -1574,9 +1689,43 @@ export class SemanticAdapter {
             ];
 
             canvasEvents.forEach(evt => {
-              const unsub = this.canvas.on(evt, onCanvasEvent);
+              const unsub = this.canvas.on(evt, (payload) => {
+                if (this.isApplyingBatch) return;
+
+                if (evt === 'node:update' || evt === 'node:remove') {
+                  const nodeId = typeof payload === 'string' ? payload : (payload?.id ?? payload?.node?.id);
+                  if (nodeId && this.highlightedNodes.has(nodeId)) {
+                    this.clearNodeHighlight(nodeId);
+                  }
+                } else if (evt === 'edge:update' || evt === 'edge:remove' || evt === 'edge:reconnect' || evt === 'edge:split') {
+                  const edgeId = typeof payload === 'string'
+                    ? payload
+                    : (payload?.id ?? payload?.edge?.id ?? payload?.edgeId);
+                  if (edgeId && this.highlightedEdges.has(edgeId)) {
+                    this.clearEdgeHighlight(edgeId);
+                  }
+                }
+
+                onCanvasEvent();
+              });
               this.unsubscribers.push(unsub);
             });
+
+            const nodeLabelUnsub = this.canvas.on('node:labelChange', ({ node }) => {
+              if (this.isApplyingBatch) return;
+              if (node?.id && this.highlightedNodes.has(node.id)) {
+                this.clearNodeHighlight(node.id);
+              }
+            });
+            this.unsubscribers.push(nodeLabelUnsub);
+
+            const edgeLabelUnsub = this.canvas.on('edge:labelChange', ({ edge }) => {
+              if (this.isApplyingBatch) return;
+              if (edge?.id && this.highlightedEdges.has(edge.id)) {
+                this.clearEdgeHighlight(edge.id);
+              }
+            });
+            this.unsubscribers.push(edgeLabelUnsub);
 
             // Immediate flush when an undo/redo batch completes
             const batchUnsub = this.canvas.on('batch:complete', () => {

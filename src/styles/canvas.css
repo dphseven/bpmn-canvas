@@ -69,9 +69,51 @@
   transition: stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
-.bpmn-edge-path:hover {
+.bpmn-edge:hover .bpmn-edge-path {
   stroke: var(--border-focus);
   stroke-width: 3.2px;
+}
+
+.bpmn-edge.bpmn-agent-highlight .bpmn-edge-path,
+.bpmn-edge.bpmn-agent-highlight-cyan .bpmn-edge-path,
+.bpmn-edge.bpmn-agent-highlight-emerald .bpmn-edge-path,
+.bpmn-edge.bpmn-agent-highlight-rose .bpmn-edge-path {
+  stroke: var(--bpmn-edge-agent-color, #f59e0b);
+  stroke-width: 3.2px;
+  filter: drop-shadow(0 0 6px var(--bpmn-edge-agent-glow, rgba(245, 158, 11, 0.7)));
+}
+
+.bpmn-edge.bpmn-agent-highlight-cyan {
+  --bpmn-edge-agent-color: #06b6d4;
+  --bpmn-edge-agent-glow: rgba(6, 182, 212, 0.7);
+}
+
+.bpmn-edge.bpmn-agent-highlight-emerald {
+  --bpmn-edge-agent-color: #10b981;
+  --bpmn-edge-agent-glow: rgba(16, 185, 129, 0.7);
+}
+
+.bpmn-edge.bpmn-agent-highlight-rose {
+  --bpmn-edge-agent-color: #f43f5e;
+  --bpmn-edge-agent-glow: rgba(244, 63, 94, 0.7);
+}
+
+.bpmn-edge.bpmn-agent-pulse .bpmn-edge-path {
+  animation: agentEdgePulse 2s ease-in-out infinite;
+}
+
+[data-bpmn-pulsing="false"] .bpmn-edge.bpmn-agent-pulse .bpmn-edge-path,
+.bpmn-canvas-viewport[data-bpmn-pulsing="false"] .bpmn-edge.bpmn-agent-pulse .bpmn-edge-path {
+  animation: none;
+}
+
+@keyframes agentEdgePulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px var(--bpmn-edge-agent-glow, rgba(245, 158, 11, 0.6)));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px var(--bpmn-edge-agent-glow, rgba(245, 158, 11, 0.95)));
+  }
 }
 
 .bpmn-edge.selected .bpmn-edge-path {

@@ -934,7 +934,8 @@
   white-space: normal;
   word-break: break-word;
   text-align: left;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   z-index: 40;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
