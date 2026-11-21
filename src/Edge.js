@@ -43,7 +43,7 @@ export class BpmnEdge {
   }
 
   initSVG() {
-    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgNS = 'https://www.w3.org/2000/svg';
     this.groupElement = document.createElementNS(svgNS, 'g');
     this.groupElement.classList.add('bpmn-edge');
     this.groupElement.dataset.edgeId = this.id;
@@ -248,7 +248,7 @@ export class BpmnEdge {
   }
 
   renderLabel(pos) {
-    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgNS = 'https://www.w3.org/2000/svg';
     this.labelGroup.innerHTML = '';
 
     const lines = String(this.label).split('\n');

@@ -404,7 +404,7 @@ export class BpmnCanvas {
     this.surface.className = 'bpmn-canvas-surface';
 
     // SVG layer for connectors
-    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgNS = 'https://www.w3.org/2000/svg';
     this.svg = document.createElementNS(svgNS, 'svg');
     this.svg.classList.add('bpmn-svg-layer');
 

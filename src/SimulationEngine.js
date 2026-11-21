@@ -54,7 +54,7 @@ export class SimulationEngine {
 
   ensureTokenElement() {
     if (!this.tokenGroup) {
-      const svgNS = 'http://www.w3.org/2000/svg';
+      const svgNS = 'https://www.w3.org/2000/svg';
       this.tokenGroup = document.createElementNS(svgNS, 'g');
       this.tokenGroup.classList.add('bpmn-sim-token');
       this.tokenGroup.style.display = 'none';

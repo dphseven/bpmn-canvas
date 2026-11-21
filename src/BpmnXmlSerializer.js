@@ -20,12 +20,12 @@ import { Router } from './router.js';
  * Standard XML Namespaces for BPMN 2.0
  */
 export const BPMN_NAMESPACES = {
-  BPMN: 'http://www.omg.org/spec/BPMN/20100524/MODEL',
-  BPMNDI: 'http://www.omg.org/spec/BPMN/20100524/DI',
-  DC: 'http://www.omg.org/spec/DD/20100524/DC',
-  DI: 'http://www.omg.org/spec/DD/20100524/DI',
-  XSI: 'http://www.w3.org/2001/XMLSchema-instance',
-  BPMNCANVAS: 'http://bpmn-canvas.org/schema/1.0/bpmn'
+  BPMN: 'https://www.omg.org/spec/BPMN/20100524/MODEL',
+  BPMNDI: 'https://www.omg.org/spec/BPMN/20100524/DI',
+  DC: 'https://www.omg.org/spec/DD/20100524/DC',
+  DI: 'https://www.omg.org/spec/DD/20100524/DI',
+  XSI: 'https://www.w3.org/2001/XMLSchema-instance',
+  BPMNCANVAS: 'https://bpmn-canvas.org/schema/1.0/bpmn',
 };
 
 /**
@@ -60,7 +60,7 @@ export class BpmnXmlSerializer {
    * @param {string} [options.processId='Process_1']
    * @param {string} [options.processName='BPMN Canvas Workflow']
    * @param {boolean} [options.isExecutable=false]
-   * @param {string} [options.targetNamespace='http://bpmn.io/schema/bpmn']
+   * @param {string} [options.targetNamespace='https://bpmn.io/schema/bpmn']
    * @returns {string} Standard BPMN 2.0 XML string
    */
   toXml(data = null, options = {}) {
@@ -71,7 +71,7 @@ export class BpmnXmlSerializer {
     const processId = options.processId || 'Process_1';
     const processName = options.processName || 'BPMN Canvas Workflow';
     const isExecutable = options.isExecutable ? 'true' : 'false';
-    const targetNamespace = options.targetNamespace || 'http://bpmn.io/schema/bpmn';
+    const targetNamespace = options.targetNamespace || 'https://bpmn.io/schema/bpmn';
     const definitionsId = options.definitionsId || `Definitions_${Date.now()}`;
     const diagramId = options.diagramId || 'BPMNDiagram_1';
     const planeId = options.planeId || 'BPMNPlane_1';

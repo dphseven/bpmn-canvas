@@ -185,7 +185,7 @@ export class ImageExporter {
               const ruleText = rule.cssText;
               // Skip @import, external url(...) references, and interactive pseudo-classes (:hover, :active, :focus)
               if (
-                !ruleText.includes('http://') &&
+                !ruleText.includes('https://') &&
                 !ruleText.includes('https://') &&
                 !ruleText.startsWith('@import') &&
                 !ruleText.includes(':hover') &&
@@ -223,10 +223,10 @@ export class ImageExporter {
 
     const { width, height, offsetX, offsetY } = bounds;
 
-    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgNS = 'https://www.w3.org/2000/svg';
     const svgEl = document.createElementNS(svgNS, 'svg');
     svgEl.setAttribute('xmlns', svgNS);
-    svgEl.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
+    svgEl.setAttribute('xmlns:xhtml', 'https://www.w3.org/1999/xhtml');
     svgEl.setAttribute('width', String(width));
     svgEl.setAttribute('height', String(height));
     svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -282,7 +282,7 @@ export class ImageExporter {
 
     const createNodeWrapper = (nodes) => {
       const wrapper = document.createElement('div');
-      wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      wrapper.setAttribute('xmlns', 'https://www.w3.org/1999/xhtml');
       wrapper.className = `bpmn-export-surface ${theme}`;
       wrapper.style.position = 'relative';
       wrapper.style.width = `${width}px`;
