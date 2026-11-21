@@ -515,6 +515,8 @@ describe('AutoLayoutManager', () => {
 
     expect(n2.x - (n1.x + n1.width)).toBe(100);
     expect(n3.x - (n2.x + n2.width)).toBeGreaterThanOrEqual(212);
+  });
+
   it('syncs non-zero rendered DOM dimensions before layout to prevent vertical misalignment', () => {
     const n1 = createMockNode({ id: 'n1', type: 'start-event', width: 40, height: 40 });
     n1.domElement = { offsetWidth: 40, offsetHeight: 40 };
