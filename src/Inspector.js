@@ -16,6 +16,33 @@
 /**
  * Real-time Properties Inspector Panel
  */
+function createEl(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === undefined || value === null || value === false) continue;
+    if (key === 'className') {
+      node.className = value;
+    } else if (key === 'textContent') {
+      node.textContent = String(value);
+    } else if (key === 'checked' || key === 'selected' || key === 'readOnly') {
+      if (value) {
+        node.setAttribute(key === 'readOnly' ? 'readonly' : key, '');
+        node[key] = true;
+      }
+    } else if (key === 'value') {
+      node.setAttribute('value', String(value));
+      node.value = String(value);
+    } else {
+      node.setAttribute(key, String(value));
+    }
+  }
+  for (const child of children) {
+    if (child === null || child === undefined || child === false) continue;
+    node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+  }
+  return node;
+}
+
 export class Inspector {
   /**
    * @param {HTMLElement} containerElement - DOM container element to mount the inspector
@@ -36,15 +63,25 @@ export class Inspector {
     this.renderEmpty();
   }
 
+  escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   renderEmpty() {
-    this.container.innerHTML = `
-      <div class="inspector-title">
-        <span>Properties</span>
-      </div>
-      <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 24px 0;">
-        Select an element to inspect and edit its properties.
-      </div>
-    `;
+    this.container.replaceChildren(
+      createEl('div', { className: 'inspector-title' }, [
+        createEl('span', { textContent: 'Properties' })
+      ]),
+      createEl('div', {
+        style: 'font-size: 12px; color: var(--text-muted); text-align: center; padding: 24px 0;',
+        textContent: 'Select an element to inspect and edit its properties.'
+      })
+    );
   }
 
   bindEvents() {
@@ -96,107 +133,158 @@ export class Inspector {
     this.targetType = 'node';
     this.container.classList.remove('hidden');
 
-    this.container.innerHTML = `
-      <div class="inspector-title">
-        <span>Node Properties</span>
-        <span class="inspector-badge">${node.type}</span>
-      </div>
+    const isBoundary = node.type.startsWith('boundary-');
+    const isContainer = this.canvas?.registry?.hasCapability
+      ? this.canvas.registry.hasCapability(node.type, 'isContainer')
+      : node.type === 'subprocess';
 
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-id">ID</label>
-        <input class="inspector-input" id="prop-id" type="text" value="${node.id}" readonly style="opacity: 0.6; cursor: not-allowed;" />
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-label">Label</label>
-        <input class="inspector-input" id="prop-label" type="text" value="${node.label || ''}" placeholder="Enter label..." />
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-type">Type</label>
-        <select class="inspector-select" id="prop-type">
-          ${this.buildTypeOptionsHtml(node.type)}
-        </select>
-      </div>
-
-      ${node.type.startsWith('boundary-') ? `
-      <div class="inspector-field" style="flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px; padding: 6px 0;">
-        <div>
-          <label class="inspector-label" for="prop-boundary-interrupting" style="cursor: pointer; font-weight: 600;">Interrupting</label>
-          <div style="font-size: 11px; color: var(--text-muted);">${node.data.interrupting !== false ? 'Aborts parent activity' : 'Parallel non-interrupting trigger'}</div>
-        </div>
-        <input type="checkbox" id="prop-boundary-interrupting" ${node.data.interrupting !== false ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
-      </div>
-      <div class="inspector-field">
-        <label class="inspector-label">Host Activity</label>
-        <div style="font-size: 12px; font-weight: 500; color: ${node.data.hostNodeId ? 'var(--text-main)' : 'var(--text-muted)'}; display: flex; align-items: center; gap: 6px;">
-          <span>${node.data.hostNodeId ? `Attached to "${this.canvas.getNode(node.data.hostNodeId)?.label || node.data.hostNodeId}" (${node.data.dockEdge || 'border'})` : 'Floating / Unattached'}</span>
-        </div>
-      </div>
-      ` : ''}
-
-      ${(this.canvas?.registry?.hasCapability ? this.canvas.registry.hasCapability(node.type, 'isContainer') : node.type === 'subprocess') ? `
-      <div class="inspector-field" style="margin-top: 6px;">
-        <label class="inspector-label">Subprocess View</label>
-        <div style="display: flex; gap: 8px; margin-top: 4px;">
-          <button class="btn" id="btn-toggle-subprocess" style="width: 100%; justify-content: center; background: rgba(129, 140, 248, 0.15); border-color: rgba(129, 140, 248, 0.35); color: #c7d2fe;">
-            ${node.data.expanded ? '− Contract (Collapse)' : '+ Expand Subprocess'}
-          </button>
-        </div>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-          ${node.data.expanded ? 'Expanded view shows contained child nodes and inner canvas.' : 'Collapsed view hides inner items into a compact marker.'}
-        </div>
-      </div>
-      ` : ''}
-
-      ${node.data?.parentId ? `
-      <div class="inspector-field" style="margin-top: 6px;">
-        <label class="inspector-label">Contained In</label>
-        <div style="font-size: 12px; font-weight: 500; color: #818cf8; display: flex; align-items: center; gap: 6px;">
-          <span>Subprocess: "${this.canvas.getNode(node.data.parentId)?.label || node.data.parentId}"</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <div style="display: flex; gap: 8px; margin-top: 10px;">
-        <button class="btn" id="btn-delete-element" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
-          Delete Element
-        </button>
-      </div>
-    `;
-
-    // Wire up events
-    const labelInput = this.container.querySelector('#prop-label');
+    const labelInput = createEl('input', {
+      className: 'inspector-input',
+      id: 'prop-label',
+      type: 'text',
+      value: node.label || '',
+      placeholder: 'Enter label...'
+    });
     labelInput.addEventListener('input', (e) => {
       node.setLabel(e.target.value);
     });
 
-    const typeSelect = this.container.querySelector('#prop-type');
+    const typeSelect = createEl('select', { className: 'inspector-select', id: 'prop-type' },
+      this.buildTypeOptionElements(node.type)
+    );
     typeSelect.addEventListener('change', (e) => {
       node.setType(e.target.value);
       this.inspectNode(node); // refresh badge and attributes
     });
 
-    const interruptingCheckbox = this.container.querySelector('#prop-boundary-interrupting');
-    if (interruptingCheckbox) {
+    const children = [
+      createEl('div', { className: 'inspector-title' }, [
+        createEl('span', { textContent: 'Node Properties' }),
+        createEl('span', { className: 'inspector-badge', textContent: node.type })
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-id', textContent: 'ID' }),
+        createEl('input', {
+          className: 'inspector-input',
+          id: 'prop-id',
+          type: 'text',
+          value: node.id,
+          readOnly: true,
+          style: 'opacity: 0.6; cursor: not-allowed;'
+        })
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-label', textContent: 'Label' }),
+        labelInput
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-type', textContent: 'Type' }),
+        typeSelect
+      ])
+    ];
+
+    if (isBoundary) {
+      const isInterrupting = node.data.interrupting !== false;
+      const interruptingCheckbox = createEl('input', {
+        type: 'checkbox',
+        id: 'prop-boundary-interrupting',
+        checked: isInterrupting,
+        style: 'cursor: pointer; width: 16px; height: 16px;'
+      });
       interruptingCheckbox.addEventListener('change', (e) => {
         node.setInterrupting(e.target.checked);
         this.inspectNode(node);
       });
+
+      const hostText = node.data.hostNodeId
+        ? `Attached to "${this.canvas.getNode(node.data.hostNodeId)?.label || node.data.hostNodeId}" (${node.data.dockEdge || 'border'})`
+        : 'Floating / Unattached';
+
+      children.push(
+        createEl('div', {
+          className: 'inspector-field',
+          style: 'flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px; padding: 6px 0;'
+        }, [
+          createEl('div', {}, [
+            createEl('label', {
+              className: 'inspector-label',
+              for: 'prop-boundary-interrupting',
+              style: 'cursor: pointer; font-weight: 600;',
+              textContent: 'Interrupting'
+            }),
+            createEl('div', {
+              style: 'font-size: 11px; color: var(--text-muted);',
+              textContent: isInterrupting ? 'Aborts parent activity' : 'Parallel non-interrupting trigger'
+            })
+          ]),
+          interruptingCheckbox
+        ]),
+        createEl('div', { className: 'inspector-field' }, [
+          createEl('label', { className: 'inspector-label', textContent: 'Host Activity' }),
+          createEl('div', {
+            style: `font-size: 12px; font-weight: 500; color: ${node.data.hostNodeId ? 'var(--text-main)' : 'var(--text-muted)'}; display: flex; align-items: center; gap: 6px;`
+          }, [
+            createEl('span', { textContent: hostText })
+          ])
+        ])
+      );
     }
 
-    const toggleSubprocessBtn = this.container.querySelector('#btn-toggle-subprocess');
-    if (toggleSubprocessBtn) {
+    if (isContainer) {
+      const toggleSubprocessBtn = createEl('button', {
+        className: 'btn',
+        id: 'btn-toggle-subprocess',
+        style: 'width: 100%; justify-content: center; background: rgba(129, 140, 248, 0.15); border-color: rgba(129, 140, 248, 0.35); color: #c7d2fe;',
+        textContent: node.data.expanded ? '− Contract (Collapse)' : '+ Expand Subprocess'
+      });
       toggleSubprocessBtn.addEventListener('click', () => {
         this.canvas.toggleSubprocessExpanded(node.id);
         this.inspectNode(node);
       });
+
+      children.push(
+        createEl('div', { className: 'inspector-field', style: 'margin-top: 6px;' }, [
+          createEl('label', { className: 'inspector-label', textContent: 'Subprocess View' }),
+          createEl('div', { style: 'display: flex; gap: 8px; margin-top: 4px;' }, [toggleSubprocessBtn]),
+          createEl('div', {
+            style: 'font-size: 11px; color: var(--text-muted); margin-top: 4px;',
+            textContent: node.data.expanded
+              ? 'Expanded view shows contained child nodes and inner canvas.'
+              : 'Collapsed view hides inner items into a compact marker.'
+          })
+        ])
+      );
     }
 
-    const deleteBtn = this.container.querySelector('#btn-delete-element');
+    if (node.data?.parentId) {
+      const parentLabel = this.canvas.getNode(node.data.parentId)?.label || node.data.parentId;
+      children.push(
+        createEl('div', { className: 'inspector-field', style: 'margin-top: 6px;' }, [
+          createEl('label', { className: 'inspector-label', textContent: 'Contained In' }),
+          createEl('div', {
+            style: 'font-size: 12px; font-weight: 500; color: #818cf8; display: flex; align-items: center; gap: 6px;'
+          }, [
+            createEl('span', { textContent: `Subprocess: "${parentLabel}"` })
+          ])
+        ])
+      );
+    }
+
+    const deleteBtn = createEl('button', {
+      className: 'btn',
+      id: 'btn-delete-element',
+      style: 'color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;',
+      textContent: 'Delete Element'
+    });
     deleteBtn.addEventListener('click', () => {
       this.canvas.removeNode(node.id);
     });
+
+    children.push(
+      createEl('div', { style: 'display: flex; gap: 8px; margin-top: 10px;' }, [deleteBtn])
+    );
+
+    this.container.replaceChildren(...children);
   }
 
   inspectMulti(nodes) {
@@ -204,24 +292,13 @@ export class Inspector {
     this.targetType = 'multi';
     this.container.classList.remove('hidden');
 
-    this.container.innerHTML = `
-      <div class="inspector-title">
-        <span>Multiple Elements</span>
-        <span class="inspector-badge">${nodes.length} Selected</span>
-      </div>
-
-      <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 12px 0;">
-        You have selected <strong>${nodes.length}</strong> shapes. Drag any selected shape to move them together, or press <kbd style="background: var(--bg-primary); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border-color);">Del</kbd> to delete.
-      </div>
-
-      <div style="display: flex; gap: 8px; margin-top: 14px;">
-        <button class="btn" id="btn-delete-multi" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
-          Delete ${nodes.length} Elements
-        </button>
-      </div>
-    `;
-
-    const deleteBtn = this.container.querySelector('#btn-delete-multi');
+    const count = nodes.length;
+    const deleteBtn = createEl('button', {
+      className: 'btn',
+      id: 'btn-delete-multi',
+      style: 'color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;',
+      textContent: `Delete ${count} Elements`
+    });
     deleteBtn.addEventListener('click', () => {
       const ids = nodes.map(n => n.id);
       this.canvas.batchOperation(() => {
@@ -229,6 +306,26 @@ export class Inspector {
       });
       this.canvas.clearSelection();
     });
+
+    this.container.replaceChildren(
+      createEl('div', { className: 'inspector-title' }, [
+        createEl('span', { textContent: 'Multiple Elements' }),
+        createEl('span', { className: 'inspector-badge', textContent: `${count} Selected` })
+      ]),
+      createEl('div', {
+        style: 'font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 12px 0;'
+      }, [
+        'You have selected ',
+        createEl('strong', { textContent: String(count) }),
+        ' shapes. Drag any selected shape to move them together, or press ',
+        createEl('kbd', {
+          style: 'background: var(--bg-primary); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border-color);',
+          textContent: 'Del'
+        }),
+        ' to delete.'
+      ]),
+      createEl('div', { style: 'display: flex; gap: 8px; margin-top: 14px;' }, [deleteBtn])
+    );
   }
 
   inspectEdge(edge) {
@@ -239,130 +336,150 @@ export class Inspector {
     const allNodes = this.canvas.getNodes();
     const ports = ['left', 'right', 'top', 'bottom'];
 
-    const renderNodeOptions = (selectedId, excludeId) => {
+    const buildNodeOptions = (selectedId, excludeId) => {
       return allNodes
         .filter(n => n.id !== excludeId)
-        .map(n => `<option value="${n.id}" ${n.id === selectedId ? 'selected' : ''}>${n.label || n.id} (${n.type})</option>`)
-        .join('');
+        .map(n => createEl('option', {
+          value: n.id,
+          selected: n.id === selectedId,
+          textContent: `${n.label || n.id} (${n.type})`
+        }));
     };
 
-    const renderPortOptions = (selectedPort) => {
-      return ports
-        .map(p => `<option value="${p}" ${p === selectedPort ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`)
-        .join('');
+    const buildPortOptions = (selectedPort) => {
+      return ports.map(p => createEl('option', {
+        value: p,
+        selected: p === selectedPort,
+        textContent: p.charAt(0).toUpperCase() + p.slice(1)
+      }));
     };
 
-    this.container.innerHTML = `
-      <div class="inspector-title">
-        <span>Flow Connector</span>
-        <span class="inspector-badge">Sequence</span>
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-edge-label">Condition / Label</label>
-        <textarea class="inspector-input" id="prop-edge-label" rows="2" placeholder="e.g. Yes / Validated" style="resize: vertical; font-family: inherit;">${edge.label || ''}</textarea>
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-edge-source">Source Node</label>
-        <div style="display: flex; gap: 6px;">
-          <select class="inspector-select" id="prop-edge-source" style="flex: 2;">
-            ${renderNodeOptions(edge.sourceId, edge.targetId)}
-          </select>
-          <select class="inspector-select" id="prop-edge-source-port" style="flex: 1;" title="Source Port">
-            ${renderPortOptions(edge.sourcePort)}
-          </select>
-        </div>
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-edge-target">Target Node</label>
-        <div style="display: flex; gap: 6px;">
-          <select class="inspector-select" id="prop-edge-target" style="flex: 2;">
-            ${renderNodeOptions(edge.targetId, edge.sourceId)}
-          </select>
-          <select class="inspector-select" id="prop-edge-target-port" style="flex: 1;" title="Target Port">
-            ${renderPortOptions(edge.targetPort)}
-          </select>
-        </div>
-      </div>
-
-      <div class="inspector-field">
-        <label class="inspector-label" for="prop-edge-routing">Routing Style</label>
-        <select class="inspector-select" id="prop-edge-routing">
-          <option value="bezier" ${edge.routing === 'bezier' ? 'selected' : ''}>Smooth Organic Curve</option>
-          <option value="orthogonal" ${edge.routing === 'orthogonal' ? 'selected' : ''}>Orthogonal (Fillet Rounded)</option>
-        </select>
-      </div>
-
-      <div class="inspector-field" style="flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px;">
-        <label class="inspector-label" for="prop-edge-animated" style="cursor: pointer;">Active Pulse Animation</label>
-        <input type="checkbox" id="prop-edge-animated" ${edge.animated ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
-      </div>
-
-      <div style="display: flex; gap: 8px; margin-top: 10px;">
-        <button class="btn" id="btn-delete-edge" style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;">
-          Delete Connector
-        </button>
-      </div>
-    `;
-
-    const labelInput = this.container.querySelector('#prop-edge-label');
+    const labelInput = createEl('textarea', {
+      className: 'inspector-input',
+      id: 'prop-edge-label',
+      rows: '2',
+      placeholder: 'e.g. Yes / Validated',
+      style: 'resize: vertical; font-family: inherit;',
+      textContent: edge.label || ''
+    });
+    labelInput.value = edge.label || '';
     labelInput.addEventListener('input', (e) => {
       edge.setLabel(e.target.value);
     });
 
-    const sourceSelect = this.container.querySelector('#prop-edge-source');
+    const sourceSelect = createEl('select', {
+      className: 'inspector-select',
+      id: 'prop-edge-source',
+      style: 'flex: 2;'
+    }, buildNodeOptions(edge.sourceId, edge.targetId));
     sourceSelect.addEventListener('change', (e) => {
       this.canvas.updateEdgeEndpoints(edge.id, { sourceId: e.target.value });
       this.inspectEdge(edge);
     });
 
-    const sourcePortSelect = this.container.querySelector('#prop-edge-source-port');
+    const sourcePortSelect = createEl('select', {
+      className: 'inspector-select',
+      id: 'prop-edge-source-port',
+      style: 'flex: 1;',
+      title: 'Source Port'
+    }, buildPortOptions(edge.sourcePort));
     sourcePortSelect.addEventListener('change', (e) => {
       this.canvas.updateEdgeEndpoints(edge.id, { sourcePort: e.target.value });
     });
 
-    const targetSelect = this.container.querySelector('#prop-edge-target');
+    const targetSelect = createEl('select', {
+      className: 'inspector-select',
+      id: 'prop-edge-target',
+      style: 'flex: 2;'
+    }, buildNodeOptions(edge.targetId, edge.sourceId));
     targetSelect.addEventListener('change', (e) => {
       this.canvas.updateEdgeEndpoints(edge.id, { targetId: e.target.value });
       this.inspectEdge(edge);
     });
 
-    const targetPortSelect = this.container.querySelector('#prop-edge-target-port');
+    const targetPortSelect = createEl('select', {
+      className: 'inspector-select',
+      id: 'prop-edge-target-port',
+      style: 'flex: 1;',
+      title: 'Target Port'
+    }, buildPortOptions(edge.targetPort));
     targetPortSelect.addEventListener('change', (e) => {
       this.canvas.updateEdgeEndpoints(edge.id, { targetPort: e.target.value });
     });
 
-    const routingSelect = this.container.querySelector('#prop-edge-routing');
+    const routingSelect = createEl('select', {
+      className: 'inspector-select',
+      id: 'prop-edge-routing'
+    }, [
+      createEl('option', { value: 'bezier', selected: edge.routing === 'bezier', textContent: 'Smooth Organic Curve' }),
+      createEl('option', { value: 'orthogonal', selected: edge.routing === 'orthogonal', textContent: 'Orthogonal (Fillet Rounded)' })
+    ]);
     routingSelect.addEventListener('change', (e) => {
       edge.setRouting(e.target.value);
     });
 
-    const animatedCheck = this.container.querySelector('#prop-edge-animated');
+    const animatedCheck = createEl('input', {
+      type: 'checkbox',
+      id: 'prop-edge-animated',
+      checked: Boolean(edge.animated),
+      style: 'cursor: pointer; width: 16px; height: 16px;'
+    });
     animatedCheck.addEventListener('change', (e) => {
       edge.setAnimated(e.target.checked);
     });
 
-    const deleteBtn = this.container.querySelector('#btn-delete-edge');
+    const deleteBtn = createEl('button', {
+      className: 'btn',
+      id: 'btn-delete-edge',
+      style: 'color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); width: 100%; justify-content: center;',
+      textContent: 'Delete Connector'
+    });
     deleteBtn.addEventListener('click', () => {
       this.canvas.removeEdge(edge.id);
     });
+
+    this.container.replaceChildren(
+      createEl('div', { className: 'inspector-title' }, [
+        createEl('span', { textContent: 'Flow Connector' }),
+        createEl('span', { className: 'inspector-badge', textContent: 'Sequence' })
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-edge-label', textContent: 'Condition / Label' }),
+        labelInput
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-edge-source', textContent: 'Source Node' }),
+        createEl('div', { style: 'display: flex; gap: 6px;' }, [sourceSelect, sourcePortSelect])
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-edge-target', textContent: 'Target Node' }),
+        createEl('div', { style: 'display: flex; gap: 6px;' }, [targetSelect, targetPortSelect])
+      ]),
+      createEl('div', { className: 'inspector-field' }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-edge-routing', textContent: 'Routing Style' }),
+        routingSelect
+      ]),
+      createEl('div', {
+        className: 'inspector-field',
+        style: 'flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px;'
+      }, [
+        createEl('label', { className: 'inspector-label', for: 'prop-edge-animated', style: 'cursor: pointer;', textContent: 'Active Pulse Animation' }),
+        animatedCheck
+      ]),
+      createEl('div', { style: 'display: flex; gap: 8px; margin-top: 10px;' }, [deleteBtn])
+    );
   }
 
-  buildTypeOptionsHtml(currentType) {
+  getGroupedTypeOptions(currentType) {
+    const normalizedCurrent = (currentType === 'task' || currentType === 'activity') ? 'manual-task' : currentType;
     if (!this.canvas || !this.canvas.registry) {
-      return `<option value="${currentType}" selected>${currentType}</option>`;
+      return { normalizedCurrent, groups: null };
     }
 
     const registry = this.canvas.registry;
     const categories = registry.getCategories();
     const allDefs = registry.getAll();
 
-    // Map legacy aliases
-    const normalizedCurrent = (currentType === 'task' || currentType === 'activity') ? 'manual-task' : currentType;
-
-    // Group items by category
     const catMap = new Map();
     categories.forEach(cat => catMap.set(cat.id, { label: cat.label, items: [] }));
     if (!catMap.has('boundary-events')) {
@@ -384,14 +501,40 @@ export class Inspector {
       });
     });
 
+    return { normalizedCurrent, groups: Array.from(catMap.values()).filter(g => g.items.length > 0) };
+  }
+
+  buildTypeOptionElements(currentType) {
+    const { normalizedCurrent, groups } = this.getGroupedTypeOptions(currentType);
+    if (!groups) {
+      return [createEl('option', { value: currentType, selected: true, textContent: currentType })];
+    }
+
+    return groups.map(({ label, items }) =>
+      createEl('optgroup', { label }, items.map(item =>
+        createEl('option', {
+          value: item.type,
+          selected: item.type === normalizedCurrent,
+          textContent: item.label
+        })
+      ))
+    );
+  }
+
+  buildTypeOptionsHtml(currentType) {
+    const { normalizedCurrent, groups } = this.getGroupedTypeOptions(currentType);
+    if (!groups) {
+      const safeType = this.escapeHtml(currentType);
+      return `<option value="${safeType}" selected>${safeType}</option>`;
+    }
+
     let html = '';
-    catMap.forEach(({ label, items }) => {
-      if (!items.length) return;
+    groups.forEach(({ label, items }) => {
       const optionsHtml = items.map(item => {
         const selected = item.type === normalizedCurrent ? 'selected' : '';
-        return `<option value="${item.type}" ${selected}>${item.label}</option>`;
+        return `<option value="${this.escapeHtml(item.type)}" ${selected}>${this.escapeHtml(item.label)}</option>`;
       }).join('');
-      html += `<optgroup label="${label}">${optionsHtml}</optgroup>`;
+      html += `<optgroup label="${this.escapeHtml(label)}">${optionsHtml}</optgroup>`;
     });
 
     return html;
