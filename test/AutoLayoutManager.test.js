@@ -481,5 +481,42 @@ describe('AutoLayoutManager', () => {
     const branchMid = (centerY(resolve) + centerY(escalate)) / 2;
     expect(Math.abs(branchMid - centerY(gateway))).toBeLessThanOrEqual(1);
   });
+
+  it('syncs non-zero rendered DOM dimensions before layout to prevent vertical misalignment', () => {
+    const n1 = createMockNode({ id: 'n1', type: 'start-event', width: 40, height: 40 });
+    n1.domElement = { offsetWidth: 40, offsetHeight: 40 };
+    const n2 = createMockNode({ id: 'n2', type: 'task', width: 120, height: 80 });
+    // Simulate wrapped label text increasing rendered height before ResizeObserver fires
+    n2.domElement = { offsetWidth: 160, offsetHeight: 120 };
+
+    nodes.set('n1', n1);
+    nodes.set('n2', n2);
+    edges.set('e1', createMockEdge({ id: 'e1', sourceId: 'n1', targetId: 'n2' }));
+
+    manager.autoArrange({ direction: 'LR' });
+
+    expect(n2.width).toBe(160);
+    expect(n2.height).toBe(120);
+    // Center Y of n1 and n2 must match using the synced DOM height (120)
+    expect(n1.y + n1.height / 2).toBe(n2.y + n2.height / 2);
+  });
+
+  it('ignores zero DOM dimensions and excludes subprocess containers from DOM sync', () => {
+    const zeroDom = createMockNode({ id: 'z1', type: 'task', width: 120, height: 80 });
+    zeroDom.domElement = { offsetWidth: 0, offsetHeight: 0 };
+
+    const sub = createMockNode({ id: 'sub1', type: 'subprocess', width: 300, height: 200, data: { expanded: true } });
+    sub.domElement = { offsetWidth: 500, offsetHeight: 400 };
+
+    nodes.set('z1', zeroDom);
+    nodes.set('sub1', sub);
+
+    manager.autoArrange({ direction: 'LR' });
+
+    expect(zeroDom.width).toBe(120);
+    expect(zeroDom.height).toBe(80);
+    expect(sub.width).toBe(300);
+    expect(sub.height).toBe(200);
+  });
 });
 
