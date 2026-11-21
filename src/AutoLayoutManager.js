@@ -694,7 +694,28 @@ export class AutoLayoutManager {
 
       // Ample clearance after subprocess containers to guarantee edges don't double back
       const isSubproc = bucket.some(n => n.type === 'subprocess' || n.data?.expanded);
-      const gap = isSubproc ? Math.max(config.horizontalGap, 130) : config.horizontalGap;
+      let gap = isSubproc ? Math.max(config.horizontalGap, 130) : config.horizontalGap;
+
+      // Expand horizontal gap for labeled outgoing edges in LR layout so shaft & arrowhead remain visible
+      if (isLR) {
+        const layerNodeIds = new Set(bucket.filter(n => !n.isDummy).map(n => n.id));
+        this.edges.forEach(edge => {
+          if (!edge.label || !layerNodeIds.has(edge.sourceId)) return;
+          const targetLayer = layers.get(edge.targetId);
+          if (targetLayer === undefined || targetLayer <= layerIdx) return;
+
+          const lines = String(edge.label).split('\n');
+          let maxLineLength = 0;
+          lines.forEach(line => {
+            maxLineLength = Math.max(maxLineLength, line.trim().length);
+          });
+          if (maxLineLength > 0) {
+            const labelWidth = Math.max(maxLineLength * 7 + 16, 40);
+            gap = Math.max(gap, labelWidth + 56);
+          }
+        });
+      }
+
       currentMainAxisPos += maxMainAxisSize + gap;
     });
 
