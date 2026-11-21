@@ -26,13 +26,14 @@ describe('AutoLayoutManager', () => {
     };
   }
 
-  function createMockEdge({ id, sourceId, targetId, sourcePort = 'right', targetPort = 'left' }) {
+  function createMockEdge({ id, sourceId, targetId, sourcePort = 'right', targetPort = 'left', label = '' }) {
     return {
       id: id || `edge_${sourceId}_${targetId}`,
       sourceId,
       targetId,
       sourcePort,
       targetPort,
+      label,
       updateConnection: vi.fn(function(updates) {
         if (updates.sourcePort) this.sourcePort = updates.sourcePort;
         if (updates.targetPort) this.targetPort = updates.targetPort;
@@ -480,6 +481,40 @@ describe('AutoLayoutManager', () => {
     // Gateway branches remain symmetrically centered around gateway
     const branchMid = (centerY(resolve) + centerY(escalate)) / 2;
     expect(Math.abs(branchMid - centerY(gateway))).toBeLessThanOrEqual(1);
+  });
+
+  it('expands horizontalGap for labeled outgoing edges in LR layout so shaft and arrowhead remain visible', () => {
+    const gw = createMockNode({ id: 'gw', type: 'gateway-exclusive', width: 50, height: 50 });
+    const next = createMockNode({ id: 'next', type: 'task', width: 120, height: 80 });
+    nodes.set('gw', gw);
+    nodes.set('next', next);
+
+    // "Offer Eligible" = 14 chars -> labelWidth = 14 * 7 + 16 = 114 -> gap = max(100, 114 + 56) = 170
+    edges.set('e1', createMockEdge({ id: 'e1', sourceId: 'gw', targetId: 'next', label: 'Offer Eligible' }));
+
+    manager.autoArrange({ direction: 'LR', horizontalGap: 100, gridSize: 0 });
+
+    const actualGap = next.x - (gw.x + gw.width);
+    expect(actualGap).toBeGreaterThanOrEqual(170);
+  });
+
+  it('uses longest line for multiline edge labels and keeps default gap for short labels', () => {
+    const n1 = createMockNode({ id: 'n1', type: 'task', width: 120, height: 80 });
+    const n2 = createMockNode({ id: 'n2', type: 'task', width: 120, height: 80 });
+    const n3 = createMockNode({ id: 'n3', type: 'task', width: 120, height: 80 });
+    nodes.set('n1', n1);
+    nodes.set('n2', n2);
+    nodes.set('n3', n3);
+
+    // Short label: "Yes" (3 chars -> labelWidth = 40 -> 40 + 56 = 96 <= 100)
+    edges.set('e1', createMockEdge({ id: 'e1', sourceId: 'n1', targetId: 'n2', label: 'Yes' }));
+    // Multiline label: second line is 20 chars -> labelWidth = 20 * 7 + 16 = 156 -> gap = 212
+    edges.set('e2', createMockEdge({ id: 'e2', sourceId: 'n2', targetId: 'n3', label: 'Short\nLonger Condition 123' }));
+
+    manager.autoArrange({ direction: 'LR', horizontalGap: 100, gridSize: 0 });
+
+    expect(n2.x - (n1.x + n1.width)).toBe(100);
+    expect(n3.x - (n2.x + n2.width)).toBeGreaterThanOrEqual(212);
   });
 
   it('syncs non-zero rendered DOM dimensions before layout to prevent vertical misalignment', () => {
