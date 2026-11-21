@@ -77,6 +77,16 @@ export class AutoLayoutManager {
 
     if (this.nodes.size === 0) return false;
 
+    // 0. Sync rendered DOM dimensions before layout so center-alignment matches Node.getPortPosition()
+    this.nodes.forEach(node => {
+      if (node.domElement && node.type !== 'subprocess') {
+        const w = node.domElement.offsetWidth;
+        const h = node.domElement.offsetHeight;
+        if (w > 0) node.width = w;
+        if (h > 0) node.height = h;
+      }
+    });
+
     // 1. Separate nodes: boundary events vs container children vs top-level nodes
     const allNodesList = Array.from(this.nodes.values());
     const boundaryNodes = new Set();

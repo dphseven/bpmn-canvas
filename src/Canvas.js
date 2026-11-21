@@ -2186,6 +2186,15 @@ export class BpmnCanvas {
   }
 
   /**
+   * Highlights edges with visual glow and pulse effects.
+   * @param {Array<string|{id?: string, edgeId?: string, sourceId?: string, targetId?: string}>} edgeRefs
+   * @param {Object} [options={}]
+   */
+  highlightEdges(edgeRefs, options = {}) {
+    return this.semanticAdapter.highlightEdges(edgeRefs, options);
+  }
+
+  /**
    * Clears all active agent highlights.
    */
   clearHighlights() {

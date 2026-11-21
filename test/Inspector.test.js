@@ -250,4 +250,49 @@ describe('Inspector', () => {
     expect(canvas.nodes.has(n1.id)).toBe(false);
     expect(canvas.nodes.has(n2.id)).toBe(false);
   });
+
+  it('prevents DOM-based XSS when inspecting nodes with malicious labels, IDs, or host/parent labels', () => {
+    const xssPayload = '"><img src=x onerror=alert(1)><script>window.__xss=true</script>';
+    const host = canvas.addNode({ id: 'host-"><svg onload=alert(1)>', type: 'task', label: xssPayload });
+    const subprocess = canvas.addNode({ type: 'subprocess', label: xssPayload });
+    const boundary = canvas.addNode({
+      id: 'b-"><img src=x>',
+      type: 'boundary-timer-event',
+      label: xssPayload,
+      data: { hostNodeId: host.id, parentId: subprocess.id, dockEdge: 'bottom' }
+    });
+
+    canvas.selectNode(boundary);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('#prop-id').value).toBe(boundary.id);
+    expect(container.querySelector('#prop-label').value).toBe(xssPayload);
+    expect(container.textContent).toContain(xssPayload);
+  });
+
+  it('prevents DOM-based XSS when inspecting edges with malicious labels or node metadata', () => {
+    const xssEdgeLabel = '</textarea><img src=x onerror=alert(1)>';
+    const xssNodeLabel = '<script>alert(1)</script>"<option>';
+    const n1 = canvas.addNode({ type: 'task', label: xssNodeLabel });
+    const n2 = canvas.addNode({ type: 'task', label: 'Safe Target' });
+    const edge = canvas.addEdge({ sourceId: n1.id, targetId: n2.id, label: xssEdgeLabel });
+
+    canvas.selectEdge(edge);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.querySelector('#prop-edge-label').value).toBe(xssEdgeLabel);
+    const sourceOptions = Array.from(container.querySelectorAll('#prop-edge-source option'));
+    expect(sourceOptions.some(opt => opt.textContent.includes(xssNodeLabel))).toBe(true);
+  });
+
+  it('escapes HTML characters in buildTypeOptionsHtml', () => {
+    const html = inspector.buildTypeOptionsHtml('"><script>alert(1)</script>');
+    expect(html).not.toContain('<script>');
+    const noRegistryInspector = new Inspector(document.createElement('div'), { on: () => {} });
+    const fallbackHtml = noRegistryInspector.buildTypeOptionsHtml('"><img src=x>');
+    expect(fallbackHtml).toBe('<option value="&quot;&gt;&lt;img src=x&gt;" selected>&quot;&gt;&lt;img src=x&gt;</option>');
+  });
 });
